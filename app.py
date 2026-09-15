@@ -1,6 +1,7 @@
 """Tableau de bord Streamlit : score astro, cibles par direction/horizon, suivi Messier."""
 from datetime import date, timedelta
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -101,6 +102,29 @@ def _view_df(df: pd.DataFrame, view_mode_key: str) -> pd.DataFrame:
     return filtered if not filtered.empty else df
 
 
+def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220) -> alt.Chart:
+    """Graphique multi-series avec axe temporel en 24h (jamais d'AM/PM).
+
+    st.line_chart delegue a Vega-Lite qui formate par defaut l'axe temporel en
+    12h -- on construit donc le spec Altair a la main avec un format d'axe
+    explicite en heures:minutes 24h.
+    """
+    long_df = df[columns].reset_index().melt("time", var_name="serie", value_name="valeur")
+    return (
+        alt.Chart(long_df)
+        .mark_line()
+        .encode(
+            x=alt.X("time:T", title="Heure", axis=alt.Axis(format="%H:%M")),
+            y=alt.Y("valeur:Q", title=""),
+            color=alt.Color("serie:N", title=""),
+            tooltip=[alt.Tooltip("time:T", title="Heure", format="%H:%M"),
+                     alt.Tooltip("serie:N", title="Serie"),
+                     alt.Tooltip("valeur:Q", title="Valeur")],
+        )
+        .properties(height=height)
+    )
+
+
 @st.cache_data(ttl=1800)
 def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key: str,
                    catalog: str) -> list[dict]:
@@ -175,22 +199,25 @@ with tab_ce_soir:
                         format_func=lambda d: d.strftime("%A %d %B"))
     df = nights[sel]
     tw = twilights[sel]
-    s = night_summary(df)
-    pct, label = score_label_fr(s["score"])
 
     view_mode_key = "habituelle" if mode.startswith("Habituelle") else "complete"
     view_df = _view_df(df, view_mode_key)
+
+    # Les 4 cartes ci-dessous portent sur la fenetre affichee (view_df), pas sur
+    # la nuit entiere : c'est tout l'interet du mode "Habituelle" par defaut.
+    s = night_summary(view_df)
+    pct, label = score_label_fr(s["score"])
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(f'<div class="card"><h4>Astro score</h4><div class="value">{pct}/100</div>'
                     f'<div class="sub">{label}</div></div>', unsafe_allow_html=True)
     with c2:
-        cloud_now = round(df["cloud_cover"].mean()) if "cloud_cover" in df else 0
+        cloud_now = round(view_df["cloud_cover"].mean()) if "cloud_cover" in view_df else 0
         st.markdown(f'<div class="card"><h4>Nuages</h4><div class="value">{cloud_now}%</div>'
                     f'<div class="sub">Moyenne de la nuit</div></div>', unsafe_allow_html=True)
     with c3:
-        spread = (df["temperature_2m"] - df["dew_point_2m"]).min()
+        spread = (view_df["temperature_2m"] - view_df["dew_point_2m"]).min()
         risk = "Faible" if spread >= 3 else "Moyen" if spread >= 1.5 else "Eleve"
         advice = "Pas necessaire" if spread >= 3 else "Recommande" if spread >= 1.5 else "Indispensable"
         st.markdown(f'<div class="card"><h4>Risque de buee (ecart {spread:.1f} deg)</h4>'
@@ -213,10 +240,16 @@ with tab_ce_soir:
     )
 
     st.subheader("Tendance nuages")
-    st.line_chart(view_df[["cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"]], height=220)
+    st.altair_chart(
+        _time_series_chart(view_df, ["cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"]),
+        use_container_width=True,
+    )
 
     st.subheader("Point de rosee")
-    st.line_chart(view_df[["temperature_2m", "dew_point_2m"]], height=220)
+    st.altair_chart(
+        _time_series_chart(view_df, ["temperature_2m", "dew_point_2m"]),
+        use_container_width=True,
+    )
 
     with st.expander("Donnees horaires"):
         st.dataframe(view_df[["score", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
