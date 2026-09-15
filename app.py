@@ -5,7 +5,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from config import SITE, NB_NIGHTS, VIEW_WINDOW, SEESTAR
+from config import SITE, NB_NIGHTS, VIEW_WINDOW
 from weather import fetch_all
 from astro import night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_SECTORS
 from scoring import score_frame, night_summary, target_windows, score_label_fr

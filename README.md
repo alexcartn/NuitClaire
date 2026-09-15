@@ -23,12 +23,14 @@ est requis pour demarrer.
 - PyEphem : Soleil, Lune, altitude/azimut des cibles, crepuscules
 - OpenNGC (github.com/mattiaverga/OpenNGC) : catalogue de cibles et liste Messier
 - Nominatim (OpenStreetMap) : geocodage d'adresse
+- hips2fits (CDS, Centre de Donnees astronomiques de Strasbourg) : vignettes de reference DSS2 par coordonnees
 
 ## Fichiers
 - config.py            : coordonnees par defaut, champ du Seestar, ponderations, horizon par defaut
 - weather.py            : appels API meteo
 - astro.py              : ephemerides, secteurs cardinaux, crepuscules
 - geocode.py            : adresse -> lat/lon
+- imagery.py            : vignettes de reference (hips2fits/CDS) a partir de RA/Dec
 - progress.py           : persistance locale (horizon configure, Messiers captures)
 - catalog.py             : chargement des catalogues (CSV generes)
 - scripts/build_catalog.py : generation ponctuelle des CSV depuis OpenNGC
