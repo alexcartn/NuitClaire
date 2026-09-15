@@ -147,7 +147,8 @@ try:
     with st.spinner("Chargement meteo + ephemerides..."):
         site_key = (site["name"], site["lat"], site["lon"], site["elevation_m"], site["tz"])
         nights, twilights = load(site_key)
-except Exception:
+except Exception as e:
+    print(f"Erreur chargement meteo/ephemerides : {e}")
     st.error("Impossible de recuperer les donnees meteo. Reessayez dans quelques instants.")
     st.stop()
 
