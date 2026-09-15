@@ -102,6 +102,9 @@ def _view_df(df: pd.DataFrame, view_mode_key: str) -> pd.DataFrame:
     return filtered if not filtered.empty else df
 
 
+TIME_AXIS_FORMAT = "%H:%M"  # 24h partout, jamais d'AM/PM -- axe + tooltip des graphiques
+
+
 def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220) -> alt.Chart:
     """Graphique multi-series avec axe temporel en 24h (jamais d'AM/PM).
 
@@ -114,15 +117,34 @@ def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220) 
         alt.Chart(long_df)
         .mark_line()
         .encode(
-            x=alt.X("time:T", title="Heure", axis=alt.Axis(format="%H:%M")),
+            x=alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT)),
             y=alt.Y("valeur:Q", title=""),
-            color=alt.Color("serie:N", title=""),
-            tooltip=[alt.Tooltip("time:T", title="Heure", format="%H:%M"),
+            color=alt.Color("serie:N", title="", sort=columns),
+            tooltip=[alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
                      alt.Tooltip("serie:N", title="Serie"),
                      alt.Tooltip("valeur:Q", title="Valeur")],
         )
         .properties(height=height)
     )
+
+
+def _render_time_series(df: pd.DataFrame, columns: list[str], height: int = 220) -> None:
+    """Affiche le graphique, sauf dans deux cas degeneres ou l'axe X (temps) ou
+    l'axe Y (valeurs) n'a pas de domaine exploitable pour Altair/Vega-Lite --
+    dans les deux cas, on obtient des erreurs SVG malformees cote navigateur
+    (transform/translate avec Number.MAX_VALUE) plutot qu'un graphique casse
+    visuellement, donc on affiche un message a la place :
+    - un seul horodatage distinct (ou moins) : typique quand la fenetre
+      "Habituelle" (20h-22h30 fixe) ne recouvre que tres peu d'heures de nuit
+      astronomique reelle selon la saison ;
+    - toutes les valeurs NaN sur les colonnes affichees : observe pour des
+      nuits proches de la limite de couverture des previsions meteo, ou un
+      champ entier peut manquer pour les heures concernees.
+    """
+    if df.index.nunique() < 2 or not df[columns].notna().any().any():
+        st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
+        return
+    st.altair_chart(_time_series_chart(df, columns, height=height), use_container_width=True)
 
 
 @st.cache_data(ttl=1800)
@@ -213,14 +235,22 @@ with tab_ce_soir:
         st.markdown(f'<div class="card"><h4>Astro score</h4><div class="value">{pct}/100</div>'
                     f'<div class="sub">{label}</div></div>', unsafe_allow_html=True)
     with c2:
-        cloud_now = round(view_df["cloud_cover"].mean()) if "cloud_cover" in view_df else 0
-        st.markdown(f'<div class="card"><h4>Nuages</h4><div class="value">{cloud_now}%</div>'
+        # .mean() peut rendre NaN si la fenetre affichee ne recouvre que des
+        # heures ou ce champ meteo manque (observe sur des nuits lointaines) --
+        # round(nan) leve ValueError, d'ou le garde-fou pd.notna() ci-dessous.
+        cloud_mean = view_df["cloud_cover"].mean() if "cloud_cover" in view_df else float("nan")
+        cloud_text = f"{round(cloud_mean)}%" if pd.notna(cloud_mean) else "n/d"
+        st.markdown(f'<div class="card"><h4>Nuages</h4><div class="value">{cloud_text}</div>'
                     f'<div class="sub">Moyenne de la nuit</div></div>', unsafe_allow_html=True)
     with c3:
         spread = (view_df["temperature_2m"] - view_df["dew_point_2m"]).min()
-        risk = "Faible" if spread >= 3 else "Moyen" if spread >= 1.5 else "Eleve"
-        advice = "Pas necessaire" if spread >= 3 else "Recommande" if spread >= 1.5 else "Indispensable"
-        st.markdown(f'<div class="card"><h4>Risque de buee (ecart {spread:.1f} deg)</h4>'
+        if pd.isna(spread):
+            risk, advice, spread_text = "Inconnu", "donnees manquantes", "n/d"
+        else:
+            risk = "Faible" if spread >= 3 else "Moyen" if spread >= 1.5 else "Eleve"
+            advice = "Pas necessaire" if spread >= 3 else "Recommande" if spread >= 1.5 else "Indispensable"
+            spread_text = f"{spread:.1f}"
+        st.markdown(f'<div class="card"><h4>Risque de buee (ecart {spread_text} deg)</h4>'
                     f'<div class="value">{risk}</div>'
                     f'<div class="sub">Anti-buee : {advice}</div></div>', unsafe_allow_html=True)
     with c4:
@@ -240,16 +270,10 @@ with tab_ce_soir:
     )
 
     st.subheader("Tendance nuages")
-    st.altair_chart(
-        _time_series_chart(view_df, ["cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"]),
-        use_container_width=True,
-    )
+    _render_time_series(view_df, ["cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"])
 
     st.subheader("Point de rosee")
-    st.altair_chart(
-        _time_series_chart(view_df, ["temperature_2m", "dew_point_2m"]),
-        use_container_width=True,
-    )
+    _render_time_series(view_df, ["temperature_2m", "dew_point_2m"])
 
     with st.expander("Donnees horaires"):
         st.dataframe(view_df[["score", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
