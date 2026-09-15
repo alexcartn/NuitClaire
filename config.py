@@ -1,5 +1,7 @@
 """Configuration du site d'observation et du Seestar S50."""
 
+# lat/lon geocodes via Nominatim (7 rue Saint Jean, 51240 Marson, France),
+# arrondis a 4 decimales (~11 m de precision).
 SITE = {
     "name": "Marson",
     "lat": 48.9124,
@@ -31,5 +33,7 @@ NB_NIGHTS = 5
 VIEW_WINDOW = {"start_hour": 20, "end_hour": 22.5}
 
 # Secteurs cardinaux degages par defaut (a ajuster dans la barre laterale de l'appli).
+# Duplique intentionnellement dans progress.py (DEFAULT["horizon"]), qui sert de
+# repli quand aucun progress.json n'existe encore : garder les deux synchronises.
 DEFAULT_HORIZON = {"N": True, "NE": True, "E": False, "SE": False,
                     "S": False, "SW": False, "W": False, "NW": False}

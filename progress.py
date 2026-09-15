@@ -8,6 +8,9 @@ PROGRESS_PATH = Path(__file__).parent / "data" / "progress.json"
 # Source de verite interne, totalement figee (MappingProxyType) : aucun code,
 # y compris ce module, ne peut la muter par accident. N'y accedez jamais
 # directement en dehors de default() ci-dessous.
+# Le sous-dict "horizon" duplique intentionnellement config.DEFAULT_HORIZON
+# (repli utilise ici quand aucun progress.json n'existe encore) : garder les
+# deux synchronises.
 _DEFAULT_FROZEN = MappingProxyType({
     "horizon": MappingProxyType({"N": True, "NE": True, "E": False, "SE": False,
                                   "S": False, "SW": False, "W": False, "NW": False}),
