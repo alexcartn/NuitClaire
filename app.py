@@ -1,5 +1,6 @@
 """Tableau de bord Streamlit : score astro, cibles par direction/horizon, suivi Messier."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import altair as alt
 import pandas as pd
@@ -8,28 +9,80 @@ import streamlit as st
 from config import SITE, NB_NIGHTS, VIEW_WINDOW
 from weather import fetch_all
 from astro import night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_SECTORS
-from scoring import score_frame, night_summary, target_windows, score_label_fr
+from scoring import score_frame, night_summary, target_windows, score_label_fr, best_window_span
 from catalog import load_targets, load_messier
 from geocode import geocode, GeocodeError
 from imagery import dss_image_url
+from components import TWILIGHT_BAR_CSS, GALLERY_CSS, twilight_bar_html, card_html, gallery_html
 import progress as progress_store
 
-st.set_page_config(page_title="Planificateur Seestar", page_icon="\U0001F52D", layout="wide")
+st.set_page_config(page_title="NuitClaire", page_icon="\U0001F52D", layout="wide")
 
-st.markdown("""
+st.markdown(f"""
 <style>
-.card {
+.card {{
     background: rgba(127, 127, 127, 0.07);
     border: 1px solid rgba(127, 127, 127, 0.2);
     border-radius: 12px;
     padding: 1rem 1.25rem;
     margin-bottom: 0.75rem;
-}
-.card h4 { margin: 0 0 0.25rem 0; font-size: 0.85rem; opacity: 0.7; text-transform: uppercase; }
-.card .value { font-size: 1.8rem; font-weight: 600; }
-.card .sub { font-size: 0.85rem; opacity: 0.7; }
+}}
+.card h4 {{ margin: 0 0 0.25rem 0; font-size: 0.85rem; opacity: 0.7; text-transform: uppercase; }}
+.card .value {{ font-size: 1.8rem; font-weight: 600; }}
+.card .sub {{ font-size: 0.85rem; opacity: 0.7; }}
+{TWILIGHT_BAR_CSS}
+{GALLERY_CSS}
 </style>
 """, unsafe_allow_html=True)
+
+
+def _subtitle_with_ngc(common_name: str, ngc_name: str | None, primary_name: str) -> str | None:
+    """Combine le nom usuel et la designation NGC/IC alternative, quand elle
+    differe du nom principal affiche -- pertinent uniquement pour les objets
+    Messier, dont le nom principal est "M##" plutot que la designation NGC/IC
+    (ex. M31 -> sous-titre "Andromeda Galaxy - NGC0224")."""
+    parts = [p for p in (common_name or None, ngc_name if ngc_name and ngc_name != primary_name else None)
+             if p]
+    return " · ".join(parts) or None
+
+
+def _target_card(row: dict) -> dict:
+    """Mappe une ligne de `feasible_rows(..., "targets")` vers la forme de carte
+    attendue par `components.gallery_html`."""
+    return {
+        "image": row["Image"],
+        "title": row["Cible"],
+        "subtitle": _subtitle_with_ngc(row["Nom commun"], row.get("NGC"), row["Cible"]),
+        "badges": [row["Type"], row["Cadrage"]],
+        "meta": [
+            ("Fenetre", f"{row['Debut']}–{row['Fin']} ({row['Heures']} h)"),
+            ("Alt max", f"{row['Alt max deg']:.0f}°"),
+            ("Lune", f"{row['Lune deg']:.0f}°"),
+        ],
+    }
+
+
+_WEEKDAYS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+_MONTHS_FR = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout",
+              "septembre", "octobre", "novembre", "decembre"]
+
+
+def _format_date_fr(d: date) -> str:
+    """'lundi 15 septembre', sans dependre de la locale systeme -- contrairement a
+    strftime('%A %d %B'), peu fiable entre plateformes/threads (observe en anglais
+    par defaut sur ce poste alors que le reste de l'appli est en francais)."""
+    return f"{_WEEKDAYS_FR[d.weekday()]} {d.day} {_MONTHS_FR[d.month - 1]}"
+
+
+def _messier_card_html(row: dict) -> str:
+    """Rendu d'une carte Messier (image + infos), sans case a cocher : celle-ci
+    reste un widget Streamlit reel, ajoute a cote dans l'onglet Messier."""
+    return card_html(
+        image=row["Image"], title=row["Messier"],
+        subtitle=_subtitle_with_ngc(row["Nom commun"], row.get("NGC"), row["Messier"]),
+        badges=[row["Type"]],
+        meta=[("Faisable ce soir", f"{row['Faisable ce soir']} ({row['Heures']} h)")],
+    )
 
 
 # --- Etat de session : site actif + progression locale ---------------------
@@ -41,7 +94,7 @@ if "progress" not in st.session_state:
 site = st.session_state.site
 prog = st.session_state.progress
 
-st.title(f"\U0001F52D Planificateur Seestar : {site['name']}")
+st.title(f"\U0001F52D NuitClaire : {site['name']}")
 
 # --- Barre laterale ----------------------------------------------------------
 with st.sidebar:
@@ -70,7 +123,7 @@ with st.sidebar:
                 progress_store.save(prog)
 
     st.header("Fenetre d'observation")
-    mode = st.radio("Plage horaire", ["Habituelle (20:00–22:30)", "Nuit complete"], index=0)
+    mode = st.radio("Plage horaire", ["Nuit complete", "Habituelle (20:00–22:30)"], index=0)
 
 
 @st.cache_data(ttl=1800)
@@ -104,22 +157,33 @@ def _view_df(df: pd.DataFrame, view_mode_key: str) -> pd.DataFrame:
 
 TIME_AXIS_FORMAT = "%H:%M"  # 24h partout, jamais d'AM/PM -- axe + tooltip des graphiques
 
+# Nombre de cartes affichees d'emblee dans la galerie de cibles ; le reste va
+# dans un expander "Voir plus" pour ne pas forcer le chargement de dizaines de
+# vignettes d'un coup sur une bonne nuit.
+GALLERY_PAGE_SIZE = 24
 
-def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220) -> alt.Chart:
+
+def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220,
+                        y_title: str = "") -> alt.Chart:
     """Graphique multi-series avec axe temporel en 24h (jamais d'AM/PM).
 
     st.line_chart delegue a Vega-Lite qui formate par defaut l'axe temporel en
     12h -- on construit donc le spec Altair a la main avec un format d'axe
     explicite en heures:minutes 24h.
+
+    Legende masquee pour une serie unique : elle n'afficherait que le nom brut
+    de la colonne, redondant avec le sous-titre du graphique.
     """
     long_df = df[columns].reset_index().melt("time", var_name="serie", value_name="valeur")
+    color = alt.Color("serie:N", title="", sort=columns,
+                       legend=None if len(columns) == 1 else alt.Legend())
     return (
         alt.Chart(long_df)
         .mark_line()
         .encode(
             x=alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT)),
-            y=alt.Y("valeur:Q", title=""),
-            color=alt.Color("serie:N", title="", sort=columns),
+            y=alt.Y("valeur:Q", title=y_title),
+            color=color,
             tooltip=[alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
                      alt.Tooltip("serie:N", title="Serie"),
                      alt.Tooltip("valeur:Q", title="Valeur")],
@@ -128,7 +192,8 @@ def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220) 
     )
 
 
-def _render_time_series(df: pd.DataFrame, columns: list[str], height: int = 220) -> None:
+def _render_time_series(df: pd.DataFrame, columns: list[str], height: int = 220,
+                         y_title: str = "") -> None:
     """Affiche le graphique, sauf dans deux cas degeneres ou l'axe X (temps) ou
     l'axe Y (valeurs) n'a pas de domaine exploitable pour Altair/Vega-Lite --
     dans les deux cas, on obtient des erreurs SVG malformees cote navigateur
@@ -153,7 +218,8 @@ def _render_time_series(df: pd.DataFrame, columns: list[str], height: int = 220)
     if df.index.nunique() < 2 or not df[columns].notna().any().any():
         st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
         return
-    st.altair_chart(_time_series_chart(df, columns, height=height), use_container_width=True)
+    st.altair_chart(_time_series_chart(df, columns, height=height, y_title=y_title),
+                     use_container_width=True)
 
 
 @st.cache_data(ttl=1800)
@@ -182,6 +248,7 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
                 continue
             rows.append({
                 "Cible": w["name"], "Nom commun": tgt.get("common_name", ""), "Type": w["type"],
+                "NGC": tgt.get("ngc_name"),
                 "Filtre": w["filter"], "Debut": w["start"].strftime("%H:%M"),
                 "Fin": w["end"].strftime("%H:%M"), "Heures": w["hours"],
                 "Alt max deg": w["max_alt"], "Lune deg": w["min_moon_sep"],
@@ -193,6 +260,7 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
                 "id": tgt["messier"],
                 "Messier": tgt["name"],
                 "Nom commun": tgt.get("common_name", ""),
+                "NGC": tgt.get("ngc_name"),
                 "Type": w["type"],
                 "Faisable ce soir": "Oui" if w["hours"] > 0 else "Non",
                 "Heures": w["hours"],
@@ -217,27 +285,24 @@ if not nights:
 tab_ce_soir, tab_messier = st.tabs(["Ce soir", "Catalogue Messier"])
 
 with tab_ce_soir:
-    st.subheader("Nuits a venir")
-    cols = st.columns(len(nights))
-    for col, (d, df) in zip(cols, nights.items()):
-        s = night_summary(df)
-        pct, label = score_label_fr(s["score"])
-        emoji = "\U0001F7E2" if s["score"] >= 0.7 else "\U0001F7E1" if s["score"] >= 0.5 else "\U0001F534"
-        col.metric(f"{emoji} {d.strftime('%a %d/%m')}", f"{pct}/100", label)
-        col.caption(f"Lune {s['moon_illum']:.0f} %")
-
-    sel = st.selectbox("Detail de la nuit", list(nights.keys()),
-                        format_func=lambda d: d.strftime("%A %d %B"))
+    # Uniquement la nuit du jour meme : pas de strip multi-jours (previsions
+    # peu fiables au-dela de 24-48h) -- si `date.today()` n'a pas d'heures de
+    # nuit astronomique calculables (garde-fou improbable a cette latitude),
+    # on retombe sur la premiere nuit disponible plutot que de planter.
+    sel = date.today() if date.today() in nights else next(iter(nights))
     df = nights[sel]
     tw = twilights[sel]
 
     view_mode_key = "habituelle" if mode.startswith("Habituelle") else "complete"
     view_df = _view_df(df, view_mode_key)
 
-    # Les 4 cartes ci-dessous portent sur la fenetre affichee (view_df), pas sur
-    # la nuit entiere : c'est tout l'interet du mode "Habituelle" par defaut.
+    # Unique source du score affiche sur la page (view_df) : c'est ce qui
+    # garantit que le score du bandeau et celui de la carte ne divergent plus.
     s = night_summary(view_df)
     pct, label = score_label_fr(s["score"])
+    emoji = "\U0001F7E2" if s["score"] >= 0.7 else "\U0001F7E1" if s["score"] >= 0.5 else "\U0001F534"
+
+    st.subheader(f"{emoji} Ce soir : {_format_date_fr(sel)}")
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -269,17 +334,17 @@ with tab_ce_soir:
                     f'<div class="sub">Fenetre astro {tw["astro_dusk"].strftime("%H:%M")}'
                     f'–{tw["astro_dawn"].strftime("%H:%M")}</div></div>', unsafe_allow_html=True)
 
-    st.caption(
-        f"Crepuscule civil {tw['civil_dusk'].strftime('%H:%M')} · "
-        f"nautique {tw['nautical_dusk'].strftime('%H:%M')} · "
-        f"astronomique {tw['astro_dusk'].strftime('%H:%M')}  —  "
-        f"Aube astronomique {tw['astro_dawn'].strftime('%H:%M')} · "
-        f"nautique {tw['nautical_dawn'].strftime('%H:%M')} · "
-        f"civile {tw['civil_dawn'].strftime('%H:%M')}"
-    )
+    # Repere "maintenant" uniquement si la nuit affichee est bien celle de ce
+    # soir (toujours vrai sauf repli sur `next(iter(nights))` ci-dessus).
+    now_local = datetime.now(ZoneInfo(site["tz"])).replace(tzinfo=None) if sel == date.today() else None
+    st.markdown(twilight_bar_html(tw, best_span=best_window_span(view_df), now=now_local),
+                unsafe_allow_html=True)
 
     st.subheader("Tendance nuages")
-    _render_time_series(view_df, ["cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"])
+    # Une seule courbe (couverture nuageuse totale) : le detail par altitude
+    # (basse/moyenne/haute) reste disponible dans "Donnees horaires" ci-dessous
+    # pour qui veut le detail, mais n'est pas utile pour un coup d'oeil rapide.
+    _render_time_series(view_df, ["cloud_cover"], y_title="Couverture nuageuse (%)")
 
     st.subheader("Point de rosee")
     _render_time_series(view_df, ["temperature_2m", "dew_point_2m"])
@@ -289,13 +354,21 @@ with tab_ce_soir:
                                "wind_gusts_10m", "temperature_2m", "dew_point_2m",
                                "moon_alt", "moon_illum", "seeing", "transparency"]].round(1))
 
-    st.subheader(f"Cibles faisables : nuit du {sel.strftime('%d/%m')}")
+    st.subheader("Cibles faisables ce soir")
     horizon_key = tuple(sorted(prog["horizon"].items()))
     rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "targets")
     if rows:
-        st.dataframe(pd.DataFrame(rows).sort_values("Heures", ascending=False),
-                     use_container_width=True, hide_index=True,
-                     column_config={"Image": st.column_config.ImageColumn("Apercu")})
+        rows = sorted(rows, key=lambda r: r["Heures"], reverse=True)
+        types = sorted({r["Type"] for r in rows if r["Type"]})
+        type_choice = st.selectbox("Filtrer par type", ["Tous"] + types)
+        if type_choice != "Tous":
+            rows = [r for r in rows if r["Type"] == type_choice]
+
+        shown, rest = rows[:GALLERY_PAGE_SIZE], rows[GALLERY_PAGE_SIZE:]
+        st.markdown(gallery_html([_target_card(r) for r in shown]), unsafe_allow_html=True)
+        if rest:
+            with st.expander(f"Voir {len(rest)} cible(s) de plus"):
+                st.markdown(gallery_html([_target_card(r) for r in rest]), unsafe_allow_html=True)
     else:
         st.info("Aucune cible exploitable cette nuit (meteo, Lune ou horizon degage).")
 
@@ -305,26 +378,24 @@ with tab_messier:
     messier_total = len(load_messier())
     st.progress(len(captured) / messier_total, text=f"{len(captured)}/{messier_total} captures")
 
-    sel_m = st.selectbox("Nuit consideree", list(nights.keys()),
-                          format_func=lambda d: d.strftime("%A %d %B"), key="messier_night")
-
+    # Meme nuit que l'onglet "Ce soir" (`sel`, la nuit du jour meme) -- pas de
+    # selecteur multi-jours ici non plus.
     horizon_key = tuple(sorted(prog["horizon"].items()))
     # view_mode_key fixe ("na") : la faisabilite Messier ignore la fenetre
     # d'observation habituelle (df de nuit complet), donc un changement de
     # mode dans la barre laterale ne doit pas invalider ce cache.
-    rows = feasible_rows(site_key, sel_m, horizon_key, "na", "messier")
+    rows = feasible_rows(site_key, sel, horizon_key, "na", "messier")
     for row in rows:
         row["Capture"] = row["id"] in captured
     rows.sort(key=lambda r: int(r["id"]))
 
-    for row in rows:
-        c0, c1, c2, c3, c4 = st.columns([1, 1, 3, 2, 2])
-        c0.image(row["Image"], width=60)
-        c1.write(row["Messier"])
-        c2.write(row["Nom commun"] or "—")
-        c3.write(f"{row['Type']} · {row['Faisable ce soir']} ({row['Heures']}h)")
-        new_val = c4.checkbox("Capture", value=row["Capture"], key=f"cap_{row['id']}")
-        if new_val != row["Capture"]:
-            progress_store.toggle_messier(prog, row["id"])
-            progress_store.save(prog)
-            st.rerun()
+    MESSIER_COLS = 4
+    for i in range(0, len(rows), MESSIER_COLS):
+        for col, row in zip(st.columns(MESSIER_COLS), rows[i:i + MESSIER_COLS]):
+            with col:
+                st.markdown(_messier_card_html(row), unsafe_allow_html=True)
+                new_val = st.checkbox("Capturee", value=row["Capture"], key=f"cap_{row['id']}")
+                if new_val != row["Capture"]:
+                    progress_store.toggle_messier(prog, row["id"])
+                    progress_store.save(prog)
+                    st.rerun()

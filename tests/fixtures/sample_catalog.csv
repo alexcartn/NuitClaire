@@ -1,4 +1,4 @@
-name,common_name,type,type_fr,ra_h,dec_deg,size_w_arcmin,size_h_arcmin,mag,filter,messier
-M31,Andromeda Galaxy,G,galaxie,0.7123,41.685,190,60,3.44,sans,31
-M42,Orion Nebula,Neb,nebuleuse,5.5883,-5.391,65,60,4.0,LP,42
-Winnecke 4,,**,etoile double,12.37,58.0833,,,9.0,sans,40
+name,ngc_name,common_name,type,type_fr,ra_h,dec_deg,size_w_arcmin,size_h_arcmin,mag,filter,messier
+M31,NGC0224,Andromeda Galaxy,G,galaxie,0.7123,41.685,190,60,3.44,sans,31
+M42,NGC1976,Orion Nebula,Neb,nebuleuse,5.5883,-5.391,65,60,4.0,LP,42
+Winnecke 4,,,**,etoile double,12.37,58.0833,,,9.0,sans,40

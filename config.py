@@ -14,7 +14,7 @@ SITE = {
 SEESTAR = {
     "fov_w_deg": 1.29,
     "fov_h_deg": 0.73,
-    "min_alt_deg": 30,      # en dessous, turbulence + extinction trop fortes
+    "min_alt_deg": 20,      # en dessous, turbulence + extinction trop fortes
     "max_alt_deg": 85,      # zenith : le suivi alt-az decroche
 }
 
@@ -27,7 +27,11 @@ WEIGHTS = {
     "seeing_transp": 0.10,
 }
 
-NB_NIGHTS = 5
+# Une seule nuit (celle du jour meme) est chargee et affichee, dans les deux
+# onglets : volontairement pas de strip/selecteur multi-jours (previsions meteo
+# peu fiables au-dela de 24-48h, cf. docs/plans -- et l'utilisateur ne planifie
+# pas a la semaine).
+NB_NIGHTS = 1
 
 # Fenetre d'observation habituelle (heure locale, 24h), utilisee comme filtre par defaut.
 VIEW_WINDOW = {"start_hour": 20, "end_hour": 22.5}

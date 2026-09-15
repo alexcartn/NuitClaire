@@ -11,6 +11,7 @@ def _load_csv(path: Path) -> list[dict]:
         for row in csv.DictReader(f):
             rows.append({
                 "name": row["name"],
+                "ngc_name": row["ngc_name"] or None,
                 "common_name": row["common_name"],
                 "type": row["type"],
                 "type_fr": row["type_fr"],

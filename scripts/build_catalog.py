@@ -26,7 +26,7 @@ TYPE_FR = {
 }
 LP_FILTER_TYPES = {"PN", "Neb", "EmN", "HII", "SNR", "Cl+N"}
 
-FIELDNAMES = ["name", "common_name", "type", "type_fr", "ra_h", "dec_deg",
+FIELDNAMES = ["name", "ngc_name", "common_name", "type", "type_fr", "ra_h", "dec_deg",
               "size_w_arcmin", "size_h_arcmin", "mag", "filter", "messier"]
 
 # Objets Messier absents (ou non tagges "M") dans OpenNGC : ajoutes a la main.
@@ -59,11 +59,18 @@ def _mag(row: dict) -> float | None:
 
 def _to_row(row: dict) -> dict:
     display_name = f"M{int(row['M'])}" if row.get("M") else row["Name"]
+    # Designation NGC/IC preservee separement pour les objets Messier (dont le
+    # "name" ci-dessus devient "M##", perdant sinon la reference NGC/IC utile
+    # pour recouper avec d'autres atlas). Les 3 entrees MANUAL_MESSIER portent
+    # un "Name" descriptif (ex. "Winnecke 4", "Pleiades") plutot qu'une vraie
+    # designation NGC/IC -- seule "NGC 5866" (M102) en est une, d'ou le filtre.
+    ngc_name = row["Name"] if row["Name"].upper().startswith(("NGC", "IC")) else ""
     common = row["Common names"].split(",")[0].strip() if row.get("Common names") else ""
     filt = "LP" if row["Type"] in LP_FILTER_TYPES else "sans"
     mag = _mag(row)
     return {
         "name": display_name,
+        "ngc_name": ngc_name,
         "common_name": common,
         "type": row["Type"],
         "type_fr": TYPE_FR.get(row["Type"], "autre"),

@@ -32,12 +32,11 @@ MAX_SIZE_ARCMIN = 60.0
 SIZE_MARGIN = 1.5
 
 # Cote (en pixels) de la vignette carree demandee : fixe la taille du fichier
-# independamment du champ de vue couvert (voir docstring du module). Largement
-# suffisant pour un affichage a width=60 (onglet Messier) ou dans une colonne
-# ImageColumn ; un elargissement manuel important de cette derniere au-dela de
-# ~160px agrandirait la vignette au-dela de sa resolution source (flou), mais
-# reste cosmetique a cette echelle de vignette.
-THUMB_SIZE_PX = 160
+# independamment du champ de vue couvert (voir docstring du module). Les cartes de
+# la galerie de cibles (voir components.py) affichent l'image a ~256px de large ;
+# un agrandissement manuel au-dela de cette taille flouterait la vignette (source
+# de resolution fixe), mais reste cosmetique a cette echelle.
+THUMB_SIZE_PX = 256
 
 HIPS2FITS_BASE_URL = "https://alasky.cds.unistra.fr/hips-image-services/hips2fits"
 HIPS_SURVEY = "CDS/P/DSS2/color"

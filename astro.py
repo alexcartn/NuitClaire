@@ -56,15 +56,41 @@ def moon_separation(t_local: datetime, ra_h: float, dec_deg: float,
     return math.degrees(ephem.separation(body, moon))
 
 
-def night_hours(date_local, sun_limit: float = -12.0, site: dict = SITE) -> list[datetime]:
-    """Heures (locales) entre crepuscule et aube nautiques pour la nuit du `date_local`."""
+_TWILIGHT_LABEL_BY_THRESHOLD = {-6.0: "civil", -12.0: "nautical", -18.0: "astro"}
+
+
+def night_hours(date_local, sun_limit: float = -6.0, site: dict = SITE) -> list[datetime]:
+    """Heures locales, sur la grille horaire, couvrant la nuit du `date_local` a
+    partir du seuil `sun_limit` -- civil (-6 deg) par defaut : le Seestar reste
+    utilisable pour des cibles brillantes des la fin du crepuscule civil, et
+    couper des le seuil nautique (-12, ancien defaut) ecartait a tort le debut de
+    soiree (typiquement 20h-22h) des calculs de score/faisabilite alors que les
+    cibles y sont deja bien placees.
+
+    Bornes issues de `twilight_times` (calcul ephem precis), arrondies a l'heure
+    pleine englobante pour rester sur la grille horaire d'Open-Meteo -- sans quoi
+    une heure presque entierement "de nuit" pouvait etre perdue par un test au
+    sommet de l'heure seulement (ex: crepuscule civil a 20:26 ne validait pas
+    l'heure 20:00 avec un test instantane, alors que l'essentiel de cette heure
+    est bien apres le seuil).
+    """
     tz = ZoneInfo(site["tz"])
-    start = datetime(date_local.year, date_local.month, date_local.day, 12, tzinfo=tz)
+    label = _TWILIGHT_LABEL_BY_THRESHOLD.get(sun_limit)
+    if label is None:
+        # Seuil non standard (utilise par exemple par des tests cibles) : repli
+        # sur le scan horaire simple, sans les bornes precises de twilight_times.
+        start = datetime(date_local.year, date_local.month, date_local.day, 12, tzinfo=tz)
+        return [start + timedelta(hours=i) for i in range(24)
+                if sun_moon(start + timedelta(hours=i), site)["sun_alt"] < sun_limit]
+
+    tw = twilight_times(date_local, site=site)
+    dusk, dawn = tw[f"{label}_dusk"], tw[f"{label}_dawn"]
+    t = dusk.replace(minute=0, second=0, microsecond=0, tzinfo=tz)
+    end = dawn.replace(minute=0, second=0, microsecond=0, tzinfo=tz)
     hours = []
-    for i in range(24):
-        t = start + timedelta(hours=i)
-        if sun_moon(t, site)["sun_alt"] < sun_limit:
-            hours.append(t)
+    while t <= end:
+        hours.append(t)
+        t += timedelta(hours=1)
     return hours
 
 

@@ -62,8 +62,13 @@ def score_label_fr(score: float) -> tuple[int, str]:
     return pct, "Mauvaises conditions"
 
 
-def best_window(df: pd.DataFrame) -> str | None:
-    """Plus longue plage horaire contigue avec score >= 0.6, formatee 'HH:MM–HH:MM'."""
+def best_window_span(df: pd.DataFrame) -> tuple[pd.Timestamp, pd.Timestamp] | None:
+    """Plus longue plage horaire contigue avec score >= 0.6, bornes brutes (start, end).
+
+    `best_window` formate ces bornes en chaine 'HH:MM-HH:MM' pour affichage texte ;
+    les composants visuels (barre de crepuscule) ont besoin des Timestamp bruts pour
+    se positionner sur un axe, d'ou cette fonction separee.
+    """
     flags = [(t, s >= 0.6) for t, s in df["score"].items()]
     runs = []
     for ok, group in groupby(flags, key=lambda x: x[1]):
@@ -73,7 +78,15 @@ def best_window(df: pd.DataFrame) -> str | None:
     if not runs:
         return None
     start, last = max(runs, key=lambda r: r[1] - r[0])
-    end = last + pd.Timedelta(hours=1)
+    return start, last + pd.Timedelta(hours=1)
+
+
+def best_window(df: pd.DataFrame) -> str | None:
+    """Plus longue plage horaire contigue avec score >= 0.6, formatee 'HH:MM–HH:MM'."""
+    span = best_window_span(df)
+    if span is None:
+        return None
+    start, end = span
     return f"{start.strftime('%H:%M')}–{end.strftime('%H:%M')}"
 
 
