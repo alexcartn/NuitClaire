@@ -10,6 +10,7 @@ from astro import night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_S
 from scoring import score_frame, night_summary, target_windows, score_label_fr
 from catalog import load_targets, load_messier
 from geocode import geocode, GeocodeError
+from imagery import dss_image_url
 import progress as progress_store
 
 st.set_page_config(page_title="Planificateur Seestar", page_icon="\U0001F52D", layout="wide")
@@ -130,6 +131,7 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
                 "Fin": w["end"].strftime("%H:%M"), "Heures": w["hours"],
                 "Alt max deg": w["max_alt"], "Lune deg": w["min_moon_sep"],
                 "Cadrage": fits_in_fov(*w["size"]) if all(w["size"]) else "taille inconnue",
+                "Image": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
             })
         else:
             rows.append({
@@ -139,6 +141,7 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
                 "Type": w["type"],
                 "Faisable ce soir": "Oui" if w["hours"] > 0 else "Non",
                 "Heures": w["hours"],
+                "Image": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
             })
     return rows
 
@@ -225,7 +228,8 @@ with tab_ce_soir:
     rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "targets")
     if rows:
         st.dataframe(pd.DataFrame(rows).sort_values("Heures", ascending=False),
-                     use_container_width=True, hide_index=True)
+                     use_container_width=True, hide_index=True,
+                     column_config={"Image": st.column_config.ImageColumn("Apercu")})
     else:
         st.info("Aucune cible exploitable cette nuit (meteo, Lune ou horizon degage).")
 
@@ -248,7 +252,8 @@ with tab_messier:
     rows.sort(key=lambda r: int(r["id"]))
 
     for row in rows:
-        c1, c2, c3, c4 = st.columns([1, 3, 2, 2])
+        c0, c1, c2, c3, c4 = st.columns([1, 1, 3, 2, 2])
+        c0.image(row["Image"], width=60)
         c1.write(row["Messier"])
         c2.write(row["Nom commun"] or "—")
         c3.write(f"{row['Type']} · {row['Faisable ce soir']} ({row['Heures']}h)")
