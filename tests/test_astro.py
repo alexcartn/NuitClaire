@@ -30,6 +30,26 @@ def test_twilight_times_order_for_known_date():
     assert t["astro_dusk"] < t["astro_dawn"]
 
 
+def test_twilight_times_uses_site_timezone_not_frozen_module_tz():
+    # A realistic site override on the opposite side of the globe from
+    # config.SITE (Europe/Paris): real Tokyo lat/lon paired with its own
+    # Asia/Tokyo timezone (UTC+9, vs. Europe/Paris' UTC+2 in September --
+    # a 7-hour difference). If the conversion silently used the frozen
+    # module-level TZ (Europe/Paris) instead of the site's own tz, the
+    # civil dusk instant (which genuinely falls around 18:14 Tokyo local
+    # time) would instead be mislabelled as if it were Paris local time,
+    # landing near midday on the *following* calendar day instead of the
+    # evening of the requested day.
+    d = date(2026, 9, 15)
+    tokyo_site = {"name": "Tokyo", "lat": 35.68, "lon": 139.69,
+                  "elevation_m": 40, "tz": "Asia/Tokyo"}
+    t = twilight_times(d, site=tokyo_site)
+    assert t["civil_dusk"].date() == d
+    assert 17 <= t["civil_dusk"].hour <= 20
+    assert t["civil_dawn"].date() == date(2026, 9, 16)
+    assert 3 <= t["civil_dawn"].hour <= 6
+
+
 def test_target_altaz_accepts_site_override():
     t = datetime(2026, 9, 15, 22, 0, tzinfo=TZ)
     alt_default, az_default = target_altaz(t, 0.712, 41.27)

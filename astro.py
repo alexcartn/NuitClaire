@@ -87,14 +87,15 @@ def fits_in_fov(size_arcmin_w: float, size_arcmin_h: float) -> str:
     return "mosaique large"
 
 
-def _to_local(ephem_date: ephem.Date) -> datetime:
-    return ephem_date.datetime().replace(tzinfo=timezone.utc).astimezone(TZ)
+def _to_local(ephem_date: ephem.Date, tz: ZoneInfo) -> datetime:
+    return ephem_date.datetime().replace(tzinfo=timezone.utc).astimezone(tz)
 
 
 def twilight_times(date_local, site: dict = SITE) -> dict:
     """Crepuscule/aube civil (-6 deg), nautique (-12 deg), astronomique (-18 deg)
     pour la nuit du `date_local`, en heure locale (naive, dans le fuseau du site)."""
-    base = datetime(date_local.year, date_local.month, date_local.day, 12, tzinfo=TZ)
+    tz = ZoneInfo(site["tz"])
+    base = datetime(date_local.year, date_local.month, date_local.day, 12, tzinfo=tz)
     obs = _observer(base, site)
     sun = ephem.Sun()
     result = {}
@@ -102,6 +103,6 @@ def twilight_times(date_local, site: dict = SITE) -> dict:
         obs.horizon = horizon
         dusk = obs.next_setting(sun, use_center=True)
         dawn = obs.next_rising(sun, use_center=True)
-        result[f"{label}_dusk"] = _to_local(dusk).replace(tzinfo=None)
-        result[f"{label}_dawn"] = _to_local(dawn).replace(tzinfo=None)
+        result[f"{label}_dusk"] = _to_local(dusk, tz).replace(tzinfo=None)
+        result[f"{label}_dawn"] = _to_local(dawn, tz).replace(tzinfo=None)
     return result
