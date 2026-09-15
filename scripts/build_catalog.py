@@ -93,6 +93,15 @@ def main():
     target_rows = [row for row in rows if row["Type"] in GOOD_TYPES
                    and _mag(row) is not None and _mag(row) <= MAG_CUTOFF]
 
+    # Garde-fou : evite d'ecraser les CSV commits par des donnees quasi vides
+    # ou aberrantes si le telechargement echoue silencieusement ou si le
+    # schema OpenNGC change (ex: renommage d'un type, colonne manquante).
+    assert 1000 < len(target_rows) < 3000, (
+        f"nombre de cibles suspect ({len(target_rows)}), attendu ~1700-1800 : "
+        "le format OpenNGC a peut-etre change, verifier avant d'ecraser les CSV")
+    assert len(messier_rows) == 110, (
+        f"catalogue Messier incomplet ({len(messier_rows)} au lieu de 110)")
+
     DATA_DIR.mkdir(exist_ok=True)
     for filename, source in (("ngc_seestar.csv", target_rows), ("messier.csv", messier_rows)):
         out_rows = sorted((_to_row(row) for row in source), key=lambda r: r["ra_h"])
