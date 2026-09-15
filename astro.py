@@ -7,8 +7,6 @@ import ephem
 import pandas as pd
 from config import SITE, SEESTAR
 
-TZ = ZoneInfo(SITE["tz"])
-
 COMPASS_SECTORS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 
 
