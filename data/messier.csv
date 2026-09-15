@@ -1,0 +1,111 @@
+name,common_name,type,type_fr,ra_h,dec_deg,size_w_arcmin,size_h_arcmin,mag,filter,messier
+M110,,G,galaxie,0.6728,41.6853,16.22,9.59,8.15,sans,110
+M32,,G,galaxie,0.7116,40.8653,7.74,4.86,8.13,sans,32
+M31,Andromeda Galaxy,G,galaxie,0.7123,41.2691,177.83,69.66,3.44,sans,31
+M103,,OCl,amas ouvert,1.5561,60.658,4.50,4.50,7.4,sans,103
+M33,Triangulum Galaxy,G,galaxie,1.5641,30.6602,62.09,36.73,5.79,sans,33
+M74,,G,galaxie,1.6116,15.7837,9.89,9.33,9.31,sans,74
+M76,Barbell Nebula,PN,nebuleuse planetaire,1.7055,51.5755,1.12,1.12,10.1,LP,76
+M34,,OCl,amas ouvert,2.7021,42.7461,22.50,22.50,5.2,sans,34
+M77,,G,galaxie,2.7113,-0.0133,6.11,5.61,9.29,sans,77
+M45,Pleiades,OCl,amas ouvert,3.79,24.1167,110,110,1.6,sans,45
+M79,,GCl,amas globulaire,5.4029,-24.5242,7.20,7.20,8.16,sans,79
+M38,,OCl,amas ouvert,5.4785,35.8549,9.60,9.60,6.4,sans,38
+M1,Crab Nebula,SNR,remanent de supernova,5.5755,22.0145,8.00,4.00,8.4,LP,1
+M42,Great Orion Nebula,Cl+N,amas + nebuleuse,5.5879,-5.3897,90.00,60.00,4.0,LP,42
+M43,Mairan's Nebula,HII,region HII,5.592,-5.2675,20.00,15.00,9.0,LP,43
+M36,,OCl,amas ouvert,5.6049,34.1407,7.20,7.20,6.0,sans,36
+M78,,RfN,nebuleuse par reflexion,5.7794,0.0793,4.50,4.50,8.0,sans,78
+M37,,OCl,amas ouvert,5.8718,32.553,11.40,11.40,5.6,sans,37
+M35,,OCl,amas ouvert,6.1514,24.3386,24.00,24.00,5.1,sans,35
+M41,,OCl,amas ouvert,6.7667,-20.7542,12.00,12.00,4.5,sans,41
+M50,,OCl,amas ouvert,7.0446,-8.364,14.10,14.10,5.9,sans,50
+M47,,OCl,amas ouvert,7.6097,-14.4826,19.80,19.80,4.4,sans,47
+M46,,OCl,amas ouvert,7.6963,-14.81,21.00,21.00,6.1,sans,46
+M93,,OCl,amas ouvert,7.7415,-23.8531,15.00,15.00,6.2,sans,93
+M48,,OCl,amas ouvert,8.2287,-5.7504,28.20,28.20,5.8,sans,48
+M44,Beehive,OCl,amas ouvert,8.6728,19.6721,108.60,108.60,3.1,sans,44
+M67,,OCl,amas ouvert,8.8556,11.8119,33.00,33.00,6.9,sans,67
+M81,Bode's Galaxy,G,galaxie,9.9259,69.0653,21.63,11.25,6.92,sans,81
+M82,Cigar Galaxy,G,galaxie,9.9313,69.6794,10.99,5.11,8.3,sans,82
+M95,,G,galaxie,10.7327,11.7038,7.23,4.45,9.77,sans,95
+M96,,G,galaxie,10.7794,11.8199,8.26,5.51,9.21,sans,96
+M105,,G,galaxie,10.7971,12.5816,4.89,4.25,9.27,sans,105
+M108,,G,galaxie,11.1919,55.6741,3.98,1.66,10.05,sans,108
+M97,Owl Nebula,PN,nebuleuse planetaire,11.2466,55.019,3.58,3.58,9.9,LP,97
+M65,,G,galaxie,11.3155,13.0924,7.64,1.97,9.32,sans,65
+M66,,G,galaxie,11.3375,12.9915,10.28,4.61,8.92,sans,66
+M109,,G,galaxie,11.96,53.3745,8.07,5.64,9.88,sans,109
+M98,,G,galaxie,12.2301,14.9003,11.04,2.66,10.84,sans,98
+M99,Coma Pinwheel,G,galaxie,12.3138,14.4165,5.04,4.74,9.84,sans,99
+M106,,G,galaxie,12.316,47.304,16.98,7.24,9.29,sans,106
+M61,,G,galaxie,12.3652,4.4736,6.89,6.56,10.25,sans,61
+M40,,**,etoile double,12.3701,58.0833,,,9.0,sans,40
+M100,,G,galaxie,12.3819,15.8218,6.10,5.62,9.47,sans,100
+M84,,G,galaxie,12.4177,12.887,7.41,6.44,9.79,sans,84
+M85,,G,galaxie,12.4234,18.1915,6.95,5.35,9.05,sans,85
+M86,,G,galaxie,12.4366,12.9462,11.53,8.43,8.86,sans,86
+M49,,G,galaxie,12.4963,8.0005,10.21,8.38,8.28,sans,49
+M87,Virgo Galaxy,G,galaxie,12.5137,12.3911,7.11,6.67,9.0,sans,87
+M88,,G,galaxie,12.5331,14.4204,8.65,4.38,10.33,sans,88
+M91,,G,galaxie,12.5907,14.4963,5.55,4.52,10.96,sans,91
+M89,,G,galaxie,12.5944,12.5563,8.13,8.00,10.08,sans,89
+M90,,G,galaxie,12.6138,13.1629,9.12,3.82,9.54,sans,90
+M58,,G,galaxie,12.6288,11.8182,5.01,3.84,10.3,sans,58
+M68,,GCl,amas globulaire,12.6578,-26.743,6.60,6.60,7.96,sans,68
+M104,Sombrero Galaxy,G,galaxie,12.6665,-11.6231,8.45,4.91,8.59,sans,104
+M59,,G,galaxie,12.7006,11.647,4.55,3.21,9.56,sans,59
+M60,,G,galaxie,12.7278,11.5527,6.78,5.45,8.79,sans,60
+M94,,G,galaxie,12.8481,41.1204,7.74,6.68,8.24,sans,94
+M64,Black Eye Galaxy,G,galaxie,12.9455,21.683,10.52,5.33,8.52,sans,64
+M53,,GCl,amas globulaire,13.2153,18.1691,9.00,9.00,7.79,sans,53
+M63,Sunflower Galaxy,G,galaxie,13.2637,42.0293,11.83,7.16,8.61,sans,63
+M51,Whirlpool Galaxy,G,galaxie,13.498,47.1952,13.71,11.67,8.36,sans,51
+M83,Southern Pinwheel Galaxy,G,galaxie,13.6169,-29.8654,13.61,13.21,7.21,sans,83
+M3,,GCl,amas globulaire,13.7031,28.3754,16.20,16.20,6.39,sans,3
+M101,,G,galaxie,14.0535,54.3489,23.99,23.07,7.9,sans,101
+M102,,G,galaxie,15.1082,55.7632,6.31,2.72,9.89,sans,102
+M5,,GCl,amas globulaire,15.3094,2.0827,15.00,15.00,5.95,sans,5
+M80,,GCl,amas globulaire,16.284,-22.9751,5.70,5.70,7.3,sans,80
+M4,,GCl,amas globulaire,16.3932,-26.5255,28.20,28.20,5.4,sans,4
+M107,,GCl,amas globulaire,16.5422,-13.0536,7.80,7.80,8.85,sans,107
+M13,Hercules Globular Cluster,GCl,amas globulaire,16.6949,36.4613,16.50,16.50,5.8,sans,13
+M12,,GCl,amas globulaire,16.7874,-1.9478,11.10,11.10,6.07,sans,12
+M10,,GCl,amas globulaire,16.9525,-4.0993,9.30,9.30,4.98,sans,10
+M62,,GCl,amas globulaire,17.0202,-30.1124,7.80,7.80,7.39,sans,62
+M19,,GCl,amas globulaire,17.0438,-26.2679,7.50,7.50,5.57,sans,19
+M92,,GCl,amas globulaire,17.2854,43.1365,14.40,14.40,6.52,sans,92
+M9,,GCl,amas globulaire,17.3199,-18.5162,6.90,6.90,8.42,sans,9
+M14,,GCl,amas globulaire,17.6267,-3.2459,9.9,9.9,5.73,sans,14
+M6,Butterfly Cluster,OCl,amas ouvert,17.6724,-32.2542,15.60,15.60,4.2,sans,6
+M7,Ptolemy's Cluster,OCl,amas ouvert,17.8975,-34.7928,22.20,22.20,3.3,sans,7
+M23,,OCl,amas ouvert,17.9513,-18.9853,16.80,16.80,5.5,sans,23
+M20,Trifid Nebula,Neb,nebuleuse,18.045,-22.9719,28.00,28.00,8.5,LP,20
+M8,Lagoon Nebula,Neb,nebuleuse,18.0615,-24.3802,45.00,30.00,5.8,LP,8
+M21,,OCl,amas ouvert,18.0704,-22.4901,6.00,6.00,5.9,sans,21
+M24,Small Sgr Star Cloud,*Ass,association d'etoiles,18.2823,-18.5146,120.00,60.00,4.5,sans,24
+M16,Eagle Nebula,Neb,nebuleuse,18.3134,-13.8072,120.00,25.00,6.0,LP,16
+M18,,OCl,amas ouvert,18.3329,-17.102,6.00,6.00,6.9,sans,18
+M17,Checkmark Nebula,Neb,nebuleuse,18.3464,-16.1715,12.60,12.60,7.0,LP,17
+M28,,GCl,amas globulaire,18.4091,-24.8698,5.10,5.10,6.9,sans,28
+M69,,GCl,amas globulaire,18.5231,-32.348,5.70,5.70,8.31,sans,69
+M25,,OCl,amas ouvert,18.5297,-19.1149,14.10,14.10,4.6,sans,25
+M22,,GCl,amas globulaire,18.6067,-23.9034,12.60,12.60,6.17,sans,22
+M70,,GCl,amas globulaire,18.7202,-32.2919,6.60,6.60,9.06,sans,70
+M26,,OCl,amas ouvert,18.7552,-9.3836,6.00,6.00,8.87,sans,26
+M11,Amas de l'Ecu de Sobieski,OCl,amas ouvert,18.8517,-6.27,9.00,9.00,5.8,sans,11
+M57,Ring Nebula,PN,nebuleuse planetaire,18.8931,33.0286,1.27,1.27,8.8,LP,57
+M54,,GCl,amas globulaire,18.9176,-30.4785,5.10,5.10,7.7,sans,54
+M56,,GCl,amas globulaire,19.2765,30.1845,5.80,5.80,8.4,sans,56
+M55,,GCl,amas globulaire,19.6665,-30.9621,12.00,12.00,6.49,sans,55
+M71,,GCl,amas globulaire,19.8961,18.7784,6.90,6.90,6.1,sans,71
+M27,Dumbbell Nebula,PN,nebuleuse planetaire,19.9934,22.721,6.70,6.70,7.4,LP,27
+M75,,GCl,amas globulaire,20.1013,-21.9222,3.60,3.60,8.26,sans,75
+M29,,OCl,amas ouvert,20.3994,38.5077,3.60,3.60,6.6,sans,29
+M72,,GCl,amas globulaire,20.8911,-12.5371,4.50,4.50,8.96,sans,72
+M73,,Other,autre,20.9822,-12.6355,,,8.9,sans,73
+M15,,GCl,amas globulaire,21.4995,12.1668,11.10,11.10,6.3,sans,15
+M39,,OCl,amas ouvert,21.5301,48.4382,19.50,19.50,4.6,sans,39
+M2,,GCl,amas globulaire,21.5575,-0.8233,8.40,8.40,6.25,sans,2
+M30,,GCl,amas globulaire,21.6728,-23.1791,9.00,9.00,7.1,sans,30
+M52,,OCl,amas ouvert,23.4134,61.5932,9.90,9.90,6.9,sans,52
