@@ -6,8 +6,12 @@ degagee et par nuit, suivi de completion du catalogue Messier (110 objets).
 ## Installation
 
     pip install -r requirements.txt -r requirements-dev.txt
-    python scripts/build_catalog.py   # genere data/ngc_seestar.csv et data/messier.csv
+    python scripts/build_catalog.py   # optionnel : les CSV sont deja commits, ce script les regenere depuis OpenNGC
     streamlit run app.py
+
+L'appli a besoin d'un acces internet (Open-Meteo, 7Timer, Nominatim). En cas de coupure,
+les prevision 7Timer se degradent proprement (seeing/transparence neutres) mais Open-Meteo
+est requis pour demarrer.
 
 ## Tests
 
