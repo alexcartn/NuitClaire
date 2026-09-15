@@ -48,6 +48,9 @@ with st.sidebar:
     if st.button("Mettre a jour la position"):
         try:
             result = geocode(address)
+            # Nominatim ne renvoie ni elevation ni fuseau horaire : on conserve
+            # ceux du site precedent (approximation acceptable a l'echelle
+            # regionale, mais a garder en tete si l'adresse change de pays).
             st.session_state.site = {**site, "lat": result["lat"], "lon": result["lon"],
                                       "name": result["display_name"].split(",")[0]}
             st.rerun()
@@ -86,9 +89,67 @@ def load(site_key: tuple):
     return nights, twilights
 
 
-with st.spinner("Chargement meteo + ephemerides..."):
-    site_key = (site["name"], site["lat"], site["lon"], site["elevation_m"], site["tz"])
-    nights, twilights = load(site_key)
+def _view_df(df: pd.DataFrame, view_mode_key: str) -> pd.DataFrame:
+    """Filtre `df` sur la fenetre d'observation habituelle, sauf si elle est vide
+    ou que le mode 'nuit complete' est actif."""
+    if view_mode_key != "habituelle":
+        return df
+    start_h, end_h = VIEW_WINDOW["start_hour"], VIEW_WINDOW["end_hour"]
+    mask = df.index.map(lambda t: start_h <= t.hour + t.minute / 60 <= end_h)
+    filtered = df[mask]
+    return filtered if not filtered.empty else df
+
+
+@st.cache_data(ttl=1800)
+def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key: str,
+                   catalog: str) -> list[dict]:
+    """Cibles faisables pour une nuit donnee (cache par site/nuit/horizon/mode/catalogue).
+
+    Ne recalcule que si l'un de ces parametres change -- independant des autres
+    interactions widget (ex. cocher une capture Messier) qui declenchent un
+    rerun complet du script sans rien changer a ces entrees.
+    """
+    site_dict = dict(zip(("name", "lat", "lon", "elevation_m", "tz"), site_key))
+    nights, _ = load(site_key)
+    df = nights.get(day)
+    if df is None:
+        return []
+    view_df = _view_df(df, view_mode_key) if catalog == "targets" else df
+    horizon = dict(horizon_key)
+    targets = load_targets() if catalog == "targets" else load_messier()
+
+    rows = []
+    for tgt in targets:
+        w = target_windows(view_df, tgt, horizon=horizon, site=site_dict)
+        if catalog == "targets":
+            if w["hours"] == 0:
+                continue
+            rows.append({
+                "Cible": w["name"], "Nom commun": tgt.get("common_name", ""), "Type": w["type"],
+                "Filtre": w["filter"], "Debut": w["start"].strftime("%H:%M"),
+                "Fin": w["end"].strftime("%H:%M"), "Heures": w["hours"],
+                "Alt max deg": w["max_alt"], "Lune deg": w["min_moon_sep"],
+                "Cadrage": fits_in_fov(*w["size"]) if all(w["size"]) else "taille inconnue",
+            })
+        else:
+            rows.append({
+                "id": tgt["messier"],
+                "Messier": tgt["name"],
+                "Nom commun": tgt.get("common_name", ""),
+                "Type": w["type"],
+                "Faisable ce soir": "Oui" if w["hours"] > 0 else "Non",
+                "Heures": w["hours"],
+            })
+    return rows
+
+
+try:
+    with st.spinner("Chargement meteo + ephemerides..."):
+        site_key = (site["name"], site["lat"], site["lon"], site["elevation_m"], site["tz"])
+        nights, twilights = load(site_key)
+except Exception:
+    st.error("Impossible de recuperer les donnees meteo. Reessayez dans quelques instants.")
+    st.stop()
 
 if not nights:
     st.error("Aucune donnee de nuit disponible pour les prochains jours.")
@@ -113,14 +174,8 @@ with tab_ce_soir:
     s = night_summary(df)
     pct, label = score_label_fr(s["score"])
 
-    if mode.startswith("Habituelle"):
-        start_h, end_h = VIEW_WINDOW["start_hour"], VIEW_WINDOW["end_hour"]
-        mask = df.index.map(lambda t: start_h <= t.hour + t.minute / 60 <= end_h)
-        view_df = df[mask]
-        if view_df.empty:
-            view_df = df
-    else:
-        view_df = df
+    view_mode_key = "habituelle" if mode.startswith("Habituelle") else "complete"
+    view_df = _view_df(df, view_mode_key)
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -165,18 +220,8 @@ with tab_ce_soir:
                                "moon_alt", "moon_illum", "seeing", "transparency"]].round(1))
 
     st.subheader(f"Cibles faisables : nuit du {sel.strftime('%d/%m')}")
-    rows = []
-    for tgt in load_targets():
-        w = target_windows(view_df, tgt, horizon=prog["horizon"], site=site)
-        if w["hours"] == 0:
-            continue
-        rows.append({
-            "Cible": w["name"], "Nom commun": tgt.get("common_name", ""), "Type": w["type"],
-            "Filtre": w["filter"], "Debut": w["start"].strftime("%H:%M"),
-            "Fin": w["end"].strftime("%H:%M"), "Heures": w["hours"],
-            "Alt max deg": w["max_alt"], "Lune deg": w["min_moon_sep"],
-            "Cadrage": fits_in_fov(*w["size"]) if all(w["size"]) else "taille inconnue",
-        })
+    horizon_key = tuple(sorted(prog["horizon"].items()))
+    rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "targets")
     if rows:
         st.dataframe(pd.DataFrame(rows).sort_values("Heures", ascending=False),
                      use_container_width=True, hide_index=True)
@@ -186,24 +231,19 @@ with tab_ce_soir:
 with tab_messier:
     st.subheader("Catalogue Messier")
     captured = set(prog["messier_captured"])
-    st.progress(len(captured) / 110, text=f"{len(captured)}/110 captures")
+    messier_total = len(load_messier())
+    st.progress(len(captured) / messier_total, text=f"{len(captured)}/{messier_total} captures")
 
     sel_m = st.selectbox("Nuit consideree", list(nights.keys()),
                           format_func=lambda d: d.strftime("%A %d %B"), key="messier_night")
-    df_m = nights[sel_m]
 
-    rows = []
-    for tgt in load_messier():
-        w = target_windows(df_m, tgt, horizon=prog["horizon"], site=site)
-        rows.append({
-            "id": tgt["messier"],
-            "Messier": tgt["name"],
-            "Nom commun": tgt.get("common_name", ""),
-            "Type": w["type"],
-            "Faisable ce soir": "Oui" if w["hours"] > 0 else "Non",
-            "Heures": w["hours"],
-            "Capture": tgt["messier"] in captured,
-        })
+    horizon_key = tuple(sorted(prog["horizon"].items()))
+    # view_mode_key fixe ("na") : la faisabilite Messier ignore la fenetre
+    # d'observation habituelle (df de nuit complet), donc un changement de
+    # mode dans la barre laterale ne doit pas invalider ce cache.
+    rows = feasible_rows(site_key, sel_m, horizon_key, "na", "messier")
+    for row in rows:
+        row["Capture"] = row["id"] in captured
     rows.sort(key=lambda r: int(r["id"]))
 
     for row in rows:
