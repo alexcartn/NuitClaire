@@ -32,7 +32,11 @@ MAX_SIZE_ARCMIN = 60.0
 SIZE_MARGIN = 1.5
 
 # Cote (en pixels) de la vignette carree demandee : fixe la taille du fichier
-# independamment du champ de vue couvert (voir docstring du module).
+# independamment du champ de vue couvert (voir docstring du module). Largement
+# suffisant pour un affichage a width=60 (onglet Messier) ou dans une colonne
+# ImageColumn ; un elargissement manuel important de cette derniere au-dela de
+# ~160px agrandirait la vignette au-dela de sa resolution source (flou), mais
+# reste cosmetique a cette echelle de vignette.
 THUMB_SIZE_PX = 160
 
 HIPS2FITS_BASE_URL = "https://alasky.cds.unistra.fr/hips-image-services/hips2fits"
@@ -47,10 +51,13 @@ def dss_image_url(ra_h: float, dec_deg: float,
     l'objet (avec marge), bornee entre MIN_SIZE_ARCMIN et MAX_SIZE_ARCMIN."""
     ra_deg = ra_h * 15.0
 
-    if size_w_arcmin is None or size_h_arcmin is None:
+    # Utilise la plus grande dimension connue (une seule peut manquer selon le
+    # catalogue source) ; si aucune n'est connue, cadrage minimal par defaut.
+    known_sizes = [v for v in (size_w_arcmin, size_h_arcmin) if v is not None]
+    if not known_sizes:
         size_arcmin = MIN_SIZE_ARCMIN
     else:
-        size_arcmin = max(size_w_arcmin, size_h_arcmin) * SIZE_MARGIN
+        size_arcmin = max(known_sizes) * SIZE_MARGIN
         size_arcmin = max(MIN_SIZE_ARCMIN, min(MAX_SIZE_ARCMIN, size_arcmin))
 
     params = {

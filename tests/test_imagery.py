@@ -48,6 +48,19 @@ def test_size_derived_from_catalog_size_with_margin():
     assert abs(fov_arcmin - expected) < 1e-6
 
 
+def test_size_uses_whichever_dimension_is_known_when_the_other_is_missing():
+    # Une seule dimension connue (cas reel du catalogue pour certains objets) :
+    # on utilise celle-ci plutot que de retomber sur la taille minimale.
+    known_w = 20.0
+    expected = known_w * SIZE_MARGIN
+    assert MIN_SIZE_ARCMIN < expected < MAX_SIZE_ARCMIN  # sanity check on fixture values
+
+    url = dss_image_url(ra_h=5.5, dec_deg=-5.39, size_w_arcmin=known_w, size_h_arcmin=None)
+    params = _params(url)
+    fov_arcmin = float(params["fov"][0]) * 60.0
+    assert abs(fov_arcmin - expected) < 1e-6
+
+
 def test_url_contains_expected_query_keys():
     url = dss_image_url(ra_h=5.5877, dec_deg=-5.3911, size_w_arcmin=85, size_h_arcmin=85)
     params = _params(url)
