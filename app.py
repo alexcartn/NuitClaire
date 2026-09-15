@@ -140,6 +140,15 @@ def _render_time_series(df: pd.DataFrame, columns: list[str], height: int = 220)
     - toutes les valeurs NaN sur les colonnes affichees : observe pour des
       nuits proches de la limite de couverture des previsions meteo, ou un
       champ entier peut manquer pour les heures concernees.
+
+    Attention, cette garde est tout-ou-rien sur `columns` : elle ne detecte
+    pas le cas ou seule UNE colonne est entierement NaN pendant qu'une autre
+    a des valeurs (ex. `seeing`/`transparency` de 7Timer, dont l'horizon de
+    prevision est plus court que celui d'Open-Meteo). Ce cas ne se produit
+    pas aujourd'hui pour les deux graphiques existants (chacun ne melange que
+    des colonnes de la meme source), mais un futur graphique melangeant des
+    colonnes de sources differentes devra verifier la couverture colonne par
+    colonne plutot que de reutiliser cette garde telle quelle.
     """
     if df.index.nunique() < 2 or not df[columns].notna().any().any():
         st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
