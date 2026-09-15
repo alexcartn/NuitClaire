@@ -1,20 +1,32 @@
 # Seestar Planner
 
-Planificateur de sessions Seestar S50 pour Tréveray : score go/no-go par nuit + fenêtres de visibilité par cible.
+Planificateur de sessions Seestar S50 : score astro go/no-go, cibles filtrees par direction
+degagee et par nuit, suivi de completion du catalogue Messier (110 objets).
 
-## Lancer
-    pip install -r requirements.txt
+## Installation
+
+    pip install -r requirements.txt -r requirements-dev.txt
+    python scripts/build_catalog.py   # genere data/ngc_seestar.csv et data/messier.csv
     streamlit run app.py
 
+## Tests
+
+    pytest -v
+
 ## Sources
-- Open-Meteo, modèle AROME Météo-France (1.3 km) : nuages par couche, vent, rosée, pluie
+- Open-Meteo, modele AROME Meteo-France (1.3 km) : nuages par couche, vent, rosee, pluie
 - 7Timer ASTRO (GFS, 3 h) : seeing et transparence
-- PyEphem : Soleil, Lune, altitude des cibles
+- PyEphem : Soleil, Lune, altitude/azimut des cibles, crepuscules
+- OpenNGC (github.com/mattiaverga/OpenNGC) : catalogue de cibles et liste Messier
+- Nominatim (OpenStreetMap) : geocodage d'adresse
 
 ## Fichiers
-- config.py    : coordonnées, champ du Seestar, pondérations du score
-- weather.py   : appels API
-- astro.py     : éphémérides
-- catalog.py   : cibles (RA/Dec/taille)
-- scoring.py   : score horaire et fenêtres
-- app.py       : dashboard Streamlit
+- config.py            : coordonnees par defaut, champ du Seestar, ponderations, horizon par defaut
+- weather.py            : appels API meteo
+- astro.py              : ephemerides, secteurs cardinaux, crepuscules
+- geocode.py            : adresse -> lat/lon
+- progress.py           : persistance locale (horizon configure, Messiers captures)
+- catalog.py             : chargement des catalogues (CSV generes)
+- scripts/build_catalog.py : generation ponctuelle des CSV depuis OpenNGC
+- scoring.py            : score horaire, fenetres de visibilite, score francais
+- app.py                : dashboard Streamlit (onglets "Ce soir" / "Catalogue Messier")
