@@ -1,9 +1,10 @@
 """Score horaire go/no-go, fenetres de visibilite et resume par cible."""
 from itertools import groupby
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from config import WEIGHTS, SEESTAR, SITE
-from astro import target_altaz, moon_separation, compass_sector, TZ, COMPASS_SECTORS
+from astro import target_altaz, moon_separation, compass_sector, COMPASS_SECTORS
 
 
 def _clamp(x, lo=0.0, hi=1.0):
@@ -94,9 +95,10 @@ def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
                     site: dict = SITE) -> dict:
     """Pour une cible, heures ou alt/azimut dans les plages autorisees et score OK."""
     horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
+    tz = ZoneInfo(site["tz"])
     alts, azs, seps = [], [], []
     for t in df.index:
-        tl = t.to_pydatetime().replace(tzinfo=TZ)
+        tl = t.to_pydatetime().replace(tzinfo=tz)
         alt, az = target_altaz(tl, target["ra"], target["dec"], site=site)
         alts.append(alt)
         azs.append(az)

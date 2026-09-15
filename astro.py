@@ -60,7 +60,8 @@ def moon_separation(t_local: datetime, ra_h: float, dec_deg: float,
 
 def night_hours(date_local, sun_limit: float = -12.0, site: dict = SITE) -> list[datetime]:
     """Heures (locales) entre crepuscule et aube nautiques pour la nuit du `date_local`."""
-    start = datetime(date_local.year, date_local.month, date_local.day, 12, tzinfo=TZ)
+    tz = ZoneInfo(site["tz"])
+    start = datetime(date_local.year, date_local.month, date_local.day, 12, tzinfo=tz)
     hours = []
     for i in range(24):
         t = start + timedelta(hours=i)

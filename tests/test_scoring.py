@@ -53,3 +53,35 @@ def test_target_windows_blocks_hours_outside_open_horizon_sectors(monkeypatch):
     horizon_blocked_south["S"] = False
     result_blocked = target_windows(df, target, horizon=horizon_blocked_south)
     assert result_blocked["hours"] == 0
+
+
+def test_target_windows_uses_site_timezone_not_frozen_module_tz(monkeypatch):
+    # Same bug pattern as astro.twilight_times/night_hours (see
+    # tests/test_astro.py): target_windows converts each row's naive
+    # timestamp to an aware local datetime before calling target_altaz /
+    # moon_separation. If it silently used the frozen module-level TZ
+    # (Europe/Paris, imported from astro) instead of deriving the tz from
+    # `site`, the timestamps handed to target_altaz would always carry
+    # Europe/Paris regardless of which site was requested. We intercept
+    # those calls to check the tzinfo actually used.
+    import scoring
+
+    captured_tzinfos = []
+
+    def fake_target_altaz(t_local, ra_h, dec_deg, site=None):
+        captured_tzinfos.append(t_local.tzinfo)
+        return 50.0, 180.0
+
+    monkeypatch.setattr(scoring, "target_altaz", fake_target_altaz)
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: 90.0)
+
+    df = _make_night_df()
+    target = {"name": "Test", "type": "galaxie", "ra": 0.0, "dec": 0.0, "w": 10, "h": 10,
+              "filter": "sans"}
+    tokyo_site = {"name": "Tokyo", "lat": 35.68, "lon": 139.69,
+                  "elevation_m": 40, "tz": "Asia/Tokyo"}
+
+    target_windows(df, target, site=tokyo_site)
+
+    assert captured_tzinfos
+    assert all(str(tz) == "Asia/Tokyo" for tz in captured_tzinfos)

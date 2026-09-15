@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from astro import compass_sector, twilight_times, target_altaz
+from astro import compass_sector, twilight_times, target_altaz, night_hours
 from config import SITE
 
 TZ = ZoneInfo(SITE["tz"])
@@ -48,6 +48,23 @@ def test_twilight_times_uses_site_timezone_not_frozen_module_tz():
     assert 17 <= t["civil_dusk"].hour <= 20
     assert t["civil_dawn"].date() == date(2026, 9, 16)
     assert 3 <= t["civil_dawn"].hour <= 6
+
+
+def test_night_hours_uses_site_timezone_not_frozen_module_tz():
+    # Same reasoning as test_twilight_times_uses_site_timezone_not_frozen_module_tz
+    # above: night_hours anchors its 24h scan window at local noon of
+    # `date_local`. If it silently used the frozen module-level TZ
+    # (Europe/Paris) instead of deriving the tz from `site`, every returned
+    # hour would carry a tzinfo of Europe/Paris even when a Tokyo site was
+    # explicitly requested -- both mislabelling the instants and shifting the
+    # scan window by the 7-hour UTC offset difference between the two zones.
+    d = date(2026, 9, 15)
+    tokyo_site = {"name": "Tokyo", "lat": 35.68, "lon": 139.69,
+                  "elevation_m": 40, "tz": "Asia/Tokyo"}
+    hours = night_hours(d, site=tokyo_site)
+    assert hours  # nautical night definitely occurs during this window in Tokyo
+    for t in hours:
+        assert str(t.tzinfo) == "Asia/Tokyo"
 
 
 def test_target_altaz_accepts_site_override():
