@@ -12,25 +12,31 @@ def _clamp(x, lo=0.0, hi=1.0):
 
 def hourly_score(row: pd.Series) -> float:
     """Chaque sous-score va de 0 (redhibitoire) a 1 (ideal)."""
+    # Nuages : les bas pesent plus que les hauts (les cirrus tuent la transparence mais pas tout)
     low, mid, high = row.get("cloud_cover_low", 0), row.get("cloud_cover_mid", 0), row.get("cloud_cover_high", 0)
     clouds = 1 - _clamp((0.6 * low + 0.3 * mid + 0.1 * high) / 100)
 
+    # Lune : penalite proportionnelle a illumination x altitude
     moon = 1.0
     if row.get("moon_alt", -90) > 0:
         moon = 1 - _clamp((row["moon_illum"] / 100) * _clamp(row["moon_alt"] / 60))
 
+    # Vent : rafales > 40 km/h = images poubelle avec le S50
     gust = row.get("wind_gusts_10m", 0) or 0
     wind = 1 - _clamp((gust - 10) / 30)
 
+    # Rosee : ecart T - Td < 2 deg C = buee quasi certaine
     spread = (row.get("temperature_2m", 10) or 10) - (row.get("dew_point_2m", 0) or 0)
     dew = _clamp((spread - 1) / 5)
 
+    # Seeing / transparence 7Timer (1 = excellent, 8 = mauvais)
     s, t = row.get("seeing"), row.get("transparency")
     if pd.notna(s) and pd.notna(t):
         st = 1 - _clamp(((s - 1) / 7 + (t - 1) / 7) / 2)
     else:
-        st = 0.6
+        st = 0.6  # inconnu : neutre
 
+    # Pluie : veto
     if (row.get("precipitation_probability", 0) or 0) > 50:
         return 0.0
 
