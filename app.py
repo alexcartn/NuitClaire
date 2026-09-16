@@ -482,8 +482,17 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
 # rouge/jaune/vert utilisee partout ailleurs pour la "qualite" (score, nuages,
 # vent) -- une cible qui pointe au nord n'est ni bonne ni mauvaise, le
 # code couleur ici encode juste l'orientation, pas un jugement.
-_COMPASS_COLORS = ["#5E60CE", "#5390D9", "#4EA8DE", "#48BFE3",
-                   "#64DFDF", "#72EFDD", "#B298DC", "#9D4EDD"]
+#
+# 8 teintes categorielles distinctes (palette dataviz validee : ecart CVD/vue
+# normale mesure, pas choisi a l'oeil), dans l'ordre de COMPASS_SECTORS -- donc
+# deux secteurs voisins sur la rose des vents (N/NE, ..., NW/N) sont aussi
+# les plus ecartes en teinte, le cas qui compte le plus ici puisqu'une cible
+# traverse les secteurs dans l'ordre en balayant l'azimut au cours de la nuit.
+# Les 8 ne sont PAS garantis deux-a-deux distincts sur simulation de
+# daltonisme (aucun ordre ne le permet a 8 categories) ; la legende et l'info-
+# bulle ("Direction" en texte) servent de repli pour les paires non voisines.
+_COMPASS_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100",
+                   "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 
 
 def _clear_horizon_runs(series: pd.DataFrame, horizon: dict) -> pd.DataFrame:
