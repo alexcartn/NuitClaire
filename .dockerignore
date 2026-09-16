@@ -1,0 +1,12 @@
+mobile/node_modules
+mobile/dist
+mobile/*.tsbuildinfo
+data/progress.json
+data/settings.json
+data/sessions.json
+__pycache__
+**/__pycache__
+.git
+.worktrees
+.pytest_cache
+*.log

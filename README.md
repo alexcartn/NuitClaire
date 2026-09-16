@@ -23,10 +23,13 @@ Un second frontend, `mobile/`, reproduit une partie du tableau de bord dans une 
 mobile-native (voir le design `NuitClaire Mobile.dc.html`) ; il parle a une petite API REST,
 `api/`, qui reutilise directement les memes modules Python que `app.py` (aucun calcul duplique).
 
-Phase 1 (actuelle) : ecrans "Ce soir", "Cibles", "Detail cible", "Catalogue Messier" et
-"Recherche" pleinement fonctionnels ; "Reglages" en lecture seule (l'edition -- geocodage,
-horizon, mode de fenetre, alertes -- arrive en Phase 2). Le journal de session ("Journal") est
-prevu en Phase 3.
+Les 7 ecrans de la maquette sont implementes : "Ce soir", "Cibles", "Detail cible",
+"Catalogue Messier", "Recherche", "Reglages" (position/geocodage, horizon, mode de fenetre,
+alertes -- toutes editables) et "Journal" (session en cours + historique). Connu comme
+incomplet : les alertes sont enregistrees mais rien ne les envoie reellement (pas
+d'infrastructure de notification) ; "Ma position" prend les coordonnees GPS sans geocodage
+inverse (pas de nom d'adresse) ; pas de PWA installable (pas de manifest/service worker) ;
+pas de suite de tests JS (verification faite via Playwright manuel).
 
     pip install -r api/requirements-api.txt
     uvicorn api.main:app --reload --port 8000        # depuis la racine du depot
@@ -35,7 +38,7 @@ prevu en Phase 3.
     npm install
     npm run dev                                       # http://localhost:5173
 
-    pytest tests/test_api_*.py tests/test_settings.py -v
+    pytest tests/test_api_*.py tests/test_settings.py tests/test_sessions.py -v
 
 ## Sources
 - Open-Meteo, modele AROME Meteo-France (1.3 km) : nuages par couche, vent, rosee, pluie
@@ -53,6 +56,7 @@ prevu en Phase 3.
 - imagery.py            : vignettes de reference (hips2fits/CDS) a partir de RA/Dec
 - progress.py           : persistance locale (horizon configure, Messiers captures)
 - settings.py           : persistance locale (position, mode de fenetre, preferences d'alerte)
+- sessions.py            : persistance locale (journal de session : cibles cochees, historique)
 - catalog.py             : chargement des catalogues (CSV generes)
 - rows.py               : forme commune d'une ligne cible, partagee par app.py et api/
 - scripts/build_catalog.py : generation ponctuelle des CSV depuis OpenNGC

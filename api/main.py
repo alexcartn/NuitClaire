@@ -6,6 +6,7 @@ frontends appellent les memes fonctions partagees (`scoring.py`, `astro.py`,
 Lancement (depuis la racine du depot) : `uvicorn api.main:app --reload --port 8000`.
 Documentation interactive : http://localhost:8000/docs
 """
+import os
 import sys
 from pathlib import Path
 
@@ -22,10 +23,14 @@ from api.routers import catalog, night, progress, sessions, settings, state  # n
 app = FastAPI(title="NuitClaire API")
 
 # Origines de dev Vite habituelles (localhost + IP LAN, pour tester depuis un
-# telephone sur le meme Wi-Fi) -- l'appli reste a usage personnel, pas
-# d'authentification, donc pas de restriction plus stricte a faire ici.
+# telephone sur le meme Wi-Fi) toujours autorisees, plus l'origine de
+# production (ex. https://nuitclaire.vercel.app) si ALLOWED_ORIGIN est
+# definie -- l'appli reste a usage personnel, pas d'authentification, donc
+# pas de restriction plus stricte a faire au-dela de l'origine elle-meme.
+_prod_origin = os.environ.get("ALLOWED_ORIGIN")
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=[_prod_origin] if _prod_origin else [],
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+",
     allow_methods=["*"],
     allow_headers=["*"],
