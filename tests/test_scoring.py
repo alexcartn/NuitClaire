@@ -1,7 +1,8 @@
 import pandas as pd
 
 from scoring import (score_label_fr, best_window, target_windows, target_altitude_series,
-                     recommended_exposure_minutes, wind_quality, target_feasibility_reasons)
+                     recommended_exposure_minutes, wind_quality, target_feasibility_reasons,
+                     hourly_score)
 
 
 def test_score_label_fr_buckets():
@@ -164,6 +165,33 @@ def test_recommended_exposure_minutes_without_magnitude_returns_base_range():
 
 def test_recommended_exposure_minutes_unknown_type_uses_default():
     assert recommended_exposure_minutes("???", 8.0) == (30, 60)
+
+
+def test_hourly_score_vetoes_when_low_clouds_opaque():
+    # Meme avec le reste de la nuit parfait, une couche basse quasi-opaque
+    # (>80%) doit mettre le score a 0 -- avant ce veto, la moyenne ponderee
+    # de `clouds` diluait ce cas et le score pouvait remonter a ~0.7+.
+    row = pd.Series({
+        "cloud_cover_low": 90, "cloud_cover_mid": 0, "cloud_cover_high": 0,
+        "moon_alt": -10, "moon_illum": 0,
+        "wind_gusts_10m": 0,
+        "temperature_2m": 10, "dew_point_2m": 0,
+        "seeing": 1, "transparency": 1,
+        "precipitation_probability": 0,
+    })
+    assert hourly_score(row) == 0.0
+
+
+def test_hourly_score_not_vetoed_when_low_clouds_below_threshold():
+    row = pd.Series({
+        "cloud_cover_low": 80, "cloud_cover_mid": 0, "cloud_cover_high": 0,
+        "moon_alt": -10, "moon_illum": 0,
+        "wind_gusts_10m": 0,
+        "temperature_2m": 10, "dew_point_2m": 0,
+        "seeing": 1, "transparency": 1,
+        "precipitation_probability": 0,
+    })
+    assert hourly_score(row) > 0.0
 
 
 def test_target_windows_uses_site_timezone_not_frozen_module_tz(monkeypatch):

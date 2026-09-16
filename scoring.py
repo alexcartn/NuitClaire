@@ -47,6 +47,12 @@ def hourly_score(row: pd.Series) -> float:
     if (row.get("precipitation_probability", 0) or 0) > 50:
         return 0.0
 
+    # Nuages bas : veto -- une couche basse quasi opaque bouche le ciel
+    # quelles que soient les couches au-dessus (contrairement a la moyenne
+    # ponderee de `clouds`, qui dilue ce cas et laisse remonter le score).
+    if low > 80:
+        return 0.0
+
     return round(
         WEIGHTS["clouds"] * clouds + WEIGHTS["moon"] * moon + WEIGHTS["wind"] * wind
         + WEIGHTS["dew"] * dew + WEIGHTS["seeing_transp"] * st, 3)
