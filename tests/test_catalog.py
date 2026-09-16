@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from catalog import _load_csv
+from catalog import _load_csv, find_target
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_catalog.csv"
 
@@ -31,3 +31,32 @@ def test_load_csv_handles_missing_ngc_name_as_none():
     rows = _load_csv(FIXTURE)
     double_star = next(r for r in rows if r["name"] == "Winnecke 4")
     assert double_star["ngc_name"] is None
+
+
+def test_find_target_matches_messier_designation_case_and_space_insensitive():
+    for query in ("M31", "m31", "M 31", "  m31  "):
+        result = find_target(query)
+        assert result is not None
+        assert result["name"] == "M31"
+
+
+def test_find_target_matches_ngc_designation_in_broad_catalog():
+    result = find_target("NGC 7380")  # Wizard Nebula -- pas de common_name, cf. docs/plans
+    assert result is not None
+    assert result["ngc_name"] == "NGC7380"
+
+
+def test_find_target_matches_ic_designation_without_leading_zero():
+    # Le catalogue stocke "IC0434" (Flame Nebula), mais on ecrit "IC434".
+    result = find_target("IC434")
+    assert result is not None
+    assert result["ngc_name"] == "IC0434"
+
+
+def test_find_target_returns_none_when_not_found():
+    assert find_target("this is not a real designation") is None
+
+
+def test_find_target_returns_none_for_empty_query():
+    assert find_target("") is None
+    assert find_target("   ") is None

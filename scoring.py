@@ -156,6 +156,45 @@ def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
     }
 
 
+def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | None = None,
+                                site: dict = SITE) -> list[str]:
+    """Pourquoi une cible n'a aucune heure faisable cette nuit (`target_windows`
+    renvoie `hours == 0`) : chaque contrainte de `target_windows` (altitude,
+    horizon degage, meteo, Lune) est testee independamment sur toute la nuit ;
+    une raison est ajoutee pour chaque contrainte jamais satisfaite. Plusieurs
+    raisons peuvent s'accumuler (ex. meteo ET Lune toutes les deux mauvaises).
+    Renvoie une liste vide si la cible est en fait faisable."""
+    horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
+    d = _target_sky_frame(df, target, site=site)
+    open_sectors = {s for s, is_open in horizon.items() if is_open}
+
+    alt_ok = (d["alt"] >= SEESTAR["min_alt_deg"]) & (d["alt"] <= SEESTAR["max_alt_deg"])
+    sector_ok = d["sector"].isin(open_sectors)
+    score_ok = d["score"] >= 0.6  # meme seuil que target_windows
+    moon_ok = ~((d["moon_alt"] > 0) & (d["moon_sep"] < 30) & (d["moon_illum"] > 40))
+
+    reasons = []
+    if not alt_ok.any():
+        reasons.append(
+            f"Ne monte jamais entre {SEESTAR['min_alt_deg']:.0f}° et {SEESTAR['max_alt_deg']:.0f}° "
+            f"d'altitude cette nuit (maximum atteint : {d['alt'].max():.0f}°).")
+    elif not (alt_ok & sector_ok).any():
+        reasons.append("Ne passe dans un secteur d'horizon degage que hors de sa "
+                        "fenetre d'altitude exploitable.")
+    if not score_ok.any():
+        reasons.append("Aucune heure de la nuit n'atteint le score meteo minimum "
+                        "(nuages, vent, seeing...).")
+    if not moon_ok.any():
+        reasons.append("Trop proche d'une Lune brillante toute la nuit.")
+    if not reasons and not (alt_ok & sector_ok & score_ok & moon_ok).any():
+        # Chaque contrainte est parfois vraie individuellement, mais jamais
+        # toutes en meme temps (ex. bonne altitude seulement quand la meteo
+        # est mauvaise, et inversement).
+        reasons.append("Les conditions favorables (altitude, horizon, meteo, Lune) "
+                        "ne coincident jamais toutes en meme temps cette nuit.")
+    return reasons
+
+
 # (temps_bas_min, temps_haut_min, magnitude de reference) par type de cible --
 # objets compacts/brillants (amas ouverts, doubles) demandent peu de pose,
 # les objets a faible brillance de surface (galaxies, nebuleuses diffuses)

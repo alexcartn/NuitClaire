@@ -1,7 +1,7 @@
 import pandas as pd
 
 from scoring import (score_label_fr, best_window, target_windows, target_altitude_series,
-                     recommended_exposure_minutes, wind_quality)
+                     recommended_exposure_minutes, wind_quality, target_feasibility_reasons)
 
 
 def test_score_label_fr_buckets():
@@ -46,6 +46,65 @@ def test_wind_quality_zero_at_and_above_40kmh():
 
 def test_wind_quality_linear_between_thresholds():
     assert wind_quality(25) == 0.5
+
+
+def test_target_feasibility_reasons_empty_when_feasible(monkeypatch):
+    import scoring
+
+    monkeypatch.setattr(scoring, "target_altaz", lambda *a, **k: (50.0, 180.0))
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: 90.0)
+
+    df = _make_night_df()
+    target = {"name": "Test", "ra": 0.0, "dec": 0.0}
+    assert target_feasibility_reasons(df, target) == []
+
+
+def test_target_feasibility_reasons_altitude_never_reached(monkeypatch):
+    import scoring
+
+    monkeypatch.setattr(scoring, "target_altaz", lambda *a, **k: (5.0, 180.0))  # sous SEESTAR min_alt_deg
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: 90.0)
+
+    df = _make_night_df()
+    target = {"name": "Test", "ra": 0.0, "dec": 0.0}
+    reasons = target_feasibility_reasons(df, target)
+    assert len(reasons) == 1
+    assert "monte jamais" in reasons[0]
+
+
+def test_target_feasibility_reasons_blocked_horizon_sector(monkeypatch):
+    import scoring
+
+    # Bonne altitude, mais uniquement au sud -- si seul le nord est degage,
+    # l'altitude est parfois bonne mais jamais dans un secteur ouvert.
+    monkeypatch.setattr(scoring, "target_altaz", lambda *a, **k: (50.0, 180.0))
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: 90.0)
+
+    df = _make_night_df()
+    target = {"name": "Test", "ra": 0.0, "dec": 0.0}
+    horizon_north_only = {"N": True, "NE": False, "E": False, "SE": False,
+                           "S": False, "SW": False, "W": False, "NW": False}
+    reasons = target_feasibility_reasons(df, target, horizon=horizon_north_only)
+    assert len(reasons) == 1
+    assert "secteur" in reasons[0]
+
+
+def test_target_feasibility_reasons_bad_weather_and_moon_both_reported(monkeypatch):
+    import scoring
+
+    monkeypatch.setattr(scoring, "target_altaz", lambda *a, **k: (50.0, 180.0))
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: 5.0)  # tres proche
+
+    idx = pd.date_range("2026-09-15 20:00", periods=4, freq="1h")
+    df = pd.DataFrame({
+        "score": [0.2, 0.2, 0.2, 0.2],  # sous le seuil 0.6
+        "moon_alt": [30, 30, 30, 30],  # Lune levee
+        "moon_illum": [80, 80, 80, 80],  # brillante
+    }, index=idx)
+    target = {"name": "Test", "ra": 0.0, "dec": 0.0}
+    reasons = target_feasibility_reasons(df, target)
+    assert any("meteo" in r for r in reasons)
+    assert any("Lune" in r for r in reasons)
 
 
 def test_target_windows_blocks_hours_outside_open_horizon_sectors(monkeypatch):

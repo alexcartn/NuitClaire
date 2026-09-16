@@ -1,4 +1,4 @@
-streamlit>=1.32  # st.dialog (fenetre modale de detail de cible) stable depuis 1.32
+streamlit>=1.40  # st.dialog (>=1.32) + st.pills (>=1.40, filtre par type)
 pandas
 requests
 ephem
