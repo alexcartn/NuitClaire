@@ -1,7 +1,7 @@
 import pandas as pd
 
 from scoring import (score_label_fr, best_window, target_windows, target_altitude_series,
-                     recommended_exposure_minutes)
+                     recommended_exposure_minutes, wind_quality)
 
 
 def test_score_label_fr_buckets():
@@ -32,6 +32,20 @@ def _make_night_df():
         "moon_alt": [-10, -10, -10, -10],
         "moon_illum": [20, 20, 20, 20],
     }, index=idx)
+
+
+def test_wind_quality_ideal_below_10kmh():
+    assert wind_quality(0) == 1.0
+    assert wind_quality(10) == 1.0
+
+
+def test_wind_quality_zero_at_and_above_40kmh():
+    assert wind_quality(40) == 0.0
+    assert wind_quality(60) == 0.0
+
+
+def test_wind_quality_linear_between_thresholds():
+    assert wind_quality(25) == 0.5
 
 
 def test_target_windows_blocks_hours_outside_open_horizon_sectors(monkeypatch):

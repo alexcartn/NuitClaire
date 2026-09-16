@@ -1,4 +1,5 @@
 """Tableau de bord Streamlit : score astro, cibles par direction/horizon, suivi Messier."""
+import re
 from datetime import date, datetime, timedelta
 from typing import Callable
 from zoneinfo import ZoneInfo
@@ -12,10 +13,11 @@ from weather import fetch_all
 from astro import (night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_SECTORS,
                     format_ra, format_dec, moon_status)
 from scoring import (score_frame, night_summary, target_windows, score_label_fr,
-                      target_altitude_series, recommended_exposure_minutes)
+                      target_altitude_series, recommended_exposure_minutes, wind_quality)
 from catalog import load_targets, load_messier
 from geocode import geocode, GeocodeError
 from imagery import dss_image_url
+from wiki import target_summary
 from components import TWILIGHT_BAR_CSS, CARD_CSS, twilight_bar_html, card_html
 import progress as progress_store
 
@@ -205,19 +207,16 @@ def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220,
     long_df = df[columns].reset_index().melt("time", var_name="serie", value_name="valeur")
     color = alt.Color("serie:N", title="", sort=columns,
                        legend=None if len(columns) == 1 else alt.Legend())
-    return (
-        alt.Chart(long_df)
-        .mark_line()
-        .encode(
-            x=alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT)),
-            y=alt.Y("valeur:Q", title=y_title),
-            color=color,
-            tooltip=[alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
-                     alt.Tooltip("serie:N", title="Serie"),
-                     alt.Tooltip("valeur:Q", title="Valeur")],
-        )
-        .properties(height=height)
-    )
+    x = alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT))
+    y = alt.Y("valeur:Q", title=y_title)
+    tooltip = [alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
+               alt.Tooltip("serie:N", title="Serie"),
+               alt.Tooltip("valeur:Q", title="Valeur")]
+    base = alt.Chart(long_df).encode(x=x, y=y, color=color, tooltip=tooltip)
+    # Points a chaque heure de donnees (pas seulement une ligne lissee), meme
+    # habillage que les graphes score/nuages -- coherence visuelle sur tous les
+    # graphiques de l'appli.
+    return (base.mark_line() + base.mark_point(filled=True, size=50)).properties(height=height)
 
 
 def _has_plottable_data(df: pd.DataFrame, columns: list[str]) -> bool:
@@ -300,6 +299,23 @@ def _cloud_chart(df: pd.DataFrame, height: int = 220) -> alt.Chart:
     return (line + points).properties(height=height)
 
 
+def _wind_chart(df: pd.DataFrame, height: int = 220) -> alt.Chart:
+    """Rafales horaires (km/h) : ligne + points colores rouge/jaune/vert selon
+    le meme sous-score vent (`scoring.wind_quality`) que le score astro global
+    -- rafales, pas vitesse moyenne, car ce sont elles qui abiment le suivi."""
+    plot_df = df[["wind_gusts_10m"]].reset_index()
+    plot_df["quality_pct"] = plot_df["wind_gusts_10m"].apply(wind_quality) * 100
+    y = alt.Y("wind_gusts_10m:Q", title="Rafales (km/h)")
+    line = (alt.Chart(plot_df).mark_line(color="#8a8a8a")
+            .encode(x=alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT)), y=y))
+    points = (alt.Chart(plot_df).mark_point(filled=True, size=70)
+              .encode(x="time:T", y=y,
+                      color=alt.Color("quality_pct:Q", scale=_quality_color_scale(), legend=None),
+                      tooltip=[alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
+                               alt.Tooltip("wind_gusts_10m:Q", title="Rafales", format=".0f")]))
+    return (line + points).properties(height=height)
+
+
 def _render_score_chart(df: pd.DataFrame) -> None:
     if not _has_plottable_data(df, ["score"]):
         st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
@@ -312,6 +328,13 @@ def _render_cloud_chart(df: pd.DataFrame) -> None:
         st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
         return
     st.altair_chart(_cloud_chart(df), use_container_width=True)
+
+
+def _render_wind_chart(df: pd.DataFrame) -> None:
+    if not _has_plottable_data(df, ["wind_gusts_10m"]):
+        st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
+        return
+    st.altair_chart(_wind_chart(df), use_container_width=True)
 
 
 @st.cache_data(ttl=1800)
@@ -383,6 +406,36 @@ def _altitude_chart(series: pd.DataFrame, height: int = 240) -> alt.Chart:
     return (line + rules).properties(height=height)
 
 
+def _wiki_title_candidates(row: dict) -> list[str]:
+    """Titres de page Wikipedia a tenter pour une cible, du plus specifique au
+    plus generique : nom Messier complet ("Messier 31"), designation telle
+    qu'affichee ("M31" ou "NGC0188"), nom commun, et designation NGC/IC
+    secondaire reformatee au format usuel des titres Wikipedia ("NGC0224" ->
+    "NGC 224"). `wiki.target_summary` les essaie dans cet ordre, en francais
+    puis en anglais."""
+    candidates = []
+    title = row.get("Cible") or row.get("Messier")
+    if title and re.fullmatch(r"M\d+", title):
+        candidates.append(f"Messier {title[1:]}")
+    if title:
+        candidates.append(title)
+    if row.get("Nom commun"):
+        candidates.append(row["Nom commun"])
+    ngc = row.get("NGC")
+    if ngc:
+        m = re.match(r"([A-Za-z]+)0*(\d+)", ngc)
+        if m:
+            candidates.append(f"{m.group(1).upper()} {m.group(2)}")
+    return candidates
+
+
+@st.cache_data(ttl=86400)
+def _cached_wiki_summary(candidates: tuple[str, ...]) -> dict | None:
+    """Cache d'une journee : contenu quasi statique, pas besoin de re-interroger
+    Wikipedia a chaque ouverture de la modale."""
+    return target_summary(list(candidates))
+
+
 @st.dialog("Detail de la cible", width="large")
 def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict) -> None:
     """Modale ouverte par le bouton 'Detail' d'une carte (onglet 'Ce soir' ou
@@ -423,6 +476,15 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict) -> None
         st.markdown(f"**Separation lunaire mini** : {row.get('Lune deg', 'n/d')}°")
         st.markdown(f"**Temps de pose indicatif** : {low}–{high} min "
                      "(estimation, pas une mesure)")
+
+    # Absent du catalogue OpenNGC (donnees purement astrometriques) : recherche
+    # en direct sur Wikipedia (fr puis en), section masquee si rien de trouve.
+    summary = _cached_wiki_summary(tuple(_wiki_title_candidates(row)))
+    if summary:
+        st.subheader("En savoir plus")
+        st.write(summary["extract"])
+        if summary.get("url"):
+            st.caption(f"Source : [Wikipedia]({summary['url']})")
 
 
 try:
@@ -508,7 +570,7 @@ with tab_ce_soir:
     _render_time_series(view_df, ["temperature_2m", "dew_point_2m"])
 
     st.subheader("Vent")
-    _render_time_series(view_df, ["wind_speed_10m", "wind_gusts_10m"], y_title="Vent (km/h)")
+    _render_wind_chart(view_df)
 
     with st.expander("Donnees horaires"):
         st.dataframe(view_df[["score", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",

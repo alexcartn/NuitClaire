@@ -11,6 +11,14 @@ def _clamp(x, lo=0.0, hi=1.0):
     return max(lo, min(hi, x))
 
 
+def wind_quality(gust_kmh: float) -> float:
+    """Sous-score vent (0 = redhibitoire, 1 = ideal) a partir des seules
+    rafales -- rafales > 40 km/h = images poubelle avec le S50. Factorise hors
+    de `hourly_score` car reutilise par le graphe 'Vent' de l'appli (couleur
+    des points, meme echelle rouge/jaune/vert que le score astro global)."""
+    return 1 - _clamp((gust_kmh - 10) / 30)
+
+
 def hourly_score(row: pd.Series) -> float:
     """Chaque sous-score va de 0 (redhibitoire) a 1 (ideal)."""
     # Nuages : les bas pesent plus que les hauts (les cirrus tuent la transparence mais pas tout)
@@ -22,9 +30,7 @@ def hourly_score(row: pd.Series) -> float:
     if row.get("moon_alt", -90) > 0:
         moon = 1 - _clamp((row["moon_illum"] / 100) * _clamp(row["moon_alt"] / 60))
 
-    # Vent : rafales > 40 km/h = images poubelle avec le S50
-    gust = row.get("wind_gusts_10m", 0) or 0
-    wind = 1 - _clamp((gust - 10) / 30)
+    wind = wind_quality(row.get("wind_gusts_10m", 0) or 0)
 
     # Rosee : ecart T - Td < 2 deg C = buee quasi certaine
     spread = (row.get("temperature_2m", 10) or 10) - (row.get("dew_point_2m", 0) or 0)
