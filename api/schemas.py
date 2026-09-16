@@ -19,6 +19,37 @@ class SettingsOut(BaseModel):
     alerts: dict[str, bool]
 
 
+class SiteUpdate(BaseModel):
+    name: str
+    lat: float
+    lon: float
+
+
+class SettingsUpdate(BaseModel):
+    site: SiteUpdate | None = None
+    windowMode: str | None = None
+    alerts: dict[str, bool] | None = None
+
+
+class GeocodeRequest(BaseModel):
+    address: str
+
+
+class GeocodeResult(BaseModel):
+    lat: float
+    lon: float
+    displayName: str
+
+
+class HorizonUpdate(BaseModel):
+    sector: str
+    open: bool
+
+
+class MessierCaptureUpdate(BaseModel):
+    captured: bool
+
+
 class StateOut(BaseModel):
     site: SiteOut
     horizon: dict[str, bool]
@@ -105,3 +136,38 @@ class TargetDetailOut(TargetRowOut):
     exposureLowMin: int
     exposureHighMin: int
     wiki: dict | None
+
+
+class SessionItemOut(BaseModel):
+    designation: str
+    addedAt: str
+    done: bool
+    note: str
+
+
+class CurrentSessionOut(BaseModel):
+    openedAt: str | None
+    scoreAtOpen: int | None
+    items: list[SessionItemOut]
+
+
+class PastSessionOut(BaseModel):
+    date: str
+    score: int | None
+    targets: list[str]
+    note: str
+    closedAt: str
+
+
+class SessionsOut(BaseModel):
+    current: CurrentSessionOut
+    past: list[PastSessionOut]
+
+
+class AddSessionItem(BaseModel):
+    designation: str
+
+
+class UpdateSessionItem(BaseModel):
+    done: bool | None = None
+    note: str | None = None

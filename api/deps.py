@@ -22,12 +22,20 @@ from astro import night_hours, sky_frame, twilight_times
 from catalog import load_targets, load_messier
 from config import SITE, NB_NIGHTS
 from rows import common_row_fields
-from scoring import score_frame, target_windows, view_window_df
+from scoring import night_summary, score_frame, score_label_fr, target_windows, view_window_df
 from weather import fetch_all
 from wiki import target_summary
 
 _night_cache: TTLCache = TTLCache(maxsize=8, ttl=1800)
 _night_lock = threading.Lock()
+
+# Un verrou par fichier persiste (pas un seul verrou global) : serialise les
+# sequences lecture-modification-ecriture de chaque store contre des
+# requetes concurrentes, sans faire attendre une ecriture progress.json
+# derriere une ecriture settings.json sans rapport.
+progress_write_lock = threading.Lock()
+settings_write_lock = threading.Lock()
+sessions_write_lock = threading.Lock()
 _rows_cache: TTLCache = TTLCache(maxsize=32, ttl=1800)
 _rows_lock = threading.Lock()
 # Contenu quasi statique (meme rationale que `_cached_wiki_summary` dans
@@ -132,6 +140,20 @@ def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalo
                     })
         _rows_cache[key] = result
         return result
+
+
+def current_score_pct(site: dict) -> int | None:
+    """Score astro (0-100) de la nuit affichee, avec le mode de fenetre
+    courant -- utilise a l'ouverture d'une session (voir `sessions.add_item`)
+    pour figer le score du moment plutot que de le re-interroger a la
+    cloture."""
+    sel, df, _ = current_night(site)
+    if sel is None:
+        return None
+    view_df = view_window_df(df, get_window_mode())
+    s = night_summary(view_df)
+    pct, _ = score_label_fr(s["score"])
+    return pct
 
 
 def cached_wiki_summary(candidates: list[str]) -> dict | None:

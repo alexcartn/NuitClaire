@@ -1,8 +1,21 @@
-import type { AppState, Night, Settings, TargetDetail, TargetRow } from "./types";
+import type {
+  AppState,
+  GeocodeResult,
+  Night,
+  Sessions,
+  Settings,
+  SettingsUpdate,
+  TargetDetail,
+  TargetRow,
+} from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
-async function get<T>(path: string, params?: Record<string, string | string[]>): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  { params, body }: { params?: Record<string, string | string[]>; body?: unknown } = {},
+): Promise<T> {
   const url = new URL(API_BASE + path);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
@@ -10,20 +23,47 @@ async function get<T>(path: string, params?: Record<string, string | string[]>):
       else url.searchParams.set(key, value);
     }
   }
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  const res = await fetch(url, {
+    method,
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `${path} -> ${res.status}`);
+  }
   return res.json() as Promise<T>;
 }
+
+const get = <T>(path: string, params?: Record<string, string | string[]>) =>
+  request<T>("GET", path, { params });
 
 export const api = {
   state: () => get<AppState>("/api/state"),
   settings: () => get<Settings>("/api/settings"),
+  updateSettings: (update: SettingsUpdate) => request<Settings>("PUT", "/api/settings", { body: update }),
+  geocode: (address: string) => request<GeocodeResult>("POST", "/api/geocode", { body: { address } }),
+  updateHorizon: (sector: string, open: boolean) =>
+    request<Record<string, boolean>>("PUT", "/api/horizon", { body: { sector, open } }),
+  updateMessierCapture: (id: string, captured: boolean) =>
+    request<string[]>("PUT", `/api/messier/${encodeURIComponent(id)}`, { body: { captured } }),
+
   night: () => get<Night>("/api/night"),
-  targets: (types?: string[]) =>
-    get<TargetRow[]>("/api/targets", types?.length ? { types } : undefined),
+  targets: (types?: string[]) => get<TargetRow[]>("/api/targets", types?.length ? { types } : undefined),
   messier: (onlyFeasible?: boolean) =>
     get<TargetRow[]>("/api/messier", onlyFeasible ? { onlyFeasible: "true" } : undefined),
   search: (q: string) => get<TargetRow[]>("/api/search", { q }),
   targetDetail: (designation: string) =>
     get<TargetDetail>(`/api/targets/${encodeURIComponent(designation)}`),
+
+  sessions: () => get<Sessions>("/api/sessions"),
+  addSessionItem: (designation: string) =>
+    request<Sessions>("POST", "/api/sessions/current/items", { body: { designation } }),
+  updateSessionItem: (designation: string, update: { done?: boolean; note?: string }) =>
+    request<Sessions>("PUT", `/api/sessions/current/items/${encodeURIComponent(designation)}`, {
+      body: update,
+    }),
+  deleteSessionItem: (designation: string) =>
+    request<Sessions>("DELETE", `/api/sessions/current/items/${encodeURIComponent(designation)}`),
+  closeSession: () => request<Sessions>("POST", "/api/sessions/current/close"),
 };

@@ -27,15 +27,28 @@ def make_fake_weather_df(days: int = 3) -> pd.DataFrame:
     }, index=idx)
 
 
+def _fake_store(module, monkeypatch, box: dict, key: str):
+    """Remplace `module.load`/`module.save` par un stockage en memoire (un
+    dict de process partage entre les deux) -- un test peut ecrire puis
+    relire dans le meme test sans jamais toucher le vrai fichier JSON, et
+    sans qu'un test laisse un etat residuel visible par le suivant (chaque
+    test recoit sa propre `box` via `api_client`)."""
+    import copy
+
+    box[key] = module.default()
+    monkeypatch.setattr(module, "load", lambda *a, **k: copy.deepcopy(box[key]))
+    monkeypatch.setattr(module, "save", lambda data, *a, **k: box.__setitem__(key, copy.deepcopy(data)))
+
+
 @pytest.fixture
 def api_client(monkeypatch):
     """TestClient pour l'API FastAPI, avec :
     - `weather.fetch_all` remplace par des donnees synthetiques (pas d'appel
       reseau dans les tests) ;
-    - `progress.load`/`settings.load` remplaces par leurs valeurs par defaut
-      (les tests ne doivent jamais lire/ecrire les vrais data/progress.json
-      et data/settings.json de l'utilisateur) -- patch sur le module lui-meme
-      (pas sur l'alias `progress_store`/`settings_store`), pour que ca vaille
+    - `progress.load`/`save`, `settings.load`/`save`, `sessions.load`/`save`
+      remplaces par un stockage en memoire propre a ce test (les tests ne
+      doivent jamais lire/ecrire les vrais data/*.json de l'utilisateur) --
+      patch sur le module lui-meme (pas sur un alias), pour que ca vaille
       pour tous les modules qui l'importent ;
     - les caches TTL de `api.deps` vides a chaque test, pour qu'un test ne
       lise jamais le resultat cache d'un test precedent avec un site/horizon
@@ -44,12 +57,15 @@ def api_client(monkeypatch):
 
     import api.deps as deps
     import progress
+    import sessions
     import settings
     from api.main import app
 
     monkeypatch.setattr(deps, "fetch_all", lambda days, site: make_fake_weather_df())
-    monkeypatch.setattr(progress, "load", lambda *a, **k: progress.default())
-    monkeypatch.setattr(settings, "load", lambda *a, **k: settings.default())
+    box: dict = {}
+    _fake_store(progress, monkeypatch, box, "progress")
+    _fake_store(settings, monkeypatch, box, "settings")
+    _fake_store(sessions, monkeypatch, box, "sessions")
     deps._night_cache.clear()
     deps._rows_cache.clear()
     deps._wiki_cache.clear()

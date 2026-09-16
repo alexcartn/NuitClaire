@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from api.routers import catalog, night, settings, state  # noqa: E402
+from api.routers import catalog, night, progress, sessions, settings, state  # noqa: E402
 
 app = FastAPI(title="NuitClaire API")
 
@@ -35,3 +35,5 @@ app.include_router(night.router)
 app.include_router(catalog.router)
 app.include_router(settings.router)
 app.include_router(state.router)
+app.include_router(progress.router)
+app.include_router(sessions.router)

@@ -9,17 +9,20 @@ import { Detail } from "./screens/Detail";
 import { Messier } from "./screens/Messier";
 import { Recherche } from "./screens/Recherche";
 import { Reglages } from "./screens/Reglages";
+import { Journal } from "./screens/Journal";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("soir");
   const [selected, setSelected] = useState<string | null>(null);
+  const [backTo, setBackTo] = useState<Screen>("cibles");
 
   const fetchState = useCallback(() => api.state(), []);
-  const { data: state } = useFetch(fetchState, []);
+  const { data: state, reload: reloadState } = useFetch(fetchState, []);
   const captured = new Set(state?.messierCaptured ?? []);
 
-  const openTarget = (designation: string) => {
+  const openTarget = (designation: string, from: Screen = screen) => {
     setSelected(designation);
+    setBackTo(from === "detail" ? backTo : from);
     setScreen("detail");
   };
 
@@ -29,15 +32,30 @@ export default function App() {
         {screen === "soir" && (
           <CeSoir onGoTargets={() => setScreen("cibles")} onSearch={() => setScreen("recherche")} />
         )}
-        {screen === "cibles" && <Cibles captured={captured} onOpenTarget={openTarget} />}
-        {screen === "detail" && selected && (
-          <Detail designation={selected} captured={captured} onBack={() => setScreen("cibles")} />
+        {screen === "cibles" && (
+          <Cibles captured={captured} onOpenTarget={(d) => openTarget(d, "cibles")} />
         )}
-        {screen === "messier" && <Messier captured={captured} onOpenTarget={openTarget} />}
-        {screen === "recherche" && <Recherche onOpenTarget={openTarget} onCancel={() => setScreen("soir")} />}
+        {screen === "detail" && selected && (
+          <Detail
+            designation={selected}
+            captured={captured}
+            onBack={() => setScreen(backTo)}
+            onCaptureChange={reloadState}
+          />
+        )}
+        {screen === "messier" && (
+          <Messier captured={captured} onOpenTarget={(d) => openTarget(d, "messier")} onCaptureChange={reloadState} />
+        )}
+        {screen === "journal" && <Journal onOpenTarget={(d) => openTarget(d, "journal")} />}
+        {screen === "recherche" && (
+          <Recherche onOpenTarget={(d) => openTarget(d, "recherche")} onCancel={() => setScreen("soir")} />
+        )}
         {screen === "reglages" && <Reglages />}
       </div>
-      <TabBar screen={screen} onChange={setScreen} />
+      <TabBar
+        active={screen === "detail" ? backTo : screen === "recherche" ? "soir" : screen}
+        onChange={setScreen}
+      />
     </div>
   );
 }

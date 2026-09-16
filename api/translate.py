@@ -8,6 +8,18 @@ def site_to_out(site: dict) -> dict:
             "elevationM": site["elevation_m"], "tz": site["tz"]}
 
 
+def sessions_to_out(data: dict) -> dict:
+    cur = data["current"]
+    items = [
+        {"designation": designation, **item}
+        for designation, item in sorted(cur["items"].items())
+    ]
+    return {
+        "current": {"openedAt": cur["openedAt"], "scoreAtOpen": cur["scoreAtOpen"], "items": items},
+        "past": data["past"],
+    }
+
+
 def row_to_target_out(row: dict) -> dict:
     is_messier = row.get("Messier") is not None
     feasible = None

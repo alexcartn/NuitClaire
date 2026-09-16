@@ -7,9 +7,11 @@ const MESSIER_TOTAL = 110;
 export function Messier({
   captured,
   onOpenTarget,
+  onCaptureChange,
 }: {
   captured: Set<string>;
   onOpenTarget: (designation: string) => void;
+  onCaptureChange: () => void;
 }) {
   const [onlyFeasible, setOnlyFeasible] = useState(false);
 
@@ -76,16 +78,21 @@ export function Messier({
                 <div style={{ fontSize: 11, color: "var(--ink2)", minHeight: 30 }}>
                   {row.commonName || row.type}
                 </div>
-                <span
+                <button
+                  onClick={async () => {
+                    if (!row.messierId) return;
+                    await api.updateMessierCapture(row.messierId, !isCaptured);
+                    onCaptureChange();
+                  }}
+                  className="nc-btn"
                   style={{
                     background: isCaptured ? "var(--accent)" : "var(--surf2)",
                     color: isCaptured ? "var(--onaccent)" : "var(--ink2)",
-                    border: "1px solid var(--line)", borderRadius: 9,
-                    padding: 9, fontSize: 12, textAlign: "center", cursor: "default",
+                    borderRadius: 9, padding: 9, fontSize: 12, textAlign: "center", minHeight: 0,
                   }}
                 >
-                  {isCaptured ? "Capturee ✓" : "Non capturee"}
-                </span>
+                  {isCaptured ? "Capturee ✓" : "Marquer capturee"}
+                </button>
               </div>
             </div>
           );

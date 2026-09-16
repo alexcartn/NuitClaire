@@ -113,4 +113,42 @@ export type CompassSector = (typeof COMPASS_SECTORS)[number];
 // "detail" et "recherche" ne sont pas des onglets de la barre du bas (voir
 // TabBar) : on y arrive respectivement en tapant une cible et via l'icone
 // recherche de l'ecran "Ce soir", comme dans la maquette.
-export type Screen = "soir" | "cibles" | "detail" | "messier" | "recherche" | "reglages";
+export type Screen = "soir" | "cibles" | "detail" | "messier" | "recherche" | "reglages" | "journal";
+
+export interface SettingsUpdate {
+  site?: { name: string; lat: number; lon: number };
+  windowMode?: "complete" | "habituelle";
+  alerts?: Record<string, boolean>;
+}
+
+export interface GeocodeResult {
+  lat: number;
+  lon: number;
+  displayName: string;
+}
+
+export interface SessionItem {
+  designation: string;
+  addedAt: string;
+  done: boolean;
+  note: string;
+}
+
+export interface CurrentSession {
+  openedAt: string | null;
+  scoreAtOpen: number | null;
+  items: SessionItem[];
+}
+
+export interface PastSession {
+  date: string;
+  score: number | null;
+  targets: string[];
+  note: string;
+  closedAt: string;
+}
+
+export interface Sessions {
+  current: CurrentSession;
+  past: PastSession[];
+}

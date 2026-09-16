@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { AltitudeChart } from "../components/AltitudeChart";
@@ -7,18 +7,38 @@ export function Detail({
   designation,
   captured,
   onBack,
+  onCaptureChange,
 }: {
   designation: string;
   captured: Set<string>;
   onBack: () => void;
+  onCaptureChange: () => void;
 }) {
   const fetchDetail = useCallback(() => api.targetDetail(designation), [designation]);
   const { data, loading, error } = useFetch(fetchDetail, [designation]);
+  const [addedToJournal, setAddedToJournal] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+
+  const toggleCapture = async () => {
+    if (!data?.messierId) return;
+    setCapturing(true);
+    try {
+      await api.updateMessierCapture(data.messierId, !captured.has(data.messierId));
+      onCaptureChange();
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  const addToJournal = async () => {
+    await api.addSessionItem(designation);
+    setAddedToJournal(true);
+  };
 
   return (
     <div className="nc-screen">
       <button onClick={onBack} className="nc-caption" style={{ alignSelf: "flex-start", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", padding: "4px 0" }}>
-        ← Cibles
+        ← Retour
       </button>
 
       {loading && <p className="nc-caption">Chargement...</p>}
@@ -107,11 +127,25 @@ export function Detail({
             </div>
           )}
 
-          {data.messierId && (
-            <div className="nc-caption">
-              {captured.has(data.messierId) ? "Deja marquee comme capturee." : "Pas encore capturee."}
-            </div>
-          )}
+          <div style={{ display: "flex", gap: 9 }}>
+            {data.messierId && (
+              <button
+                onClick={toggleCapture}
+                disabled={capturing}
+                className="nc-btn"
+                style={{
+                  flex: 1,
+                  background: captured.has(data.messierId) ? "var(--accent)" : "var(--surf)",
+                  color: captured.has(data.messierId) ? "var(--onaccent)" : "var(--ink)",
+                }}
+              >
+                {captured.has(data.messierId) ? "Capturee ✓" : "Marquer comme capturee"}
+              </button>
+            )}
+            <button onClick={addToJournal} disabled={addedToJournal} className="nc-btn" style={{ flex: "none" }}>
+              {addedToJournal ? "Ajoutee ✓" : "Journal"}
+            </button>
+          </div>
         </>
       )}
     </div>

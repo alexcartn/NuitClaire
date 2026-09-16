@@ -3,6 +3,7 @@ __pycache__/
 .pytest_cache/
 data/progress.json
 data/settings.json
+data/sessions.json
 mobile/node_modules/
 mobile/dist/
 mobile/*.tsbuildinfo
