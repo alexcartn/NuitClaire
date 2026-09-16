@@ -1,6 +1,7 @@
 """Tableau de bord Streamlit : score astro, cibles par direction/horizon, suivi Messier."""
 import re
 from datetime import date, datetime, timedelta
+from html import escape
 from typing import Callable
 from zoneinfo import ZoneInfo
 
@@ -32,13 +33,45 @@ st.markdown(f"""
     padding: 1rem 1.25rem;
     margin-bottom: 0.75rem;
 }}
-.card h4 {{ margin: 0 0 0.25rem 0; font-size: 0.85rem; opacity: 0.7; text-transform: uppercase; }}
+/* opacity 0.85, pas 0.7 : mesure reelle (npx impeccable detect) montrait un
+   contraste de ~1.6:1 sur ces labels/sous-textes a 0.7 (bien sous les 4.5:1
+   requis) -- le texte doit rester secondaire (plus petit, majuscules) sans
+   devenir illisible en plein jour ou sur un ecran de telephone la nuit. */
+.card h4 {{ margin: 0 0 0.25rem 0; font-size: 0.85rem; opacity: 0.85; text-transform: uppercase; }}
 .card .value {{ font-size: 1.8rem; font-weight: 600; }}
-.card .sub {{ font-size: 0.85rem; opacity: 0.7; }}
+.card .sub {{ font-size: 0.85rem; opacity: 0.85; }}
+/* Remplace st.caption() : son style Streamlit integre s'est mesure a ~1.6:1
+   de contraste (npx impeccable detect), pareil que les .card avant le meme
+   correctif -- mais st.caption ne s'y prete pas (classe generee, pas de hook
+   CSS stable), donc on rend ces lignes nous-memes avec la meme opacite 0.85. */
+.soft-caption {{ font-size: 0.875rem; opacity: 0.85; margin: 0.25rem 0; }}
+.soft-caption a {{ color: inherit; text-decoration: underline; }}
 {TWILIGHT_BAR_CSS}
 {CARD_CSS}
 </style>
 """, unsafe_allow_html=True)
+
+
+_FILTER_LABELS = {"sans": "Aucun", "LP": "Anti-pollution lumineuse (LP)"}
+
+
+def _filter_label(code: str) -> str:
+    """Libelle FR lisible pour un code filtre du catalogue ('sans'/'LP') --
+    affiche tel quel si le code est inconnu plutot que de planter."""
+    return _FILTER_LABELS.get(code, code)
+
+
+def _soft_caption(text: str, link: tuple[str, str] | None = None) -> None:
+    """Remplacement de st.caption() a contraste maitrise (voir `.soft-caption`
+    dans le bloc <style>). `link`, si fourni, est (libelle, url) ajoute apres
+    `text`, sous forme de vrai lien -- st.caption interprete du Markdown mais
+    pas du HTML brut, donc un lien ne peut pas etre simplement concatene dans
+    `text`."""
+    html = escape(text)
+    if link:
+        label, url = link
+        html += f' <a href="{escape(url)}" target="_blank">{escape(label)}</a>'
+    st.markdown(f'<div class="soft-caption">{html}</div>', unsafe_allow_html=True)
 
 
 def _subtitle_with_ngc(common_name: str, ngc_name: str | None, primary_name: str) -> str | None:
@@ -118,7 +151,7 @@ with st.sidebar:
             st.error(str(e))
 
     st.header("Horizon degage")
-    st.caption("Cochez les directions ou le ciel est degage depuis votre poste.")
+    _soft_caption("Cochez les directions ou le ciel est degage depuis votre poste.")
     cols = st.columns(4)
     for i, sector in enumerate(COMPASS_SECTORS):
         with cols[i % 4]:
@@ -386,24 +419,41 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
     return rows
 
 
+# Palette dediee a la direction (secteur cardinal), distincte de l'echelle
+# rouge/jaune/vert utilisee partout ailleurs pour la "qualite" (score, nuages,
+# vent) -- une cible qui pointe au nord n'est ni bonne ni mauvaise, le
+# code couleur ici encode juste l'orientation, pas un jugement.
+_COMPASS_COLORS = ["#5E60CE", "#5390D9", "#4EA8DE", "#48BFE3",
+                   "#64DFDF", "#72EFDD", "#B298DC", "#9D4EDD"]
+
+
 def _altitude_chart(series: pd.DataFrame, height: int = 240) -> alt.Chart:
     """Graphe hauteur (altitude) vs heure d'une cible sur toute la nuit, avec la
-    plage utilisable du Seestar S50 (SEESTAR min/max alt) en reperes pointilles."""
+    plage utilisable du Seestar S50 (SEESTAR min/max alt) en reperes
+    pointilles. La cible bouge aussi en azimut (pas seulement en altitude) :
+    chaque point est colore par secteur cardinal (legende auto), l'azimut
+    exact restant disponible au survol -- garde un seul graphe/axe plutot que
+    d'ajouter un second axe ou un graphe azimut separe."""
     long_df = series.reset_index()
-    line = (
+    x = alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT))
+    y = alt.Y("alt:Q", title="Altitude (deg)", scale=alt.Scale(domain=[0, 90]))
+    tooltip = [alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
+               alt.Tooltip("alt:Q", title="Altitude", format=".0f"),
+               alt.Tooltip("az:Q", title="Azimut", format=".0f"),
+               alt.Tooltip("sector:N", title="Direction")]
+    line = alt.Chart(long_df).mark_line(color="#8a8a8a").encode(x=x, y=y)
+    points = (
         alt.Chart(long_df)
-        .mark_line()
+        .mark_point(filled=True, size=70)
         .encode(
-            x=alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT)),
-            y=alt.Y("alt:Q", title="Altitude (deg)", scale=alt.Scale(domain=[0, 90])),
-            tooltip=[alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
-                     alt.Tooltip("alt:Q", title="Altitude", format=".0f"),
-                     alt.Tooltip("sector:N", title="Direction")],
+            x=x, y=y, tooltip=tooltip,
+            color=alt.Color("sector:N", title="Direction", sort=COMPASS_SECTORS,
+                             scale=alt.Scale(domain=COMPASS_SECTORS, range=_COMPASS_COLORS)),
         )
     )
     ref_df = pd.DataFrame({"alt": [SEESTAR["min_alt_deg"], SEESTAR["max_alt_deg"]]})
     rules = alt.Chart(ref_df).mark_rule(strokeDash=[4, 4], color="gray").encode(y="alt:Q")
-    return (line + rules).properties(height=height)
+    return (line + rules + points).properties(height=height)
 
 
 def _wiki_title_candidates(row: dict) -> list[str]:
@@ -447,15 +497,15 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict) -> None
     st.subheader(title)
     subtitle = _subtitle_with_ngc(row["Nom commun"], row.get("NGC"), title)
     if subtitle:
-        st.caption(subtitle)
+        _soft_caption(subtitle)
 
     series = target_altitude_series(night_df, {"ra": row["RA"], "dec": row["Dec"]}, site=site)
     st.altair_chart(_altitude_chart(series), use_container_width=True)
 
     peak_t = series["alt"].idxmax()
     peak = series.loc[peak_t]
-    st.caption(f"Direction a l'altitude max : {peak['sector']} (azimut {peak['az']:.0f}°) "
-               f"vers {peak_t.strftime('%H:%M')}")
+    _soft_caption(f"Direction a l'altitude max : {peak['sector']} (azimut {peak['az']:.0f}°) "
+                  f"vers {peak_t.strftime('%H:%M')}")
 
     mag_txt = f"{row['Mag']:.1f}" if row.get("Mag") is not None else "inconnue"
     size_txt = (f"{row['TailleW']:.1f}' x {row['TailleH']:.1f}'"
@@ -472,7 +522,7 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict) -> None
         st.markdown(f"**Cadrage** : {row.get('Cadrage', 'n/d')}")
     with c2:
         st.markdown(f"**Fenetre exploitable** : {window_txt}")
-        st.markdown(f"**Filtre conseille** : {row.get('Filtre', 'sans')}")
+        st.markdown(f"**Filtre conseille** : {_filter_label(row.get('Filtre', 'sans'))}")
         st.markdown(f"**Separation lunaire mini** : {row.get('Lune deg', 'n/d')}°")
         st.markdown(f"**Temps de pose indicatif** : {low}–{high} min "
                      "(estimation, pas une mesure)")
@@ -484,7 +534,7 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict) -> None
         st.subheader("En savoir plus")
         st.write(summary["extract"])
         if summary.get("url"):
-            st.caption(f"Source : [Wikipedia]({summary['url']})")
+            _soft_caption("Source : ", link=("Wikipedia", summary["url"]))
 
 
 try:
@@ -520,7 +570,13 @@ with tab_ce_soir:
     pct, label = score_label_fr(s["score"])
     emoji = "\U0001F7E2" if s["score"] >= 0.7 else "\U0001F7E1" if s["score"] >= 0.5 else "\U0001F534"
 
-    st.subheader(f"{emoji} Ce soir : {_format_date_fr(sel)}")
+    st.header(f"{emoji} Ce soir : {_format_date_fr(sel)}")
+
+    # Rappel visible sur la page principale (pas seulement dans la sidebar,
+    # repliee par defaut sur mobile derriere une icone sans etiquette) : quels
+    # secteurs d'horizon sont pris en compte pour la liste de cibles plus bas.
+    open_sectors = [sect for sect in COMPASS_SECTORS if prog["horizon"].get(sect)]
+    _soft_caption(f"Horizon degage : {', '.join(open_sectors) if open_sectors else 'aucun secteur'}")
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -555,28 +611,35 @@ with tab_ce_soir:
     st.markdown(twilight_bar_html(tw, now=now_local), unsafe_allow_html=True)
 
     st.subheader("Score astro")
+    _soft_caption("🟢 ≥ 70 · 🟡 40–69 · 🔴 < 40 -- memes seuils pour les nuages et le vent ci-dessous.")
     # Nuit astro complete (df non filtre par le mode Habituelle/Nuit complete) :
     # ce graphe doit toujours montrer toute la nuit, contrairement aux autres
     # graphiques ci-dessous qui respectent le mode d'affichage actif.
     _render_score_chart(df)
 
-    st.subheader("Tendance nuages")
-    # Une seule courbe (couverture nuageuse totale) : le detail par altitude
-    # (basse/moyenne/haute) reste disponible dans "Donnees horaires" ci-dessous
-    # pour qui veut le detail, mais n'est pas utile pour un coup d'oeil rapide.
-    _render_cloud_chart(view_df)
+    # Nuages/rosee/vent/donnees horaires : detail secondaire, replie par
+    # defaut (accordeon) juste en dessous du score plutot qu'en fin de page --
+    # reste a portee immediate sans pousser vers le bas la galerie de cibles.
+    with st.expander("Details meteo (nuages, rosee, vent, donnees horaires)"):
+        st.subheader("Tendance nuages")
+        # Une seule courbe (couverture nuageuse totale) : le detail par
+        # altitude (basse/moyenne/haute) reste dans le tableau ci-dessous.
+        _render_cloud_chart(view_df)
 
-    st.subheader("Point de rosee")
-    _render_time_series(view_df, ["temperature_2m", "dew_point_2m"])
+        st.subheader("Point de rosee")
+        _render_time_series(view_df, ["temperature_2m", "dew_point_2m"])
 
-    st.subheader("Vent")
-    _render_wind_chart(view_df)
+        st.subheader("Vent")
+        _render_wind_chart(view_df)
 
-    with st.expander("Donnees horaires"):
+        st.subheader("Donnees horaires")
         st.dataframe(view_df[["score", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
                                "wind_speed_10m", "wind_gusts_10m", "temperature_2m", "dew_point_2m",
                                "moon_alt", "moon_illum", "seeing", "transparency"]].round(1))
 
+    # La galerie de cibles (la decision reelle : "que pointer ce soir") passe
+    # juste apres le score -- reste tout en haut, a l'oppose du "glanceable"
+    # vise pour un usage juste avant de sortir (cf. .impeccable.md).
     st.subheader("Cibles faisables ce soir")
     horizon_key = tuple(sorted(prog["horizon"].items()))
     rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "targets")
@@ -598,7 +661,7 @@ with tab_ce_soir:
         st.info("Aucune cible exploitable cette nuit (meteo, Lune ou horizon degage).")
 
 with tab_messier:
-    st.subheader("Catalogue Messier")
+    st.header("Catalogue Messier")
     captured = set(prog["messier_captured"])
     messier_total = len(load_messier())
     st.progress(len(captured) / messier_total, text=f"{len(captured)}/{messier_total} captures")

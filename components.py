@@ -30,7 +30,9 @@ _TWILIGHT_TICKS = [
 # Meme grammaire visuelle que .card h4 dans app.py (petit, majuscules, attenue)
 # pour toutes les etiquettes secondaires des nouveaux composants -- l'oeil doit
 # accrocher la valeur (le chiffre, l'heure), pas l'etiquette qui la precede.
-_LABEL_CSS = "font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.65;"
+# opacity 0.85 (pas 0.65) pour la meme raison que .card h4/.sub dans app.py :
+# mesure reelle du contraste trop faible (~1.6:1) au reglage precedent.
+_LABEL_CSS = "font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.85;"
 
 TWILIGHT_BAR_CSS = f"""
 .twilight-bar-wrap {{ margin: 8px 0 24px 0; }}
@@ -52,10 +54,10 @@ TWILIGHT_BAR_CSS = f"""
    dans le temps (ex. civil_dusk/nautical_dusk), qui se chevauchent sinon a
    l'etroit -- notamment sur mobile ou les % de l'axe valent peu de pixels. */
 .twilight-tick:nth-child(even) {{ top: 24px; }}
-.twilight-tick .time {{ display: block; font-size: 0.75rem; opacity: 0.75; }}
+.twilight-tick .time {{ display: block; font-size: 0.75rem; opacity: 0.85; }}
 .twilight-tick .label {{ display: block; margin-top: 2px; {_LABEL_CSS} }}
 .twilight-tick.astro .time {{ font-weight: 700; opacity: 1; }}
-.twilight-tick.astro .label {{ opacity: 0.85; }}
+.twilight-tick.astro .label {{ opacity: 0.95; }}
 
 @media (max-width: 480px) {{
     .twilight-tick .time {{ font-size: 0.66rem; }}
@@ -69,7 +71,7 @@ CARD_CSS = f"""
 .target-card img {{ width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; }}
 .target-card-body {{ padding: 12px 12px 16px 12px; display: flex; flex-direction: column; gap: 8px; }}
 .target-card-title {{ font-weight: 600; font-size: 0.95rem; }}
-.target-card-subtitle {{ font-size: 0.8rem; opacity: 0.7; margin-top: -6px; }}
+.target-card-subtitle {{ font-size: 0.8rem; opacity: 0.85; margin-top: -6px; }}
 .target-card-badges {{ display: flex; flex-wrap: wrap; gap: 4px; }}
 .target-card-badge {{ {_LABEL_CSS} padding: 2px 8px; border-radius: 999px;
     background: rgba(127,127,127,0.18); }}
