@@ -16,7 +16,7 @@ from astro import (night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_
                     format_ra, format_dec, moon_status)
 from scoring import (score_frame, night_summary, target_windows, score_label_fr,
                       target_altitude_series, recommended_exposure_minutes, wind_quality,
-                      target_feasibility_reasons)
+                      target_feasibility_reasons, cloud_trend, CLOUD_TREND_WINDOW_HOURS)
 from catalog import load_targets, load_messier, find_target
 from geocode import geocode, GeocodeError
 from imagery import dss_image_url
@@ -368,6 +368,22 @@ def _render_score_chart(df: pd.DataFrame) -> None:
         st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
         return
     st.altair_chart(_score_chart(df), use_container_width=True)
+
+
+_CLOUD_TREND_ICON = {"amelioration": "🟢", "stable": "🟡", "degradation": "🔴"}
+
+
+def _render_cloud_trend(df: pd.DataFrame, now: pd.Timestamp | None) -> None:
+    """Caption 'maintenant -> prochaines heures' au-dessus du graphe nuages ;
+    silencieuse si `cloud_trend` ne peut rien calculer (nuit differente
+    d'aujourd'hui, donnees manquantes...) plutot que d'afficher un message
+    d'erreur pour ce qui n'est qu'une info secondaire."""
+    trend = cloud_trend(df, now)
+    if trend is None:
+        return
+    icon = _CLOUD_TREND_ICON[trend["direction"]]
+    _soft_caption(f"{icon} {trend['label']} attendue : nuages {trend['now_pct']}% "
+                  f"-> {trend['future_pct']}% dans les {CLOUD_TREND_WINDOW_HOURS} prochaines heures.")
 
 
 def _render_cloud_chart(df: pd.DataFrame) -> None:
@@ -765,6 +781,9 @@ with tab_ce_soir:
         st.subheader("Tendance nuages")
         # Une seule courbe (couverture nuageuse totale) : le detail par
         # altitude (basse/moyenne/haute) reste dans le tableau ci-dessous.
+        # `df` (nuit complete), pas `view_df`, pour retrouver "maintenant"
+        # meme quand le mode d'affichage restreint la fenetre visible.
+        _render_cloud_trend(df, now_local)
         _render_cloud_chart(view_df)
 
         st.subheader("Point de rosee")

@@ -2,7 +2,7 @@ import pandas as pd
 
 from scoring import (score_label_fr, best_window, target_windows, target_altitude_series,
                      recommended_exposure_minutes, wind_quality, target_feasibility_reasons,
-                     hourly_score)
+                     hourly_score, cloud_trend)
 
 
 def test_score_label_fr_buckets():
@@ -192,6 +192,49 @@ def test_hourly_score_not_vetoed_when_low_clouds_below_threshold():
         "precipitation_probability": 0,
     })
     assert hourly_score(row) > 0.0
+
+
+def _make_cloud_df():
+    idx = pd.date_range("2026-09-15 20:00", periods=6, freq="1h")
+    return pd.DataFrame({"cloud_cover": [80, 80, 50, 30, 20, 20]}, index=idx)
+
+
+def test_cloud_trend_detects_improvement():
+    df = _make_cloud_df()
+    trend = cloud_trend(df, pd.Timestamp("2026-09-15 20:00"))
+    assert trend["direction"] == "amelioration"
+    assert trend["now_pct"] == 80
+
+
+def test_cloud_trend_detects_degradation():
+    idx = pd.date_range("2026-09-15 20:00", periods=4, freq="1h")
+    df = pd.DataFrame({"cloud_cover": [10, 40, 60, 80]}, index=idx)
+    trend = cloud_trend(df, pd.Timestamp("2026-09-15 20:00"))
+    assert trend["direction"] == "degradation"
+
+
+def test_cloud_trend_detects_stable():
+    idx = pd.date_range("2026-09-15 20:00", periods=4, freq="1h")
+    df = pd.DataFrame({"cloud_cover": [40, 42, 38, 41]}, index=idx)
+    trend = cloud_trend(df, pd.Timestamp("2026-09-15 20:00"))
+    assert trend["direction"] == "stable"
+
+
+def test_cloud_trend_none_when_now_is_none():
+    assert cloud_trend(_make_cloud_df(), None) is None
+
+
+def test_cloud_trend_none_when_now_outside_df_range():
+    df = _make_cloud_df()
+    # "now" avant la premiere heure de la nuit -- rien a comparer en amont.
+    trend = cloud_trend(df, pd.Timestamp("2026-09-15 10:00"))
+    assert trend is None
+
+
+def test_cloud_trend_none_when_now_is_last_hour():
+    df = _make_cloud_df()
+    trend = cloud_trend(df, df.index[-1])
+    assert trend is None
 
 
 def test_target_windows_uses_site_timezone_not_frozen_module_tz(monkeypatch):

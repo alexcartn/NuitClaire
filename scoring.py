@@ -116,6 +116,45 @@ def night_summary(df: pd.DataFrame) -> dict:
     }
 
 
+CLOUD_TREND_WINDOW_HOURS = 3
+CLOUD_TREND_THRESHOLD_PCT = 10.0
+
+
+def cloud_trend(df: pd.DataFrame, now: pd.Timestamp | None) -> dict | None:
+    """Tendance nuages horaire simple : compare la couverture nuageuse totale
+    'maintenant' a la moyenne des `CLOUD_TREND_WINDOW_HOURS` heures suivantes,
+    pour dire si le ciel se degage, se degrade ou reste stable. Renvoie None
+    quand `now` ne tombe pas dans `df` (nuit differente d'aujourd'hui) ou
+    qu'il ne reste pas assez d'heures futures pour comparer.
+
+    Volontairement limite a un seul point (la position du site) : pas
+    d'anneau de points geographiques autour -- a cette echelle, l'ecart
+    entre points proches serait surtout du bruit de modele, pas un vrai
+    signal, et le site de l'utilisateur est fixe de toute facon."""
+    if now is None or "cloud_cover" not in df:
+        return None
+    past_or_now = df.index[df.index <= now]
+    if past_or_now.empty:
+        return None
+    current_t = past_or_now.max()
+    now_pct = df.loc[current_t, "cloud_cover"]
+    future = df.loc[df.index > current_t, "cloud_cover"].head(CLOUD_TREND_WINDOW_HOURS)
+    if pd.isna(now_pct) or future.empty or future.isna().all():
+        return None
+    future_pct = future.mean()
+    delta = future_pct - now_pct
+    if delta <= -CLOUD_TREND_THRESHOLD_PCT:
+        direction, label = "amelioration", "Amélioration"
+    elif delta >= CLOUD_TREND_THRESHOLD_PCT:
+        direction, label = "degradation", "Dégradation"
+    else:
+        direction, label = "stable", "Stable"
+    return {
+        "direction": direction, "label": label,
+        "now_pct": round(now_pct), "future_pct": round(future_pct), "delta": round(delta),
+    }
+
+
 def _target_sky_frame(df: pd.DataFrame, target: dict, site: dict = SITE) -> pd.DataFrame:
     """Altitude/azimut/secteur/separation lunaire de `target` a chaque horodatage
     de `df`, dans le fuseau de `site`. Base commune a `target_windows` (filtrage
