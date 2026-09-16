@@ -37,6 +37,20 @@ def sun_moon(t_local: datetime, site: dict = SITE) -> dict:
     }
 
 
+def moon_status(t_local: datetime, site: dict = SITE) -> dict:
+    """Etat de la Lune a l'instant `t_local` : illumination (%), tendance
+    croissante/decroissante et taille angulaire apparente (arcmin). Ces
+    grandeurs varient a peine sur quelques heures (cycle synodique de ~29.5
+    jours), donc un seul instant de la nuit (ex. le crepuscule astro) suffit --
+    pas besoin d'une serie horaire comme pour l'altitude."""
+    obs = _observer(t_local, site)
+    moon = ephem.Moon(obs)
+    # Croissante si le prochain evenement du cycle est la pleine lune (donc
+    # l'illumination est encore en train de monter) plutot que la nouvelle lune.
+    waxing = ephem.next_full_moon(obs.date) < ephem.next_new_moon(obs.date)
+    return {"illum": moon.phase, "waxing": waxing, "size_arcmin": moon.size / 60}
+
+
 def target_altaz(t_local: datetime, ra_h: float, dec_deg: float,
                   site: dict = SITE) -> tuple[float, float]:
     obs = _observer(t_local, site)

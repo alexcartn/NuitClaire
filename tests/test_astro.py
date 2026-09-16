@@ -1,7 +1,8 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from astro import compass_sector, twilight_times, target_altaz, night_hours, format_ra, format_dec
+from astro import (compass_sector, twilight_times, target_altaz, night_hours, format_ra,
+                    format_dec, moon_status)
 from config import SITE
 
 TZ = ZoneInfo(SITE["tz"])
@@ -34,6 +35,21 @@ def test_format_dec_positive_and_negative():
 
 def test_format_dec_carries_minute_rounding_into_degree():
     assert format_dec(1.9999) == "+02°00'"
+
+
+def test_moon_status_waxing_before_full_moon():
+    t = datetime(2026, 9, 16, 12, 0, tzinfo=TZ)
+    status = moon_status(t)
+    assert status["waxing"] is True
+    assert 20 < status["illum"] < 35
+    assert 29 < status["size_arcmin"] < 34  # taille angulaire apparente de la Lune
+
+
+def test_moon_status_waning_after_full_moon():
+    t = datetime(2026, 9, 27, 12, 0, tzinfo=TZ)
+    status = moon_status(t)
+    assert status["waxing"] is False
+    assert status["illum"] > 90
 
 
 def test_twilight_times_order_for_known_date():

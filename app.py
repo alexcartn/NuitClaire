@@ -10,9 +10,9 @@ import streamlit as st
 from config import SITE, NB_NIGHTS, VIEW_WINDOW, SEESTAR
 from weather import fetch_all
 from astro import (night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_SECTORS,
-                    format_ra, format_dec)
+                    format_ra, format_dec, moon_status)
 from scoring import (score_frame, night_summary, target_windows, score_label_fr,
-                      best_window_span, target_altitude_series, recommended_exposure_minutes)
+                      target_altitude_series, recommended_exposure_minutes)
 from catalog import load_targets, load_messier
 from geocode import geocode, GeocodeError
 from imagery import dss_image_url
@@ -220,13 +220,12 @@ def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220,
     )
 
 
-def _render_time_series(df: pd.DataFrame, columns: list[str], height: int = 220,
-                         y_title: str = "") -> None:
-    """Affiche le graphique, sauf dans deux cas degeneres ou l'axe X (temps) ou
-    l'axe Y (valeurs) n'a pas de domaine exploitable pour Altair/Vega-Lite --
-    dans les deux cas, on obtient des erreurs SVG malformees cote navigateur
-    (transform/translate avec Number.MAX_VALUE) plutot qu'un graphique casse
-    visuellement, donc on affiche un message a la place :
+def _has_plottable_data(df: pd.DataFrame, columns: list[str]) -> bool:
+    """Faux dans deux cas degeneres ou l'axe X (temps) ou l'axe Y (valeurs) n'a
+    pas de domaine exploitable pour Altair/Vega-Lite -- dans les deux cas, on
+    obtient des erreurs SVG malformees cote navigateur (transform/translate
+    avec Number.MAX_VALUE) plutot qu'un graphique casse visuellement, donc
+    l'appelant affiche un message a la place :
     - un seul horodatage distinct (ou moins) : typique quand la fenetre
       "Habituelle" (20h-22h30 fixe) ne recouvre que tres peu d'heures de nuit
       astronomique reelle selon la saison ;
@@ -237,17 +236,82 @@ def _render_time_series(df: pd.DataFrame, columns: list[str], height: int = 220,
     Attention, cette garde est tout-ou-rien sur `columns` : elle ne detecte
     pas le cas ou seule UNE colonne est entierement NaN pendant qu'une autre
     a des valeurs (ex. `seeing`/`transparency` de 7Timer, dont l'horizon de
-    prevision est plus court que celui d'Open-Meteo). Ce cas ne se produit
-    pas aujourd'hui pour les deux graphiques existants (chacun ne melange que
-    des colonnes de la meme source), mais un futur graphique melangeant des
+    prevision est plus court que celui d'Open-Meteo). Ce cas ne se produit pas
+    aujourd'hui pour les graphiques existants (chacun ne melange que des
+    colonnes de la meme source), mais un futur graphique melangeant des
     colonnes de sources differentes devra verifier la couverture colonne par
     colonne plutot que de reutiliser cette garde telle quelle.
     """
-    if df.index.nunique() < 2 or not df[columns].notna().any().any():
+    return df.index.nunique() >= 2 and df[columns].notna().any().any()
+
+
+def _render_time_series(df: pd.DataFrame, columns: list[str], height: int = 220,
+                         y_title: str = "") -> None:
+    """Affiche `_time_series_chart`, ou un message si les donnees ne s'y pretent pas."""
+    if not _has_plottable_data(df, columns):
         st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
         return
     st.altair_chart(_time_series_chart(df, columns, height=height, y_title=y_title),
                      use_container_width=True)
+
+
+# Seuils identiques a score_label_fr (40/70), pour que la couleur d'un point
+# sur les graphes ci-dessous corresponde aux memes paliers rouge/jaune/vert que
+# partout ailleurs dans l'appli (emoji d'en-tete, etiquette du score). Les
+# paires de bornes dupliquees (39.999/40, 69.999/70) simulent un degrade en
+# paliers nets plutot qu'une transition continue rouge->jaune->vert.
+_QUALITY_DOMAIN = [0, 39.999, 40, 69.999, 70, 100]
+_QUALITY_RANGE = ["#e2434f", "#e2434f", "#f2c94c", "#f2c94c", "#27ae60", "#27ae60"]
+
+
+def _quality_color_scale() -> alt.Scale:
+    return alt.Scale(domain=_QUALITY_DOMAIN, range=_QUALITY_RANGE)
+
+
+def _score_chart(df: pd.DataFrame, height: int = 220) -> alt.Chart:
+    """Score astro horaire (0-100) sur la nuit : ligne + points colores selon
+    les memes seuils rouge/jaune/vert que `score_label_fr`."""
+    plot_df = df[["score"]].reset_index()
+    plot_df["score_pct"] = (plot_df["score"] * 100).round()
+    y = alt.Y("score_pct:Q", title="Score astro", scale=alt.Scale(domain=[0, 100]))
+    line = (alt.Chart(plot_df).mark_line(color="#8a8a8a")
+            .encode(x=alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT)), y=y))
+    points = (alt.Chart(plot_df).mark_point(filled=True, size=70)
+              .encode(x="time:T", y=y,
+                      color=alt.Color("score_pct:Q", scale=_quality_color_scale(), legend=None),
+                      tooltip=[alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
+                               alt.Tooltip("score_pct:Q", title="Score")]))
+    return (line + points).properties(height=height)
+
+
+def _cloud_chart(df: pd.DataFrame, height: int = 220) -> alt.Chart:
+    """Couverture nuageuse horaire (%) : ligne + points colores rouge/jaune/vert
+    selon la clarte du ciel (100 - nuages), memes seuils que `_score_chart`."""
+    plot_df = df[["cloud_cover"]].reset_index()
+    plot_df["clarity"] = 100 - plot_df["cloud_cover"]
+    y = alt.Y("cloud_cover:Q", title="Couverture nuageuse (%)", scale=alt.Scale(domain=[0, 100]))
+    line = (alt.Chart(plot_df).mark_line(color="#8a8a8a")
+            .encode(x=alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT)), y=y))
+    points = (alt.Chart(plot_df).mark_point(filled=True, size=70)
+              .encode(x="time:T", y=y,
+                      color=alt.Color("clarity:Q", scale=_quality_color_scale(), legend=None),
+                      tooltip=[alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
+                               alt.Tooltip("cloud_cover:Q", title="Nuages", format=".0f")]))
+    return (line + points).properties(height=height)
+
+
+def _render_score_chart(df: pd.DataFrame) -> None:
+    if not _has_plottable_data(df, ["score"]):
+        st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
+        return
+    st.altair_chart(_score_chart(df), use_container_width=True)
+
+
+def _render_cloud_chart(df: pd.DataFrame) -> None:
+    if not _has_plottable_data(df, ["cloud_cover"]):
+        st.info("Pas assez de donnees sur cette fenetre pour un graphique.")
+        return
+    st.altair_chart(_cloud_chart(df), use_container_width=True)
 
 
 @st.cache_data(ttl=1800)
@@ -396,19 +460,11 @@ with tab_ce_soir:
 
     st.subheader(f"{emoji} Ce soir : {_format_date_fr(sel)}")
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(f'<div class="card"><h4>Astro score</h4><div class="value">{pct}/100</div>'
                     f'<div class="sub">{label}</div></div>', unsafe_allow_html=True)
     with c2:
-        # .mean() peut rendre NaN si la fenetre affichee ne recouvre que des
-        # heures ou ce champ meteo manque (observe sur des nuits lointaines) --
-        # round(nan) leve ValueError, d'ou le garde-fou pd.notna() ci-dessous.
-        cloud_mean = view_df["cloud_cover"].mean() if "cloud_cover" in view_df else float("nan")
-        cloud_text = f"{round(cloud_mean)}%" if pd.notna(cloud_mean) else "n/d"
-        st.markdown(f'<div class="card"><h4>Nuages</h4><div class="value">{cloud_text}</div>'
-                    f'<div class="sub">Moyenne de la nuit</div></div>', unsafe_allow_html=True)
-    with c3:
         spread = (view_df["temperature_2m"] - view_df["dew_point_2m"]).min()
         if pd.isna(spread):
             risk, advice, spread_text = "Inconnu", "donnees manquantes", "n/d"
@@ -419,31 +475,44 @@ with tab_ce_soir:
         st.markdown(f'<div class="card"><h4>Risque de buee (ecart {spread_text} deg)</h4>'
                     f'<div class="value">{risk}</div>'
                     f'<div class="sub">Anti-buee : {advice}</div></div>', unsafe_allow_html=True)
-    with c4:
-        window_text = s["best_window"] or "Aucune"
-        st.markdown(f'<div class="card"><h4>Meilleure fenetre</h4>'
-                    f'<div class="value">{window_text}</div>'
-                    f'<div class="sub">Fenetre astro {tw["astro_dusk"].strftime("%H:%M")}'
-                    f'–{tw["astro_dawn"].strftime("%H:%M")}</div></div>', unsafe_allow_html=True)
+    with c3:
+        # Calculee au crepuscule astro : illumination/taille de la Lune ne
+        # bougent quasiment pas sur une nuit (cycle synodique de ~29.5 jours),
+        # un seul instant de reference suffit (voir astro.moon_status).
+        moon = moon_status(tw["astro_dusk"].replace(tzinfo=ZoneInfo(site["tz"])), site=site)
+        trend = "Croissante" if moon["waxing"] else "Decroissante"
+        st.markdown(f'<div class="card"><h4>Lune</h4><div class="value">{moon["illum"]:.0f}%</div>'
+                    f'<div class="sub">{trend} · {moon["size_arcmin"]:.1f}\'</div></div>',
+                    unsafe_allow_html=True)
 
     # Repere "maintenant" uniquement si la nuit affichee est bien celle de ce
-    # soir (toujours vrai sauf repli sur `next(iter(nights))` ci-dessus).
+    # soir (toujours vrai sauf repli sur `next(iter(nights))` ci-dessus). Plus
+    # de surlignage "meilleure fenetre" : ca donnait l'impression trompeuse
+    # que le vert marquait toute la session astro plutot qu'un sous-interval.
     now_local = datetime.now(ZoneInfo(site["tz"])).replace(tzinfo=None) if sel == date.today() else None
-    st.markdown(twilight_bar_html(tw, best_span=best_window_span(view_df), now=now_local),
-                unsafe_allow_html=True)
+    st.markdown(twilight_bar_html(tw, now=now_local), unsafe_allow_html=True)
+
+    st.subheader("Score astro")
+    # Nuit astro complete (df non filtre par le mode Habituelle/Nuit complete) :
+    # ce graphe doit toujours montrer toute la nuit, contrairement aux autres
+    # graphiques ci-dessous qui respectent le mode d'affichage actif.
+    _render_score_chart(df)
 
     st.subheader("Tendance nuages")
     # Une seule courbe (couverture nuageuse totale) : le detail par altitude
     # (basse/moyenne/haute) reste disponible dans "Donnees horaires" ci-dessous
     # pour qui veut le detail, mais n'est pas utile pour un coup d'oeil rapide.
-    _render_time_series(view_df, ["cloud_cover"], y_title="Couverture nuageuse (%)")
+    _render_cloud_chart(view_df)
 
     st.subheader("Point de rosee")
     _render_time_series(view_df, ["temperature_2m", "dew_point_2m"])
 
+    st.subheader("Vent")
+    _render_time_series(view_df, ["wind_speed_10m", "wind_gusts_10m"], y_title="Vent (km/h)")
+
     with st.expander("Donnees horaires"):
         st.dataframe(view_df[["score", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
-                               "wind_gusts_10m", "temperature_2m", "dew_point_2m",
+                               "wind_speed_10m", "wind_gusts_10m", "temperature_2m", "dew_point_2m",
                                "moon_alt", "moon_illum", "seeing", "transparency"]].round(1))
 
     st.subheader("Cibles faisables ce soir")
