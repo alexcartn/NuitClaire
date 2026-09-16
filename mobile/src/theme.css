@@ -1,0 +1,195 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap");
+
+[data-theme="dark"] {
+  --bg: #0a090c;
+  --surf: #15131b;
+  --surf2: #1e1b26;
+  --line: rgba(255, 255, 255, 0.1);
+  --ink: #f4f2f7;
+  --ink2: rgba(244, 242, 247, 0.7);
+  --ink3: rgba(244, 242, 247, 0.46);
+  --accent: oklch(0.74 0.15 326);
+  --onaccent: #1a0410;
+  --good: #4ecf86;
+  --mid: #f2c94c;
+  --bad: #ff6b76;
+  --stripe: rgba(255, 255, 255, 0.07);
+  --bar: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme="light"] {
+  --bg: #f6f4f8;
+  --surf: #ffffff;
+  --surf2: #ede9f1;
+  --line: rgba(24, 16, 28, 0.12);
+  --ink: #16131a;
+  --ink2: rgba(22, 19, 26, 0.66);
+  --ink3: rgba(22, 19, 26, 0.46);
+  --accent: oklch(0.52 0.19 326);
+  --onaccent: #ffffff;
+  --good: #127940;
+  --mid: #8a6406;
+  --bad: #c5303c;
+  --stripe: rgba(20, 12, 26, 0.06);
+  --bar: rgba(20, 12, 26, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.nc-mono {
+  font-family: "JetBrains Mono", monospace;
+}
+
+.nc-strip {
+  background-image: repeating-linear-gradient(135deg, var(--stripe) 0 6px, transparent 6px 12px);
+}
+
+.nc-scroll::-webkit-scrollbar {
+  width: 0;
+}
+
+.nc-app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.nc-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 18px 26px;
+}
+
+.nc-eyebrow {
+  font: 500 10px/1 "JetBrains Mono", monospace;
+  letter-spacing: 0.16em;
+  color: var(--ink3);
+  text-transform: uppercase;
+}
+
+.nc-title {
+  font: 400 22px/1.15 "Helvetica Neue", Helvetica, sans-serif;
+  margin-top: 8px;
+}
+
+.nc-sub {
+  font: 400 13px/1.4 "Helvetica Neue", Helvetica, sans-serif;
+  color: var(--ink2);
+  margin-top: 5px;
+}
+
+.nc-card {
+  background: var(--surf);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.nc-card-lg {
+  border-radius: 20px;
+  padding: 19px 18px;
+}
+
+.nc-btn {
+  font: 400 13px/1.2 "Helvetica Neue", Helvetica, sans-serif;
+  border-radius: 11px;
+  padding: 13px;
+  cursor: pointer;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  background: var(--surf);
+  color: var(--ink);
+}
+
+.nc-btn-primary {
+  background: var(--accent);
+  color: var(--onaccent);
+  border: none;
+}
+
+.nc-chip {
+  padding: 7px 11px;
+  border-radius: 20px;
+  font: 500 11px/1 "JetBrains Mono", monospace;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+}
+
+.nc-chip-active {
+  background: var(--accent);
+  color: var(--onaccent);
+  border-color: var(--accent);
+}
+
+.nc-caption {
+  font: 400 11px/1.4 "Helvetica Neue", Helvetica, sans-serif;
+  color: var(--ink3);
+}
+
+.nc-tabbar {
+  flex: none;
+  border-top: 1px solid var(--line);
+  background: var(--surf);
+  padding: 9px 6px calc(9px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+}
+
+.nc-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  color: var(--ink3);
+}
+
+.nc-tab-active {
+  color: var(--ink);
+}
+
+.nc-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--bar);
+}
+
+.nc-tab-active .nc-tab-dot {
+  background: var(--accent);
+}
+
+.nc-tab-label {
+  font: 400 10px/1.2 "Helvetica Neue", Helvetica, sans-serif;
+}

@@ -1,5 +1,6 @@
 """Persistance locale : secteurs d'horizon degages et Messiers captures."""
 import json
+import os
 from pathlib import Path
 from types import MappingProxyType
 
@@ -63,9 +64,16 @@ def load(path: Path = PROGRESS_PATH) -> dict:
 
 
 def save(data: dict, path: Path = PROGRESS_PATH) -> None:
+    """Ecriture atomique (fichier temporaire + `os.replace`) : un crash ou une
+    coupure en plein milieu de l'ecriture laisse l'ancien fichier intact
+    plutot qu'un JSON tronque -- important maintenant que ce fichier peut
+    aussi etre ecrit par l'API mobile (requetes concurrentes possibles,
+    contrairement au script Streamlit qui traite une requete a la fois)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
 
 
 def toggle_messier(data: dict, messier_id: str) -> dict:

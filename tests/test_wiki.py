@@ -1,6 +1,6 @@
 import requests
 
-from wiki import target_summary, _clean_extract
+from wiki import target_summary, _clean_extract, wiki_title_candidates
 
 
 class FakeResponse:
@@ -107,3 +107,17 @@ def test_clean_extract_strips_section_headings():
     assert "==" not in cleaned
     assert "Chapeau introductif." in cleaned
     assert "Deuxieme paragraphe." in cleaned
+
+
+def test_wiki_title_candidates_orders_messier_first():
+    row = {"Cible": None, "Messier": "M31", "Nom commun": "Andromeda Galaxy", "NGC": "NGC0224"}
+    assert wiki_title_candidates(row) == ["Messier 31", "M31", "Andromeda Galaxy", "NGC 224"]
+
+
+def test_wiki_title_candidates_non_messier_target():
+    row = {"Cible": "NGC7380", "Messier": None, "Nom commun": "", "NGC": None}
+    assert wiki_title_candidates(row) == ["NGC7380"]
+
+
+def test_wiki_title_candidates_skips_missing_fields():
+    assert wiki_title_candidates({"Cible": None, "Messier": None, "Nom commun": "", "NGC": None}) == []

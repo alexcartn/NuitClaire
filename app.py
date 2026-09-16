@@ -1,6 +1,5 @@
 """Tableau de bord Streamlit : score astro, cibles par direction/horizon, suivi Messier."""
-import re
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from html import escape
 from itertools import groupby
 from typing import Callable
@@ -10,18 +9,19 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from config import SITE, NB_NIGHTS, VIEW_WINDOW, SEESTAR
+from config import SITE, NB_NIGHTS, SEESTAR
 from weather import fetch_all
-from astro import (night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_SECTORS,
-                    format_ra, format_dec, moon_status)
+from astro import (night_hours, sky_frame, twilight_times, COMPASS_SECTORS,
+                    format_ra, format_dec, moon_status, local_now)
 from scoring import (score_frame, night_summary, target_windows, score_label_fr,
                       target_altitude_series, recommended_exposure_minutes, wind_quality,
-                      target_feasibility_reasons, cloud_trend, CLOUD_TREND_WINDOW_HOURS)
+                      target_feasibility_reasons, cloud_trend, CLOUD_TREND_WINDOW_HOURS,
+                      dew_risk, discovery_sort_key, view_window_df)
 from catalog import load_targets, load_messier, find_target
 from geocode import geocode, GeocodeError
-from imagery import dss_image_url
-from wiki import target_summary
+from wiki import target_summary, wiki_title_candidates
 from components import TWILIGHT_BAR_CSS, CARD_CSS, twilight_bar_html, card_html
+from rows import common_row_fields, row_from_search, day_frame, filter_label, subtitle_with_ngc
 import progress as progress_store
 
 st.set_page_config(page_title="NuitClaire", page_icon="\U0001F52D", layout="wide")
@@ -54,15 +54,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-_FILTER_LABELS = {"sans": "Aucun", "LP": "Anti-pollution lumineuse (LP)"}
-
-
-def _filter_label(code: str) -> str:
-    """Libelle FR lisible pour un code filtre du catalogue ('sans'/'LP') --
-    affiche tel quel si le code est inconnu plutot que de planter."""
-    return _FILTER_LABELS.get(code, code)
-
-
 def _soft_caption(text: str, link: tuple[str, str] | None = None, italic: bool = False) -> None:
     """Remplacement de st.caption() a contraste maitrise (voir `.soft-caption`
     dans le bloc <style>). `link`, si fourni, est (libelle, url) ajoute apres
@@ -77,23 +68,13 @@ def _soft_caption(text: str, link: tuple[str, str] | None = None, italic: bool =
     st.markdown(f'<div class="soft-caption"{style}>{html}</div>', unsafe_allow_html=True)
 
 
-def _subtitle_with_ngc(common_name: str, ngc_name: str | None, primary_name: str) -> str | None:
-    """Combine le nom usuel et la designation NGC/IC alternative, quand elle
-    differe du nom principal affiche -- pertinent uniquement pour les objets
-    Messier, dont le nom principal est "M##" plutot que la designation NGC/IC
-    (ex. M31 -> sous-titre "Andromeda Galaxy - NGC0224")."""
-    parts = [p for p in (common_name or None, ngc_name if ngc_name and ngc_name != primary_name else None)
-             if p]
-    return " · ".join(parts) or None
-
-
 def _target_card(row: dict) -> dict:
     """Mappe une ligne de `feasible_rows(..., "targets")` vers la forme de carte
     attendue par `components.gallery_html`."""
     return {
         "image": row["Image"],
         "title": row["Cible"],
-        "subtitle": _subtitle_with_ngc(row["Nom commun"], row.get("NGC"), row["Cible"]),
+        "subtitle": subtitle_with_ngc(row["Nom commun"], row.get("NGC"), row["Cible"]),
         "badges": [row["Type"], row["Cadrage"]],
         "meta": [
             ("Fenetre", f"{row['Debut']}–{row['Fin']} ({row['Heures']} h)"),
@@ -120,7 +101,7 @@ def _messier_card_html(row: dict) -> str:
     reste un widget Streamlit reel, ajoute a cote dans l'onglet Messier."""
     return card_html(
         image=row["Image"], title=row["Messier"],
-        subtitle=_subtitle_with_ngc(row["Nom commun"], row.get("NGC"), row["Messier"]),
+        subtitle=subtitle_with_ngc(row["Nom commun"], row.get("NGC"), row["Messier"]),
         badges=[row["Type"]],
         meta=[("Faisable ce soir", f"{row['Faisable ce soir']} ({row['Heures']} h)")],
     )
@@ -194,17 +175,6 @@ def load(site_key: tuple):
         nights[d] = score_frame(df)
         twilights[d] = twilight_times(d, site=site_dict)
     return nights, twilights
-
-
-def _view_df(df: pd.DataFrame, view_mode_key: str) -> pd.DataFrame:
-    """Filtre `df` sur la fenetre d'observation habituelle, sauf si elle est vide
-    ou que le mode 'nuit complete' est actif."""
-    if view_mode_key != "habituelle":
-        return df
-    start_h, end_h = VIEW_WINDOW["start_hour"], VIEW_WINDOW["end_hour"]
-    mask = df.index.map(lambda t: start_h <= t.hour + t.minute / 60 <= end_h)
-    filtered = df[mask]
-    return filtered if not filtered.empty else df
 
 
 TIME_AXIS_FORMAT = "%H:%M"  # 24h partout, jamais d'AM/PM -- axe + tooltip des graphiques
@@ -400,59 +370,6 @@ def _render_wind_chart(df: pd.DataFrame) -> None:
     st.altair_chart(_wind_chart(df), use_container_width=True)
 
 
-def _common_row_fields(tgt: dict, w: dict, night_df: pd.DataFrame, horizon: dict,
-                        site: dict, compute_reasons: bool) -> dict:
-    """Champs communs aux deux catalogues (targets/messier) et a la recherche --
-    utilises par `_target_card`/`_messier_card_html` et par la modale de
-    detail. `compute_reasons` ne calcule `target_feasibility_reasons` que
-    lorsque c'est utile (cible infaisable), pour ne pas payer ce calcul
-    supplementaire sur les dizaines de cibles faisables d'une nuit normale."""
-    reasons = (target_feasibility_reasons(night_df, tgt, horizon=horizon, site=site)
-               if compute_reasons and w["hours"] == 0 else [])
-    return {
-        "Nom commun": tgt.get("common_name", ""), "NGC": tgt.get("ngc_name"),
-        "Type": w["type"], "TypeCode": tgt.get("type"),
-        "Filtre": w["filter"],
-        "Debut": w["start"].strftime("%H:%M") if w["start"] is not None else None,
-        "Fin": w["end"].strftime("%H:%M") if w["end"] is not None else None,
-        "Heures": w["hours"],
-        "Alt max deg": w["max_alt"], "Lune deg": w["min_moon_sep"],
-        "Cadrage": fits_in_fov(*w["size"]) if all(w["size"]) else "taille inconnue",
-        "Image": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
-        "RA": tgt["ra"], "Dec": tgt["dec"], "Mag": tgt.get("mag"),
-        "TailleW": tgt.get("w"), "TailleH": tgt.get("h"),
-        "MessierId": tgt.get("messier"),
-        "Raisons": reasons,
-    }
-
-
-_CADRAGE_RANK = {"cadre unique": 0, "mosaique 2x": 1, "mosaique large": 2}
-
-
-def _discovery_sort_key(row: dict, captured: set) -> tuple:
-    """Cle de tri de la galerie 'Cibles faisables ce soir' : priorite aux
-    Messier pas encore captures (gamification -- cf. onglet Catalogue
-    Messier), puis aux cadrages simples (une mosaique demande plusieurs
-    sessions et un assemblage, un cadre unique est plus sur a reussir en une
-    nuit) ; les heures disponibles ne departagent qu'en dernier recours. Les
-    objets sans identifiant Messier (la majorite du catalogue large) restent
-    neutres sur le premier critere -- ni boostes ni relegues, juste tries par
-    cadrage puis par heures comme les Messier deja captures."""
-    is_new = row["MessierId"] is not None and row["MessierId"] not in captured
-    return (not is_new, _CADRAGE_RANK.get(row["Cadrage"], 3), -row["Heures"])
-
-
-def _row_from_search(tgt: dict, night_df: pd.DataFrame, horizon: dict, site: dict) -> dict:
-    """Construit une ligne (meme forme que `feasible_rows`) pour un objet
-    trouve par recherche, faisable ou non -- sur la nuit complete (`night_df`,
-    pas la fenetre Habituelle/Nuit complete active), avec les raisons
-    d'infaisabilite toujours calculees."""
-    w = target_windows(night_df, tgt, horizon=horizon, site=site)
-    common = _common_row_fields(tgt, w, night_df, horizon, site, compute_reasons=True)
-    is_messier = bool(tgt.get("messier"))
-    return {"Cible": None if is_messier else w["name"],
-            "Messier": w["name"] if is_messier else None,
-            "id": tgt.get("messier"), **common}
 
 
 @st.cache_data(ttl=1800)
@@ -469,7 +386,7 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
     df = nights.get(day)
     if df is None:
         return []
-    view_df = _view_df(df, view_mode_key) if catalog == "targets" else df
+    view_df = view_window_df(df, view_mode_key) if catalog == "targets" else df
     horizon = dict(horizon_key)
     targets = load_targets() if catalog == "targets" else load_messier()
 
@@ -481,7 +398,7 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
         # Raisons d'infaisabilite calculees uniquement cote Messier : ce
         # catalogue garde les objets infaisables (avec "Faisable ce soir" :
         # "Non"), contrairement au catalogue "targets" qui les exclut deja.
-        common = _common_row_fields(tgt, w, view_df, horizon, site_dict,
+        common = common_row_fields(tgt, w, view_df, horizon, site_dict,
                                      compute_reasons=(catalog == "messier"))
         if catalog == "targets":
             rows.append({"Cible": w["name"], **common})
@@ -532,7 +449,7 @@ def _clear_horizon_runs(series: pd.DataFrame, horizon: dict) -> pd.DataFrame:
 
 def _altitude_chart(series: pd.DataFrame, horizon: dict, height: int = 240) -> alt.Chart:
     """Graphe hauteur (altitude) vs heure d'une cible entre 19h et 6h (voir
-    `_day_frame`), avec la plage utilisable du Seestar S50 (SEESTAR min/max
+    `rows.day_frame`), avec la plage utilisable du Seestar S50 (SEESTAR min/max
     alt) en reperes pointilles. Domaine Y non-negatif : sur cette fenetre la
     cible reste generalement au-dessus de l'horizon, et une echelle etiree
     jusqu'a -90 pour de rares heures negatives ecrasait le reste du graphe.
@@ -570,29 +487,6 @@ def _altitude_chart(series: pd.DataFrame, horizon: dict, height: int = 240) -> a
     return (bands + line + rules + points).properties(height=height)
 
 
-def _wiki_title_candidates(row: dict) -> list[str]:
-    """Titres de page Wikipedia a tenter pour une cible, du plus specifique au
-    plus generique : nom Messier complet ("Messier 31"), designation telle
-    qu'affichee ("M31" ou "NGC0188"), nom commun, et designation NGC/IC
-    secondaire reformatee au format usuel des titres Wikipedia ("NGC0224" ->
-    "NGC 224"). `wiki.target_summary` les essaie dans cet ordre, en francais
-    puis en anglais."""
-    candidates = []
-    title = row.get("Cible") or row.get("Messier")
-    if title and re.fullmatch(r"M\d+", title):
-        candidates.append(f"Messier {title[1:]}")
-    if title:
-        candidates.append(title)
-    if row.get("Nom commun"):
-        candidates.append(row["Nom commun"])
-    ngc = row.get("NGC")
-    if ngc:
-        m = re.match(r"([A-Za-z]+)0*(\d+)", ngc)
-        if m:
-            candidates.append(f"{m.group(1).upper()} {m.group(2)}")
-    return candidates
-
-
 @st.cache_data(ttl=86400)
 def _cached_wiki_summary(candidates: tuple[str, ...]) -> dict | None:
     """Cache d'une journee : contenu quasi statique, pas besoin de re-interroger
@@ -600,34 +494,18 @@ def _cached_wiki_summary(candidates: tuple[str, ...]) -> dict | None:
     return target_summary(list(candidates))
 
 
-def _day_frame(night_df: pd.DataFrame, site: dict) -> pd.DataFrame:
-    """Grille horaire 24h (midi a midi, voir `astro.day_hours`) ancree sur la
-    nuit de `night_df` (son premier horodatage, toujours en soiree) -- fenetre
-    fixe 19h-6h pour le graphe de detail : plus large que `night_hours`
-    (crepuscule astro, variable selon la saison) mais sans aller jusqu'a la
-    pleine journee (altitude negative la plupart du temps, qui ecrase
-    l'echelle du graphe pour un interet limite). Aucune colonne meteo requise
-    : `target_altitude_series` ne garde que les colonnes ephemerides qu'elle
-    calcule elle-meme."""
-    anchor = night_df.index.min().date()
-    tz = ZoneInfo(site["tz"])
-    start = datetime(anchor.year, anchor.month, anchor.day, 19, tzinfo=tz)
-    hours = [(start + timedelta(hours=i)).replace(tzinfo=None) for i in range(12)]  # 19h -> 6h
-    return pd.DataFrame(index=pd.DatetimeIndex(hours, name="time"))
-
-
 @st.dialog("Detail de la cible", width="large")
 def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict, horizon: dict) -> None:
     """Modale ouverte par le bouton 'Detail' d'une carte (onglet 'Ce soir' ou
     'Catalogue Messier') : image + graphe de hauteur (19h-6h, voir
-    `_day_frame`) cote a cote, puis fiche technique de la cible."""
+    `rows.day_frame`) cote a cote, puis fiche technique de la cible."""
     title = row.get("Cible") or row["Messier"]
     st.subheader(title)
-    subtitle = _subtitle_with_ngc(row["Nom commun"], row.get("NGC"), title)
+    subtitle = subtitle_with_ngc(row["Nom commun"], row.get("NGC"), title)
     if subtitle:
         _soft_caption(subtitle)
 
-    series = target_altitude_series(_day_frame(night_df, site), {"ra": row["RA"], "dec": row["Dec"]},
+    series = target_altitude_series(day_frame(night_df, site), {"ra": row["RA"], "dec": row["Dec"]},
                                      site=site)
     if row.get("Image"):
         img_col, chart_col = st.columns([1, 2])
@@ -660,14 +538,14 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict, horizon
         st.markdown(f"**Fenetre exploitable** : {window_txt}")
         for reason in row.get("Raisons") or []:
             st.markdown(f"- {reason}")
-        st.markdown(f"**Filtre conseille** : {_filter_label(row.get('Filtre', 'sans'))}")
+        st.markdown(f"**Filtre conseille** : {filter_label(row.get('Filtre', 'sans'))}")
         st.markdown(f"**Separation lunaire mini** : {row.get('Lune deg', 'n/d')}°")
         st.markdown(f"**Temps de pose indicatif** : {low}–{high} min "
                      "(estimation, pas une mesure)")
 
     # Absent du catalogue OpenNGC (donnees purement astrometriques) : recherche
     # en direct sur Wikipedia (fr puis en), section masquee si rien de trouve.
-    summary = _cached_wiki_summary(tuple(_wiki_title_candidates(row)))
+    summary = _cached_wiki_summary(tuple(wiki_title_candidates(row)))
     if summary:
         st.subheader("En savoir plus")
         st.write(summary["extract"])
@@ -700,7 +578,7 @@ with tab_ce_soir:
     tw = twilights[sel]
 
     view_mode_key = "habituelle" if mode.startswith("Habituelle") else "complete"
-    view_df = _view_df(df, view_mode_key)
+    view_df = view_window_df(df, view_mode_key)
 
     # Unique source du score affiche sur la page (view_df) : c'est ce qui
     # garantit que le score du bandeau et celui de la carte ne divergent plus.
@@ -729,7 +607,7 @@ with tab_ce_soir:
     if searched and query:
         found = find_target(query)
         if found:
-            _target_detail_dialog(_row_from_search(found, df, prog["horizon"], site), df, site,
+            _target_detail_dialog(row_from_search(found, df, prog["horizon"], site), df, site,
                                    prog["horizon"])
         else:
             st.warning(f"Aucun objet trouve pour « {query} ». Essayez une designation "
@@ -740,16 +618,11 @@ with tab_ce_soir:
         st.markdown(f'<div class="card"><h4>Astro score</h4><div class="value">{pct}/100</div>'
                     f'<div class="sub">{label}</div></div>', unsafe_allow_html=True)
     with c2:
-        spread = (view_df["temperature_2m"] - view_df["dew_point_2m"]).min()
-        if pd.isna(spread):
-            risk, advice, spread_text = "Inconnu", "donnees manquantes", "n/d"
-        else:
-            risk = "Faible" if spread >= 3 else "Moyen" if spread >= 1.5 else "Eleve"
-            advice = "Pas necessaire" if spread >= 3 else "Recommande" if spread >= 1.5 else "Indispensable"
-            spread_text = f"{spread:.1f}"
+        dew = dew_risk(view_df)
+        spread_text = f"{dew['spread']:.1f}" if dew["spread"] is not None else "n/d"
         st.markdown(f'<div class="card"><h4>Risque de buee (ecart {spread_text} deg)</h4>'
-                    f'<div class="value">{risk}</div>'
-                    f'<div class="sub">Anti-buee : {advice}</div></div>', unsafe_allow_html=True)
+                    f'<div class="value">{dew["risk"]}</div>'
+                    f'<div class="sub">Anti-buee : {dew["advice"]}</div></div>', unsafe_allow_html=True)
     with c3:
         # Calculee au crepuscule astro : illumination/taille de la Lune ne
         # bougent quasiment pas sur une nuit (cycle synodique de ~29.5 jours),
@@ -764,7 +637,7 @@ with tab_ce_soir:
     # soir (toujours vrai sauf repli sur `next(iter(nights))` ci-dessus). Plus
     # de surlignage "meilleure fenetre" : ca donnait l'impression trompeuse
     # que le vert marquait toute la session astro plutot qu'un sous-interval.
-    now_local = datetime.now(ZoneInfo(site["tz"])).replace(tzinfo=None) if sel == date.today() else None
+    now_local = local_now(site) if sel == date.today() else None
     st.markdown(twilight_bar_html(tw, now=now_local), unsafe_allow_html=True)
 
     st.subheader("Score astro")
@@ -805,7 +678,7 @@ with tab_ce_soir:
     rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "targets")
     if rows:
         captured = set(prog["messier_captured"])
-        rows = sorted(rows, key=lambda r: _discovery_sort_key(r, captured))
+        rows = sorted(rows, key=lambda r: discovery_sort_key(r, captured))
         types = sorted({r["Type"] for r in rows if r["Type"]})
         # Boutons multi-selection (pas un menu deroulant) : on veut pouvoir
         # afficher plusieurs types a la fois (ex. galaxies + amas globulaires),

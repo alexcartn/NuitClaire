@@ -2,3 +2,9 @@ __pycache__/
 .worktrees/
 .pytest_cache/
 data/progress.json
+data/settings.json
+mobile/node_modules/
+mobile/dist/
+mobile/*.tsbuildinfo
+mobile/vite.config.js
+mobile/vite.config.d.ts

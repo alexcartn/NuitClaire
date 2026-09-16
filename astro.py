@@ -16,6 +16,15 @@ def compass_sector(azimuth_deg: float) -> str:
     return COMPASS_SECTORS[idx]
 
 
+def local_now(site: dict = SITE) -> datetime:
+    """'Maintenant' naif dans le fuseau de `site`, au meme format (naif, pas
+    de tzinfo) que l'index des DataFrames horaires -- comparable directement
+    a `df.index`, ex. pour `scoring.cloud_trend`. Ne jamais utiliser
+    `datetime.now()` nu a la place : ca donnerait l'heure du fuseau du
+    serveur, pas celle du site observe."""
+    return datetime.now(ZoneInfo(site["tz"])).replace(tzinfo=None)
+
+
 def _observer(t_local: datetime, site: dict = SITE) -> ephem.Observer:
     obs = ephem.Observer()
     obs.lat, obs.lon = str(site["lat"]), str(site["lon"])

@@ -72,6 +72,29 @@ def _fetch_summary(lang: str, title: str) -> dict | None:
     return {"title": resolved_title, "extract": extract, "url": url, "lang": lang}
 
 
+def wiki_title_candidates(row: dict) -> list[str]:
+    """Titres de page Wikipedia a tenter pour une cible (ligne au format
+    `rows.common_row_fields`), du plus specifique au plus generique : nom
+    Messier complet ("Messier 31"), designation telle qu'affichee ("M31" ou
+    "NGC0188"), nom commun, et designation NGC/IC secondaire reformatee au
+    format usuel des titres Wikipedia ("NGC0224" -> "NGC 224"). `target_summary`
+    les essaie dans cet ordre, en francais puis en anglais."""
+    candidates = []
+    title = row.get("Cible") or row.get("Messier")
+    if title and re.fullmatch(r"M\d+", title):
+        candidates.append(f"Messier {title[1:]}")
+    if title:
+        candidates.append(title)
+    if row.get("Nom commun"):
+        candidates.append(row["Nom commun"])
+    ngc = row.get("NGC")
+    if ngc:
+        m = re.match(r"([A-Za-z]+)0*(\d+)", ngc)
+        if m:
+            candidates.append(f"{m.group(1).upper()} {m.group(2)}")
+    return candidates
+
+
 def target_summary(title_candidates: list[str]) -> dict | None:
     """Cherche un resume Wikipedia pour une cible, en essayant plusieurs titres
     de page possibles (ex. "Messier 31", "M31", nom commun, designation NGC),

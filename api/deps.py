@@ -1,0 +1,144 @@
+"""Dependances de l'API : site effectif, et caches TTL (memes durees que les
+`@st.cache_data` de app.py) pour les calculs meteo/ephemerides et les listes
+de cibles faisables. `app.py` execute du code Streamlit au niveau module a
+l'import (page config, rendu de la sidebar...), il n'est donc pas importable
+depuis l'API -- cette petite couche de "colle" (boucle sur le catalogue,
+appel des memes fonctions partagees que app.py : `scoring.target_windows`,
+`rows.common_row_fields`, `scoring.view_window_df`) est dupliquee ici plutot
+que factorisee, contrairement a la logique metier (row shaping, calculs de
+score) qui elle vit dans des modules communs.
+
+Starlette execute les handlers synchrones dans un vrai threadpool -- deux
+requetes concurrentes sont possibles, contrairement au script Streamlit qui
+traite une requete a la fois -- d'ou le verrou autour de chaque cache."""
+import threading
+from datetime import date, timedelta
+
+from cachetools import TTLCache
+
+import progress as progress_store
+import settings as settings_store
+from astro import night_hours, sky_frame, twilight_times
+from catalog import load_targets, load_messier
+from config import SITE, NB_NIGHTS
+from rows import common_row_fields
+from scoring import score_frame, target_windows, view_window_df
+from weather import fetch_all
+from wiki import target_summary
+
+_night_cache: TTLCache = TTLCache(maxsize=8, ttl=1800)
+_night_lock = threading.Lock()
+_rows_cache: TTLCache = TTLCache(maxsize=32, ttl=1800)
+_rows_lock = threading.Lock()
+# Contenu quasi statique (meme rationale que `_cached_wiki_summary` dans
+# app.py) : pas besoin de re-interroger Wikipedia a chaque ouverture de fiche.
+_wiki_cache: TTLCache = TTLCache(maxsize=256, ttl=86400)
+_wiki_lock = threading.Lock()
+
+
+def get_site() -> dict:
+    """Site effectif : reglages persistes (`data/settings.json`) si presents,
+    sinon `config.SITE`. A la difference de `st.session_state.site` cote
+    Streamlit (ephemere, reinitialise a `config.SITE` a chaque session de
+    navigateur), ce reglage est durable -- les deux frontends peuvent donc
+    diverger sur la position active si l'un des deux change de site (choix
+    delibere, voir le commentaire en tete de `settings.py`)."""
+    saved = settings_store.load().get("site")
+    return saved if saved else dict(SITE)
+
+
+def get_horizon() -> dict:
+    return progress_store.load()["horizon"]
+
+
+def get_window_mode() -> str:
+    return settings_store.load()["window_mode"]
+
+
+def get_progress() -> dict:
+    return progress_store.load()
+
+
+def _site_key(site: dict) -> tuple:
+    return (site["name"], site["lat"], site["lon"], site["elevation_m"], site["tz"])
+
+
+def load_night(site: dict):
+    """Equivalent de `app.load()` (meme logique, meme duree de cache TTL)."""
+    key = _site_key(site)
+    with _night_lock:
+        cached = _night_cache.get(key)
+        if cached is not None:
+            return cached
+        wx = fetch_all(days=NB_NIGHTS + 1, site=site)
+        nights, twilights = {}, {}
+        for i in range(NB_NIGHTS):
+            d = date.today() + timedelta(days=i)
+            hrs = night_hours(d, site=site)
+            if not hrs:
+                continue
+            sky = sky_frame(hrs, site=site)
+            df = sky.join(wx, how="left")
+            nights[d] = score_frame(df)
+            twilights[d] = twilight_times(d, site=site)
+        result = (nights, twilights)
+        _night_cache[key] = result
+        return result
+
+
+def current_night(site: dict):
+    """Nuit affichee : celle d'aujourd'hui si elle a des heures astro
+    calculables, sinon la premiere disponible -- meme repli que app.py.
+    Renvoie (None, None, None) si aucune nuit n'est disponible."""
+    nights, twilights = load_night(site)
+    if not nights:
+        return None, None, None
+    sel = date.today() if date.today() in nights else next(iter(nights))
+    return sel, nights[sel], twilights[sel]
+
+
+def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalog: str) -> list[dict]:
+    """Equivalent de `app.feasible_rows` : meme forme de ligne (via
+    `rows.common_row_fields`), meme asymetrie Messier/targets face au mode de
+    fenetre (le mode Habituelle/Nuit complete ne s'applique qu'au catalogue
+    "targets" -- la faisabilite Messier reste sur la nuit complete, comme
+    dans app.py)."""
+    key = (_site_key(site), day, tuple(sorted(horizon.items())), window_mode, catalog)
+    with _rows_lock:
+        cached = _rows_cache.get(key)
+        if cached is not None:
+            return cached
+        nights, _ = load_night(site)
+        df = nights.get(day)
+        if df is None:
+            result: list[dict] = []
+        else:
+            view_df = view_window_df(df, window_mode) if catalog == "targets" else df
+            targets = load_targets() if catalog == "targets" else load_messier()
+            result = []
+            for tgt in targets:
+                w = target_windows(view_df, tgt, horizon=horizon, site=site)
+                if catalog == "targets" and w["hours"] == 0:
+                    continue
+                common = common_row_fields(tgt, w, view_df, horizon, site,
+                                            compute_reasons=(catalog == "messier"))
+                if catalog == "targets":
+                    result.append({"Cible": w["name"], **common})
+                else:
+                    result.append({
+                        "id": tgt["messier"], "Messier": tgt["name"],
+                        "Faisable ce soir": "Oui" if w["hours"] > 0 else "Non",
+                        **common,
+                    })
+        _rows_cache[key] = result
+        return result
+
+
+def cached_wiki_summary(candidates: list[str]) -> dict | None:
+    key = tuple(candidates)
+    with _wiki_lock:
+        if key in _wiki_cache:
+            return _wiki_cache[key]
+        result = target_summary(list(key))
+        _wiki_cache[key] = result
+        return result

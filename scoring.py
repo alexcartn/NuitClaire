@@ -3,7 +3,7 @@ from itertools import groupby
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from config import WEIGHTS, SEESTAR, SITE
+from config import WEIGHTS, SEESTAR, SITE, VIEW_WINDOW
 from astro import target_altaz, moon_separation, compass_sector, COMPASS_SECTORS
 
 
@@ -56,6 +56,17 @@ def hourly_score(row: pd.Series) -> float:
     return round(
         WEIGHTS["clouds"] * clouds + WEIGHTS["moon"] * moon + WEIGHTS["wind"] * wind
         + WEIGHTS["dew"] * dew + WEIGHTS["seeing_transp"] * st, 3)
+
+
+def view_window_df(df: pd.DataFrame, view_mode_key: str) -> pd.DataFrame:
+    """Filtre `df` sur la fenetre d'observation habituelle (`config.VIEW_WINDOW`),
+    sauf si elle est vide ou que le mode 'nuit complete' est actif."""
+    if view_mode_key != "habituelle":
+        return df
+    start_h, end_h = VIEW_WINDOW["start_hour"], VIEW_WINDOW["end_hour"]
+    mask = df.index.map(lambda t: start_h <= t.hour + t.minute / 60 <= end_h)
+    filtered = df[mask]
+    return filtered if not filtered.empty else df
 
 
 def score_frame(df: pd.DataFrame) -> pd.DataFrame:
@@ -153,6 +164,35 @@ def cloud_trend(df: pd.DataFrame, now: pd.Timestamp | None) -> dict | None:
         "direction": direction, "label": label,
         "now_pct": round(now_pct), "future_pct": round(future_pct), "delta": round(delta),
     }
+
+
+def dew_risk(df: pd.DataFrame) -> dict:
+    """Risque de buee pour une nuit : plus petit ecart temperature/point de
+    rosee observe sur `df`. Renvoie `spread=None` si `df` n'a pas les colonnes
+    necessaires ou est vide -- meme seuils que la carte 'Risque de buee' de
+    l'onglet 'Ce soir' (3° / 1.5°)."""
+    spread = (df["temperature_2m"] - df["dew_point_2m"]).min()
+    if pd.isna(spread):
+        return {"spread": None, "risk": "Inconnu", "advice": "donnees manquantes"}
+    risk = "Faible" if spread >= 3 else "Moyen" if spread >= 1.5 else "Eleve"
+    advice = "Pas necessaire" if spread >= 3 else "Recommande" if spread >= 1.5 else "Indispensable"
+    return {"spread": round(float(spread), 1), "risk": risk, "advice": advice}
+
+
+_CADRAGE_RANK = {"cadre unique": 0, "mosaique 2x": 1, "mosaique large": 2}
+
+
+def discovery_sort_key(row: dict, captured: set) -> tuple:
+    """Cle de tri de la galerie 'Cibles faisables ce soir' : priorite aux
+    Messier pas encore captures (gamification -- cf. onglet Catalogue
+    Messier), puis aux cadrages simples (une mosaique demande plusieurs
+    sessions et un assemblage, un cadre unique est plus sur a reussir en une
+    nuit) ; les heures disponibles ne departagent qu'en dernier recours. Les
+    objets sans identifiant Messier (la majorite du catalogue large) restent
+    neutres sur le premier critere -- ni boostes ni relegues, juste tries par
+    cadrage puis par heures comme les Messier deja captures."""
+    is_new = row["MessierId"] is not None and row["MessierId"] not in captured
+    return (not is_new, _CADRAGE_RANK.get(row["Cadrage"], 3), -row["Heures"])
 
 
 def _target_sky_frame(df: pd.DataFrame, target: dict, site: dict = SITE) -> pd.DataFrame:

@@ -2,7 +2,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from astro import (compass_sector, twilight_times, target_altaz, night_hours, format_ra,
-                    format_dec, moon_status)
+                    format_dec, moon_status, local_now)
 from config import SITE
 
 TZ = ZoneInfo(SITE["tz"])
@@ -108,3 +108,23 @@ def test_target_altaz_accepts_site_override():
     other_site = {**SITE, "lat": 40.0, "lon": 2.0, "elevation_m": 0}
     alt_other, az_other = target_altaz(t, 0.712, 41.27, site=other_site)
     assert (alt_default, az_default) != (alt_other, az_other)
+
+
+def test_local_now_is_naive():
+    assert local_now().tzinfo is None
+
+
+def test_local_now_uses_site_timezone_not_frozen_module_tz():
+    # Same reasoning as the twilight_times/night_hours tz-regression tests
+    # above: `local_now` must derive the zone from `site`, not a frozen
+    # module-level default, or a caller passing a non-default site (e.g. a
+    # future multi-site API) would silently get server/Paris-local time
+    # mislabelled as that site's local time.
+    tokyo_site = {"name": "Tokyo", "lat": 35.68, "lon": 139.69,
+                  "elevation_m": 40, "tz": "Asia/Tokyo"}
+    now_paris = local_now(SITE)
+    now_tokyo = local_now(tokyo_site)
+    # Tokyo (UTC+9) is always ahead of Paris (UTC+1/+2) by 7-8h; comparing the
+    # naive wall-clock values directly is meaningful because both were sampled
+    # within the same instant (to within test execution jitter).
+    assert (now_tokyo - now_paris).total_seconds() > 3600 * 6

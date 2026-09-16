@@ -2,7 +2,7 @@ import pandas as pd
 
 from scoring import (score_label_fr, best_window, target_windows, target_altitude_series,
                      recommended_exposure_minutes, wind_quality, target_feasibility_reasons,
-                     hourly_score, cloud_trend)
+                     hourly_score, cloud_trend, dew_risk, discovery_sort_key, view_window_df)
 
 
 def test_score_label_fr_buckets():
@@ -235,6 +235,62 @@ def test_cloud_trend_none_when_now_is_last_hour():
     df = _make_cloud_df()
     trend = cloud_trend(df, df.index[-1])
     assert trend is None
+
+
+def test_dew_risk_low_when_spread_comfortable():
+    df = pd.DataFrame({"temperature_2m": [15, 16], "dew_point_2m": [10, 10]})
+    d = dew_risk(df)
+    assert d == {"spread": 5.0, "risk": "Faible", "advice": "Pas necessaire"}
+
+
+def test_dew_risk_high_when_spread_tiny():
+    df = pd.DataFrame({"temperature_2m": [10, 11], "dew_point_2m": [9.5, 10]})
+    d = dew_risk(df)
+    assert d["risk"] == "Eleve"
+    assert d["advice"] == "Indispensable"
+
+
+def test_dew_risk_medium_at_threshold():
+    df = pd.DataFrame({"temperature_2m": [11.5], "dew_point_2m": [10]})
+    assert dew_risk(df) == {"spread": 1.5, "risk": "Moyen", "advice": "Recommande"}
+
+
+def test_dew_risk_unknown_when_columns_missing_values():
+    df = pd.DataFrame({"temperature_2m": [None], "dew_point_2m": [None]})
+    assert dew_risk(df) == {"spread": None, "risk": "Inconnu", "advice": "donnees manquantes"}
+
+
+def test_discovery_sort_key_prioritizes_uncaptured_messier():
+    new_messier = {"MessierId": "31", "Cadrage": "cadre unique", "Heures": 3}
+    captured_messier = {"MessierId": "13", "Cadrage": "cadre unique", "Heures": 3}
+    assert discovery_sort_key(new_messier, {"13"}) < discovery_sort_key(captured_messier, {"13"})
+
+
+def test_discovery_sort_key_prefers_simple_framing_then_more_hours():
+    single_frame = {"MessierId": None, "Cadrage": "cadre unique", "Heures": 2}
+    mosaic = {"MessierId": None, "Cadrage": "mosaique large", "Heures": 6}
+    more_hours = {"MessierId": None, "Cadrage": "cadre unique", "Heures": 5}
+    assert discovery_sort_key(single_frame, set()) < discovery_sort_key(mosaic, set())
+    assert discovery_sort_key(more_hours, set()) < discovery_sort_key(single_frame, set())
+
+
+def test_view_window_df_complete_mode_returns_full_frame():
+    idx = pd.date_range("2026-09-15 18:00", periods=10, freq="1h")
+    df = pd.DataFrame({"x": range(10)}, index=idx)
+    assert view_window_df(df, "complete") is df
+
+
+def test_view_window_df_habituelle_mode_filters_to_configured_hours():
+    idx = pd.date_range("2026-09-15 18:00", periods=10, freq="1h")  # 18h..03h
+    df = pd.DataFrame({"x": range(10)}, index=idx)
+    filtered = view_window_df(df, "habituelle")  # config.VIEW_WINDOW = 20h-22.5h
+    assert list(filtered.index.hour) == [20, 21, 22]
+
+
+def test_view_window_df_habituelle_mode_falls_back_to_full_frame_when_empty():
+    idx = pd.date_range("2026-09-15 00:00", periods=3, freq="1h")  # 00h-02h, hors fenetre
+    df = pd.DataFrame({"x": range(3)}, index=idx)
+    assert view_window_df(df, "habituelle") is df
 
 
 def test_target_windows_uses_site_timezone_not_frozen_module_tz(monkeypatch):
