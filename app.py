@@ -1,19 +1,22 @@
 """Tableau de bord Streamlit : score astro, cibles par direction/horizon, suivi Messier."""
 from datetime import date, datetime, timedelta
+from typing import Callable
 from zoneinfo import ZoneInfo
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from config import SITE, NB_NIGHTS, VIEW_WINDOW
+from config import SITE, NB_NIGHTS, VIEW_WINDOW, SEESTAR
 from weather import fetch_all
-from astro import night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_SECTORS
-from scoring import score_frame, night_summary, target_windows, score_label_fr, best_window_span
+from astro import (night_hours, sky_frame, fits_in_fov, twilight_times, COMPASS_SECTORS,
+                    format_ra, format_dec)
+from scoring import (score_frame, night_summary, target_windows, score_label_fr,
+                      best_window_span, target_altitude_series, recommended_exposure_minutes)
 from catalog import load_targets, load_messier
 from geocode import geocode, GeocodeError
 from imagery import dss_image_url
-from components import TWILIGHT_BAR_CSS, GALLERY_CSS, twilight_bar_html, card_html, gallery_html
+from components import TWILIGHT_BAR_CSS, CARD_CSS, twilight_bar_html, card_html
 import progress as progress_store
 
 st.set_page_config(page_title="NuitClaire", page_icon="\U0001F52D", layout="wide")
@@ -31,7 +34,7 @@ st.markdown(f"""
 .card .value {{ font-size: 1.8rem; font-weight: 600; }}
 .card .sub {{ font-size: 0.85rem; opacity: 0.7; }}
 {TWILIGHT_BAR_CSS}
-{GALLERY_CSS}
+{CARD_CSS}
 </style>
 """, unsafe_allow_html=True)
 
@@ -162,6 +165,31 @@ TIME_AXIS_FORMAT = "%H:%M"  # 24h partout, jamais d'AM/PM -- axe + tooltip des g
 # vignettes d'un coup sur une bonne nuit.
 GALLERY_PAGE_SIZE = 24
 
+# Colonnes par rangee pour les grilles de cartes cibles (st.columns s'empile
+# nativement en une seule colonne sur mobile, donc pas de media query requise ici).
+GALLERY_COLS = 3
+MESSIER_COLS = 4
+
+
+def _target_grid(rows: list[dict], night_df: pd.DataFrame, site: dict, key_prefix: str,
+                  cols: int, card: Callable[[dict], str],
+                  extra: Callable[[dict], None] | None = None) -> None:
+    """Grille de cartes en colonnes Streamlit, chacune suivie d'un bouton
+    'Detail' ouvrant la modale de hauteur/fiche technique de la cible.
+    `card(row)` rend le HTML de la carte ; `extra(row)`, si fourni, rend un
+    widget Streamlit supplementaire sous le bouton (ex. la case a cocher
+    'Capturee' de l'onglet Messier)."""
+    for start in range(0, len(rows), cols):
+        chunk = rows[start:start + cols]
+        for col, row in zip(st.columns(cols), chunk):
+            with col:
+                st.markdown(card(row), unsafe_allow_html=True)
+                uid = row.get("Cible") or row["id"]
+                if st.button("Detail", key=f"{key_prefix}_detail_{uid}", use_container_width=True):
+                    _target_detail_dialog(row, night_df, site)
+                if extra is not None:
+                    extra(row)
+
 
 def _time_series_chart(df: pd.DataFrame, columns: list[str], height: int = 220,
                         y_title: str = "") -> alt.Chart:
@@ -243,30 +271,94 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
     rows = []
     for tgt in targets:
         w = target_windows(view_df, tgt, horizon=horizon, site=site_dict)
+        if catalog == "targets" and w["hours"] == 0:
+            continue
+        # Champs communs aux deux catalogues (utilises entre autres par la
+        # modale de detail d'une cible, identique pour les deux onglets).
+        common = {
+            "Nom commun": tgt.get("common_name", ""), "NGC": tgt.get("ngc_name"),
+            "Type": w["type"], "TypeCode": tgt.get("type"),
+            "Filtre": w["filter"],
+            "Debut": w["start"].strftime("%H:%M") if w["start"] is not None else None,
+            "Fin": w["end"].strftime("%H:%M") if w["end"] is not None else None,
+            "Heures": w["hours"],
+            "Alt max deg": w["max_alt"], "Lune deg": w["min_moon_sep"],
+            "Cadrage": fits_in_fov(*w["size"]) if all(w["size"]) else "taille inconnue",
+            "Image": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
+            "RA": tgt["ra"], "Dec": tgt["dec"], "Mag": tgt.get("mag"),
+            "TailleW": tgt.get("w"), "TailleH": tgt.get("h"),
+        }
         if catalog == "targets":
-            if w["hours"] == 0:
-                continue
-            rows.append({
-                "Cible": w["name"], "Nom commun": tgt.get("common_name", ""), "Type": w["type"],
-                "NGC": tgt.get("ngc_name"),
-                "Filtre": w["filter"], "Debut": w["start"].strftime("%H:%M"),
-                "Fin": w["end"].strftime("%H:%M"), "Heures": w["hours"],
-                "Alt max deg": w["max_alt"], "Lune deg": w["min_moon_sep"],
-                "Cadrage": fits_in_fov(*w["size"]) if all(w["size"]) else "taille inconnue",
-                "Image": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
-            })
+            rows.append({"Cible": w["name"], **common})
         else:
             rows.append({
-                "id": tgt["messier"],
-                "Messier": tgt["name"],
-                "Nom commun": tgt.get("common_name", ""),
-                "NGC": tgt.get("ngc_name"),
-                "Type": w["type"],
+                "id": tgt["messier"], "Messier": tgt["name"],
                 "Faisable ce soir": "Oui" if w["hours"] > 0 else "Non",
-                "Heures": w["hours"],
-                "Image": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
+                **common,
             })
     return rows
+
+
+def _altitude_chart(series: pd.DataFrame, height: int = 240) -> alt.Chart:
+    """Graphe hauteur (altitude) vs heure d'une cible sur toute la nuit, avec la
+    plage utilisable du Seestar S50 (SEESTAR min/max alt) en reperes pointilles."""
+    long_df = series.reset_index()
+    line = (
+        alt.Chart(long_df)
+        .mark_line()
+        .encode(
+            x=alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT)),
+            y=alt.Y("alt:Q", title="Altitude (deg)", scale=alt.Scale(domain=[0, 90])),
+            tooltip=[alt.Tooltip("time:T", title="Heure", format=TIME_AXIS_FORMAT),
+                     alt.Tooltip("alt:Q", title="Altitude", format=".0f"),
+                     alt.Tooltip("sector:N", title="Direction")],
+        )
+    )
+    ref_df = pd.DataFrame({"alt": [SEESTAR["min_alt_deg"], SEESTAR["max_alt_deg"]]})
+    rules = alt.Chart(ref_df).mark_rule(strokeDash=[4, 4], color="gray").encode(y="alt:Q")
+    return (line + rules).properties(height=height)
+
+
+@st.dialog("Detail de la cible", width="large")
+def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict) -> None:
+    """Modale ouverte par le bouton 'Detail' d'une carte (onglet 'Ce soir' ou
+    'Catalogue Messier') : graphe de hauteur sur la nuit complete + fiche
+    technique de la cible. `night_df` est la nuit non filtree (pas `view_df`)
+    pour couvrir la nuit astronomique entiere quel que soit le mode d'affichage
+    actif dans la barre laterale."""
+    title = row.get("Cible") or row["Messier"]
+    st.subheader(title)
+    subtitle = _subtitle_with_ngc(row["Nom commun"], row.get("NGC"), title)
+    if subtitle:
+        st.caption(subtitle)
+
+    series = target_altitude_series(night_df, {"ra": row["RA"], "dec": row["Dec"]}, site=site)
+    st.altair_chart(_altitude_chart(series), use_container_width=True)
+
+    peak_t = series["alt"].idxmax()
+    peak = series.loc[peak_t]
+    st.caption(f"Direction a l'altitude max : {peak['sector']} (azimut {peak['az']:.0f}°) "
+               f"vers {peak_t.strftime('%H:%M')}")
+
+    mag_txt = f"{row['Mag']:.1f}" if row.get("Mag") is not None else "inconnue"
+    size_txt = (f"{row['TailleW']:.1f}' x {row['TailleH']:.1f}'"
+                if row.get("TailleW") and row.get("TailleH") else "inconnue")
+    window_txt = (f"{row['Debut']}–{row['Fin']} ({row['Heures']} h)"
+                  if row.get("Debut") else "Aucune ce soir")
+    low, high = recommended_exposure_minutes(row.get("TypeCode", ""), row.get("Mag"))
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f"**Coordonnees** : {format_ra(row['RA'])} / {format_dec(row['Dec'])}")
+        st.markdown(f"**Magnitude** : {mag_txt}")
+        st.markdown(f"**Taille** : {size_txt}")
+        st.markdown(f"**Cadrage** : {row.get('Cadrage', 'n/d')}")
+    with c2:
+        st.markdown(f"**Fenetre exploitable** : {window_txt}")
+        st.markdown(f"**Filtre conseille** : {row.get('Filtre', 'sans')}")
+        st.markdown(f"**Separation lunaire mini** : {row.get('Lune deg', 'n/d')}°")
+        st.markdown(f"**Temps de pose indicatif** : {low}–{high} min "
+                     "(estimation, pas une mesure)")
 
 
 try:
@@ -365,10 +457,12 @@ with tab_ce_soir:
             rows = [r for r in rows if r["Type"] == type_choice]
 
         shown, rest = rows[:GALLERY_PAGE_SIZE], rows[GALLERY_PAGE_SIZE:]
-        st.markdown(gallery_html([_target_card(r) for r in shown]), unsafe_allow_html=True)
+        _target_grid(shown, df, site, "soir", GALLERY_COLS,
+                     card=lambda r: card_html(**_target_card(r)))
         if rest:
             with st.expander(f"Voir {len(rest)} cible(s) de plus"):
-                st.markdown(gallery_html([_target_card(r) for r in rest]), unsafe_allow_html=True)
+                _target_grid(rest, df, site, "soir_plus", GALLERY_COLS,
+                              card=lambda r: card_html(**_target_card(r)))
     else:
         st.info("Aucune cible exploitable cette nuit (meteo, Lune ou horizon degage).")
 
@@ -389,13 +483,19 @@ with tab_messier:
         row["Capture"] = row["id"] in captured
     rows.sort(key=lambda r: int(r["id"]))
 
-    MESSIER_COLS = 4
-    for i in range(0, len(rows), MESSIER_COLS):
-        for col, row in zip(st.columns(MESSIER_COLS), rows[i:i + MESSIER_COLS]):
-            with col:
-                st.markdown(_messier_card_html(row), unsafe_allow_html=True)
-                new_val = st.checkbox("Capturee", value=row["Capture"], key=f"cap_{row['id']}")
-                if new_val != row["Capture"]:
-                    progress_store.toggle_messier(prog, row["id"])
-                    progress_store.save(prog)
-                    st.rerun()
+    only_feasible = st.checkbox("Faisable ce soir uniquement")
+    if only_feasible:
+        rows = [r for r in rows if r["Faisable ce soir"] == "Oui"]
+
+    def _messier_extra(row: dict) -> None:
+        new_val = st.checkbox("Capturee", value=row["Capture"], key=f"cap_{row['id']}")
+        if new_val != row["Capture"]:
+            progress_store.toggle_messier(prog, row["id"])
+            progress_store.save(prog)
+            st.rerun()
+
+    if rows:
+        _target_grid(rows, df, site, "messier", MESSIER_COLS,
+                      card=_messier_card_html, extra=_messier_extra)
+    else:
+        st.info("Aucun objet Messier faisable ce soir (meteo, Lune ou horizon degage).")

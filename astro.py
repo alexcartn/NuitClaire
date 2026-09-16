@@ -116,6 +116,26 @@ def _to_local(ephem_date: ephem.Date, tz: ZoneInfo) -> datetime:
     return ephem_date.datetime().replace(tzinfo=timezone.utc).astimezone(tz)
 
 
+def format_ra(ra_h: float) -> str:
+    """Ascension droite (heures decimales) -> 'HHhMMm'."""
+    h = int(ra_h)
+    m = round((ra_h - h) * 60)
+    if m == 60:
+        h, m = h + 1, 0
+    return f"{h:02d}h{m:02d}m"
+
+
+def format_dec(dec_deg: float) -> str:
+    """Declinaison (degres decimaux) -> \"+DD°MM'\"."""
+    sign = "+" if dec_deg >= 0 else "-"
+    d = abs(dec_deg)
+    deg = int(d)
+    minutes = round((d - deg) * 60)
+    if minutes == 60:
+        deg, minutes = deg + 1, 0
+    return f"{sign}{deg:02d}°{minutes:02d}'"
+
+
 def twilight_times(date_local, site: dict = SITE) -> dict:
     """Crepuscule/aube civil (-6 deg), nautique (-12 deg), astronomique (-18 deg)
     pour la nuit du `date_local`, en heure locale (naive, dans le fuseau du site)."""

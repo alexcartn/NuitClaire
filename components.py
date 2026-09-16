@@ -44,18 +44,26 @@ TWILIGHT_BAR_CSS = f"""
 .twilight-now::after {{ content: "maintenant"; position: absolute; top: -18px; left: 50%;
     transform: translateX(-50%); font-size: 0.65rem; font-weight: 600; color: #e2434f;
     white-space: nowrap; }}
-.twilight-ticks {{ position: relative; height: 42px; margin-top: 4px; }}
+.twilight-ticks {{ position: relative; height: 66px; margin-top: 4px; }}
 .twilight-tick {{ position: absolute; top: 0; transform: translateX(-50%); text-align: center;
     white-space: nowrap; }}
+/* Les 6 ticks sont dans l'ordre chronologique (trio crepuscule, trio aube) :
+   decaler une rangee sur deux separe verticalement les ticks les plus proches
+   dans le temps (ex. civil_dusk/nautical_dusk), qui se chevauchent sinon a
+   l'etroit -- notamment sur mobile ou les % de l'axe valent peu de pixels. */
+.twilight-tick:nth-child(even) {{ top: 24px; }}
 .twilight-tick .time {{ display: block; font-size: 0.75rem; opacity: 0.75; }}
 .twilight-tick .label {{ display: block; margin-top: 2px; {_LABEL_CSS} }}
 .twilight-tick.astro .time {{ font-weight: 700; opacity: 1; }}
 .twilight-tick.astro .label {{ opacity: 0.85; }}
+
+@media (max-width: 480px) {{
+    .twilight-tick .time {{ font-size: 0.66rem; }}
+    .twilight-tick .label {{ font-size: 0.58rem; }}
+}}
 """
 
-GALLERY_CSS = f"""
-.card-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px; margin: 8px 0 16px 0; }}
+CARD_CSS = f"""
 .target-card {{ background: rgba(127,127,127,0.07); border: 1px solid rgba(127,127,127,0.2);
     border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; height: 100%; }}
 .target-card img {{ width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; }}
@@ -135,10 +143,11 @@ def twilight_bar_html(tw: dict, best_span: tuple[datetime, datetime] | None = No
 
 def card_html(image: str, title: str, subtitle: str | None,
               badges: list[str], meta: list[tuple[str, str]]) -> str:
-    """Une carte cible : image + titre + badges + lignes cle/valeur. Utilisee par
-    `gallery_html` (grille de l'onglet "Ce soir") et directement, colonne par
-    colonne, cote onglet Messier -- ou une case a cocher Streamlit reelle doit
-    rester a cote de la carte (impossible a exprimer dans du HTML statique)."""
+    """Une carte cible : image + titre + badges + lignes cle/valeur. Rendue
+    directement, colonne par colonne (`st.columns`), dans les onglets "Ce soir"
+    et "Catalogue Messier" -- ou des widgets Streamlit reels (bouton Detail,
+    case a cocher Messier) doivent rester a cote de la carte (impossible a
+    exprimer dans du HTML statique)."""
     subtitle_html = f'<div class="target-card-subtitle">{escape(subtitle)}</div>' if subtitle else ""
     badges_html = "".join(f'<span class="target-card-badge">{escape(b)}</span>' for b in badges if b)
     meta_html = "".join(
@@ -155,13 +164,3 @@ def card_html(image: str, title: str, subtitle: str | None,
         f'<div class="target-card-meta">{meta_html}</div>'
         '</div></div>'
     )
-
-
-def gallery_html(cards: list[dict]) -> str:
-    """Grille de cartes non-interactive (onglet "Ce soir"). Chaque dict de `cards`
-    attend les cles image/title/subtitle/badges/meta (voir `card_html`)."""
-    cards_html = "".join(
-        card_html(c["image"], c["title"], c.get("subtitle"), c.get("badges", []), c.get("meta", []))
-        for c in cards
-    )
-    return f'<div class="card-grid">{cards_html}</div>'

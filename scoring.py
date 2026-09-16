@@ -104,10 +104,10 @@ def night_summary(df: pd.DataFrame) -> dict:
     }
 
 
-def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
-                    site: dict = SITE) -> dict:
-    """Pour une cible, heures ou alt/azimut dans les plages autorisees et score OK."""
-    horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
+def _target_sky_frame(df: pd.DataFrame, target: dict, site: dict = SITE) -> pd.DataFrame:
+    """Altitude/azimut/secteur/separation lunaire de `target` a chaque horodatage
+    de `df`, dans le fuseau de `site`. Base commune a `target_windows` (filtrage
+    de faisabilite) et `target_altitude_series` (graphe de detail, sans filtrage)."""
     tz = ZoneInfo(site["tz"])
     alts, azs, seps = [], [], []
     for t in df.index:
@@ -118,6 +118,20 @@ def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
         seps.append(moon_separation(tl, target["ra"], target["dec"], site=site))
     d = df.assign(alt=alts, az=azs, moon_sep=seps)
     d["sector"] = d["az"].apply(compass_sector)
+    return d
+
+
+def target_altitude_series(df: pd.DataFrame, target: dict, site: dict = SITE) -> pd.DataFrame:
+    """Serie complete (non filtree) alt/az/secteur/separation lunaire de `target`
+    sur toute la plage de `df`, pour le graphe de detail d'une cible."""
+    return _target_sky_frame(df, target, site=site)[["alt", "az", "sector", "moon_sep"]]
+
+
+def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
+                    site: dict = SITE) -> dict:
+    """Pour une cible, heures ou alt/azimut dans les plages autorisees et score OK."""
+    horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
+    d = _target_sky_frame(df, target, site=site)
     open_sectors = {s for s, is_open in horizon.items() if is_open}
     ok = d[(d["alt"] >= SEESTAR["min_alt_deg"]) & (d["alt"] <= SEESTAR["max_alt_deg"])
            & (d["score"] >= 0.6) & (d["sector"].isin(open_sectors))]
@@ -134,3 +148,32 @@ def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
         "min_moon_sep": round(d["moon_sep"].min(), 0),
         "size": (target.get("w"), target.get("h")),
     }
+
+
+# (temps_bas_min, temps_haut_min, magnitude de reference) par type de cible --
+# objets compacts/brillants (amas ouverts, doubles) demandent peu de pose,
+# les objets a faible brillance de surface (galaxies, nebuleuses diffuses)
+# beaucoup plus. Purement indicatif : aucune donnee reelle de temps
+# d'integration par objet n'est disponible dans le catalogue (juste type +
+# magnitude), donc `recommended_exposure_minutes` reste une heuristique.
+_EXPOSURE_BASE = {
+    "OCl": (10, 20, 6.0), "*Ass": (10, 20, 6.0), "**": (10, 20, 6.0),
+    "GCl": (15, 30, 7.0),
+    "PN": (20, 40, 9.0),
+    "G": (45, 90, 9.5),
+    "Neb": (40, 75, 8.0), "EmN": (40, 75, 8.0), "HII": (40, 75, 8.0),
+    "RfN": (40, 75, 8.0), "SNR": (40, 75, 8.0), "Cl+N": (30, 60, 7.5),
+}
+_EXPOSURE_DEFAULT = (30, 60, 8.0)
+
+
+def recommended_exposure_minutes(type_code: str, mag: float | None) -> tuple[int, int]:
+    """Fourchette de temps de pose totale (minutes) indicative pour le Seestar
+    S50, par type d'objet et magnitude -- ordre de grandeur, pas une mesure
+    de temps d'integration reelle (donnee absente du catalogue). Chaque
+    magnitude d'ecart avec la reference du type ajuste la fourchette de 15%."""
+    low, high, ref_mag = _EXPOSURE_BASE.get(type_code, _EXPOSURE_DEFAULT)
+    if mag is None:
+        return low, high
+    factor = _clamp(1 + 0.15 * (mag - ref_mag), 0.6, 2.5)
+    return max(5, round(low * factor)), max(low + 5, round(high * factor))

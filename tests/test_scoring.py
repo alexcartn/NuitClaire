@@ -1,6 +1,7 @@
 import pandas as pd
 
-from scoring import score_label_fr, best_window, target_windows
+from scoring import (score_label_fr, best_window, target_windows, target_altitude_series,
+                     recommended_exposure_minutes)
 
 
 def test_score_label_fr_buckets():
@@ -53,6 +54,43 @@ def test_target_windows_blocks_hours_outside_open_horizon_sectors(monkeypatch):
     horizon_blocked_south["S"] = False
     result_blocked = target_windows(df, target, horizon=horizon_blocked_south)
     assert result_blocked["hours"] == 0
+
+
+def test_target_altitude_series_is_unfiltered_and_matches_df_index(monkeypatch):
+    import scoring
+
+    monkeypatch.setattr(scoring, "target_altaz", lambda *a, **k: (5.0, 90.0))
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: 90.0)
+
+    df = _make_night_df()
+    target = {"name": "Test", "ra": 0.0, "dec": 0.0}
+
+    series = target_altitude_series(df, target)
+
+    # Altitude 5deg est sous SEESTAR["min_alt_deg"] (20) : target_windows
+    # l'exclurait, mais la serie de detail ne filtre rien.
+    assert len(series) == len(df)
+    assert list(series.index) == list(df.index)
+    assert (series["alt"] == 5.0).all()
+    assert (series["sector"] == "E").all()
+
+
+def test_recommended_exposure_minutes_at_reference_magnitude_returns_base_range():
+    assert recommended_exposure_minutes("G", 9.5) == (45, 90)
+    assert recommended_exposure_minutes("OCl", 6.0) == (10, 20)
+
+
+def test_recommended_exposure_minutes_scales_with_magnitude():
+    low, high = recommended_exposure_minutes("G", 12.5)  # 3 mag plus faible que la reference
+    assert (low, high) > (45, 90)
+
+
+def test_recommended_exposure_minutes_without_magnitude_returns_base_range():
+    assert recommended_exposure_minutes("PN", None) == (20, 40)
+
+
+def test_recommended_exposure_minutes_unknown_type_uses_default():
+    assert recommended_exposure_minutes("???", 8.0) == (30, 60)
 
 
 def test_target_windows_uses_site_timezone_not_frozen_module_tz(monkeypatch):

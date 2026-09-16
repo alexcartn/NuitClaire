@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from components import twilight_bar_html, card_html, gallery_html
+from components import twilight_bar_html, card_html
 
 
 def _tw():
@@ -64,13 +64,3 @@ def test_card_html_omits_subtitle_block_when_none():
     html = card_html(image="https://example.com/x.jpg", title="M31", subtitle=None,
                       badges=[], meta=[])
     assert "target-card-subtitle" not in html
-
-
-def test_gallery_html_wraps_all_cards():
-    cards = [
-        {"image": "https://example.com/a.jpg", "title": "A"},
-        {"image": "https://example.com/b.jpg", "title": "B"},
-    ]
-    html = gallery_html(cards)
-    assert html.count("target-card\"") == 2
-    assert html.startswith('<div class="card-grid">')

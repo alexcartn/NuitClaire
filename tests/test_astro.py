@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from astro import compass_sector, twilight_times, target_altaz, night_hours
+from astro import compass_sector, twilight_times, target_altaz, night_hours, format_ra, format_dec
 from config import SITE
 
 TZ = ZoneInfo(SITE["tz"])
@@ -15,6 +15,25 @@ def test_compass_sector_cardinal_points():
     assert compass_sector(180) == "S"
     assert compass_sector(270) == "W"
     assert compass_sector(359) == "N"
+
+
+def test_format_ra_rounds_minutes():
+    assert format_ra(0.6728) == "00h40m"
+    assert format_ra(10.0) == "10h00m"
+
+
+def test_format_ra_carries_minute_rounding_into_hour():
+    # 1.9999h -> 59.996 min de l'heure 1 -> arrondit a 60 -> doit reporter sur l'heure suivante.
+    assert format_ra(1.9999) == "02h00m"
+
+
+def test_format_dec_positive_and_negative():
+    assert format_dec(41.6853) == "+41°41'"
+    assert format_dec(-5.5) == "-05°30'"
+
+
+def test_format_dec_carries_minute_rounding_into_degree():
+    assert format_dec(1.9999) == "+02°00'"
 
 
 def test_twilight_times_order_for_known_date():
