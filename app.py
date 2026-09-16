@@ -2,6 +2,7 @@
 import re
 from datetime import date, datetime, timedelta
 from html import escape
+from itertools import groupby
 from typing import Callable
 from zoneinfo import ZoneInfo
 
@@ -134,12 +135,17 @@ if "progress" not in st.session_state:
 site = st.session_state.site
 prog = st.session_state.progress
 
-st.title(f"\U0001F52D NuitClaire : {site['name']}")
+st.title("\U0001F52D NuitClaire")
 _catalog_size = len(load_targets()) + len(load_messier())
 _soft_caption(
     f"{_catalog_size} objets du ciel profond, passes au crible de la meteo et de "
     "l'horizon, heure par heure.",
     italic=True,
+)
+st.markdown(
+    f'<div style="font-weight: 600; font-size: 1.1rem; margin: 0.25rem 0;">'
+    f'Position : {escape(site["name"])}</div>',
+    unsafe_allow_html=True,
 )
 
 # --- Barre laterale ----------------------------------------------------------
@@ -214,8 +220,8 @@ GALLERY_COLS = 3
 MESSIER_COLS = 4
 
 
-def _target_grid(rows: list[dict], night_df: pd.DataFrame, site: dict, key_prefix: str,
-                  cols: int, card: Callable[[dict], str],
+def _target_grid(rows: list[dict], night_df: pd.DataFrame, site: dict, horizon: dict,
+                  key_prefix: str, cols: int, card: Callable[[dict], str],
                   extra: Callable[[dict], None] | None = None) -> None:
     """Grille de cartes en colonnes Streamlit, chacune suivie d'un bouton
     'Detail' ouvrant la modale de hauteur/fiche technique de la cible.
@@ -229,7 +235,7 @@ def _target_grid(rows: list[dict], night_df: pd.DataFrame, site: dict, key_prefi
                 st.markdown(card(row), unsafe_allow_html=True)
                 uid = row.get("Cible") or row["id"]
                 if st.button("Detail", key=f"{key_prefix}_detail_{uid}", use_container_width=True):
-                    _target_detail_dialog(row, night_df, site)
+                    _target_detail_dialog(row, night_df, site, horizon)
                 if extra is not None:
                     extra(row)
 
@@ -399,8 +405,25 @@ def _common_row_fields(tgt: dict, w: dict, night_df: pd.DataFrame, horizon: dict
         "Image": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
         "RA": tgt["ra"], "Dec": tgt["dec"], "Mag": tgt.get("mag"),
         "TailleW": tgt.get("w"), "TailleH": tgt.get("h"),
+        "MessierId": tgt.get("messier"),
         "Raisons": reasons,
     }
+
+
+_CADRAGE_RANK = {"cadre unique": 0, "mosaique 2x": 1, "mosaique large": 2}
+
+
+def _discovery_sort_key(row: dict, captured: set) -> tuple:
+    """Cle de tri de la galerie 'Cibles faisables ce soir' : priorite aux
+    Messier pas encore captures (gamification -- cf. onglet Catalogue
+    Messier), puis aux cadrages simples (une mosaique demande plusieurs
+    sessions et un assemblage, un cadre unique est plus sur a reussir en une
+    nuit) ; les heures disponibles ne departagent qu'en dernier recours. Les
+    objets sans identifiant Messier (la majorite du catalogue large) restent
+    neutres sur le premier critere -- ni boostes ni relegues, juste tries par
+    cadrage puis par heures comme les Messier deja captures."""
+    is_new = row["MessierId"] is not None and row["MessierId"] not in captured
+    return (not is_new, _CADRAGE_RANK.get(row["Cadrage"], 3), -row["Heures"])
 
 
 def _row_from_search(tgt: dict, night_df: pd.DataFrame, horizon: dict, site: dict) -> dict:
@@ -463,7 +486,26 @@ _COMPASS_COLORS = ["#5E60CE", "#5390D9", "#4EA8DE", "#48BFE3",
                    "#64DFDF", "#72EFDD", "#B298DC", "#9D4EDD"]
 
 
-def _altitude_chart(series: pd.DataFrame, height: int = 240) -> alt.Chart:
+def _clear_horizon_runs(series: pd.DataFrame, horizon: dict) -> pd.DataFrame:
+    """Plages horaires contigues ou la cible est a la fois dans l'altitude
+    exploitable du Seestar et dans un secteur d'horizon degage -- purement
+    geometrique (site + position), independant de la meteo/Lune (`series` n'a
+    pas ces colonnes ici, voir `_target_detail_dialog`). Meme technique de
+    regroupement en plages que `scoring.best_window_span`, dupliquee ici
+    plutot que partagee : l'un opere sur un score meteo, l'autre sur un
+    masque alt/secteur, deux notions distinctes malgre la forme commune."""
+    open_sectors = {s for s, is_open in horizon.items() if is_open}
+    ok = ((series["alt"] >= SEESTAR["min_alt_deg"]) & (series["alt"] <= SEESTAR["max_alt_deg"])
+          & series["sector"].isin(open_sectors))
+    runs = []
+    for is_ok, group in groupby(zip(series.index, ok), key=lambda x: x[1]):
+        if is_ok:
+            times = [t for t, _ in group]
+            runs.append((times[0], times[-1] + pd.Timedelta(hours=1)))
+    return pd.DataFrame(runs, columns=["start", "end"])
+
+
+def _altitude_chart(series: pd.DataFrame, horizon: dict, height: int = 240) -> alt.Chart:
     """Graphe hauteur (altitude) vs heure d'une cible entre 19h et 6h (voir
     `_day_frame`), avec la plage utilisable du Seestar S50 (SEESTAR min/max
     alt) en reperes pointilles. Domaine Y non-negatif : sur cette fenetre la
@@ -472,7 +514,9 @@ def _altitude_chart(series: pd.DataFrame, height: int = 240) -> alt.Chart:
     La cible bouge aussi en azimut (pas seulement en altitude) : chaque point
     est colore par secteur cardinal (legende auto), l'azimut exact restant
     disponible au survol -- garde un seul graphe/axe plutot que d'ajouter un
-    second axe ou un graphe separe."""
+    second axe ou un graphe separe. Bande verte en fond : plages ou l'horizon
+    degage choisi (barre laterale) rend la cible reellement pointable, cf.
+    `_clear_horizon_runs`."""
     long_df = series.reset_index()
     x = alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT))
     y = alt.Y("alt:Q", title="Altitude (deg)", scale=alt.Scale(domain=[0, 90]))
@@ -480,6 +524,12 @@ def _altitude_chart(series: pd.DataFrame, height: int = 240) -> alt.Chart:
                alt.Tooltip("alt:Q", title="Altitude", format=".0f"),
                alt.Tooltip("az:Q", title="Azimut", format=".0f"),
                alt.Tooltip("sector:N", title="Direction")]
+    runs_df = _clear_horizon_runs(series, horizon)
+    bands = (
+        alt.Chart(runs_df)
+        .mark_rect(color="#2ecc71", opacity=0.18)
+        .encode(x="start:T", x2="end:T", y=alt.value(0), y2=alt.value(height))
+    ) if not runs_df.empty else alt.Chart(pd.DataFrame()).mark_rect()
     line = alt.Chart(long_df).mark_line(color="#8a8a8a").encode(x=x, y=y)
     points = (
         alt.Chart(long_df)
@@ -492,7 +542,7 @@ def _altitude_chart(series: pd.DataFrame, height: int = 240) -> alt.Chart:
     )
     ref_df = pd.DataFrame({"alt": [SEESTAR["min_alt_deg"], SEESTAR["max_alt_deg"]]})
     rules = alt.Chart(ref_df).mark_rule(strokeDash=[4, 4], color="gray").encode(y="alt:Q")
-    return (line + rules + points).properties(height=height)
+    return (bands + line + rules + points).properties(height=height)
 
 
 def _wiki_title_candidates(row: dict) -> list[str]:
@@ -542,7 +592,7 @@ def _day_frame(night_df: pd.DataFrame, site: dict) -> pd.DataFrame:
 
 
 @st.dialog("Detail de la cible", width="large")
-def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict) -> None:
+def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict, horizon: dict) -> None:
     """Modale ouverte par le bouton 'Detail' d'une carte (onglet 'Ce soir' ou
     'Catalogue Messier') : image + graphe de hauteur (19h-6h, voir
     `_day_frame`) cote a cote, puis fiche technique de la cible."""
@@ -559,9 +609,9 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict) -> None
         with img_col:
             st.image(row["Image"], use_container_width=True)
         with chart_col:
-            st.altair_chart(_altitude_chart(series), use_container_width=True)
+            st.altair_chart(_altitude_chart(series, horizon), use_container_width=True)
     else:
-        st.altair_chart(_altitude_chart(series), use_container_width=True)
+        st.altair_chart(_altitude_chart(series, horizon), use_container_width=True)
 
     peak_t = series["alt"].idxmax()
     peak = series.loc[peak_t]
@@ -654,7 +704,8 @@ with tab_ce_soir:
     if searched and query:
         found = find_target(query)
         if found:
-            _target_detail_dialog(_row_from_search(found, df, prog["horizon"], site), df, site)
+            _target_detail_dialog(_row_from_search(found, df, prog["horizon"], site), df, site,
+                                   prog["horizon"])
         else:
             st.warning(f"Aucun objet trouve pour « {query} ». Essayez une designation "
                        "comme M31, NGC7380 ou IC434.")
@@ -725,7 +776,8 @@ with tab_ce_soir:
     horizon_key = tuple(sorted(prog["horizon"].items()))
     rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "targets")
     if rows:
-        rows = sorted(rows, key=lambda r: r["Heures"], reverse=True)
+        captured = set(prog["messier_captured"])
+        rows = sorted(rows, key=lambda r: _discovery_sort_key(r, captured))
         types = sorted({r["Type"] for r in rows if r["Type"]})
         # Boutons multi-selection (pas un menu deroulant) : on veut pouvoir
         # afficher plusieurs types a la fois (ex. galaxies + amas globulaires),
@@ -735,11 +787,11 @@ with tab_ce_soir:
             rows = [r for r in rows if r["Type"] in chosen_types]
 
         shown, rest = rows[:GALLERY_PAGE_SIZE], rows[GALLERY_PAGE_SIZE:]
-        _target_grid(shown, df, site, "soir", GALLERY_COLS,
+        _target_grid(shown, df, site, prog["horizon"], "soir", GALLERY_COLS,
                      card=lambda r: card_html(**_target_card(r)))
         if rest:
             with st.expander(f"Voir {len(rest)} cible(s) de plus"):
-                _target_grid(rest, df, site, "soir_plus", GALLERY_COLS,
+                _target_grid(rest, df, site, prog["horizon"], "soir_plus", GALLERY_COLS,
                               card=lambda r: card_html(**_target_card(r)))
     else:
         st.info("Aucune cible exploitable cette nuit (meteo, Lune ou horizon degage).")
@@ -773,7 +825,7 @@ with tab_messier:
             st.rerun()
 
     if rows:
-        _target_grid(rows, df, site, "messier", MESSIER_COLS,
+        _target_grid(rows, df, site, prog["horizon"], "messier", MESSIER_COLS,
                       card=_messier_card_html, extra=_messier_extra)
     else:
         st.info("Aucun objet Messier faisable ce soir (meteo, Lune ou horizon degage).")
