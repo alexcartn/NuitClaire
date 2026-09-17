@@ -806,23 +806,13 @@ with tab_journal:
                         st.rerun()
                 with col_name:
                     added_txt = datetime.fromisoformat(item["addedAt"]).strftime("%H:%M")
-                    st.markdown(f"**{designation}** &nbsp;·&nbsp; ajoutee {added_txt}")
+                    notes_hint = f" · {len(item['notes'])} note(s)" if item["notes"] else ""
+                    st.markdown(f"**{designation}** &nbsp;·&nbsp; ajoutee {added_txt}{notes_hint}")
                 with col_remove:
                     if st.button("Retirer", key=f"j_remove_{designation}", use_container_width=True):
                         sessions_store.remove_item(sess, designation)
                         sessions_store.save(sess)
                         st.rerun()
-
-                for note in item["notes"]:
-                    note_col, del_col = st.columns([6, 1])
-                    with note_col:
-                        at_txt = datetime.fromisoformat(note["at"]).strftime("%H:%M")
-                        st.caption(f"{at_txt} · {note['text']}")
-                    with del_col:
-                        if st.button("×", key=f"j_delnote_{designation}_{note['id']}"):
-                            sessions_store.remove_item_note(sess, designation, note["id"])
-                            sessions_store.save(sess)
-                            st.rerun()
 
                 with st.form(f"j_addnote_form_{designation}", clear_on_submit=True):
                     note_col, add_col = st.columns([4, 1])
@@ -836,18 +826,25 @@ with tab_journal:
                     sessions_store.save(sess)
                     st.rerun()
 
-        if current["freeNotes"]:
-            st.markdown("**Notes libres**")
-            for note in current["freeNotes"]:
+        timeline_entries = sessions_store.timeline(current)
+        st.markdown("**Journal de la nuit**")
+        if timeline_entries:
+            for entry in timeline_entries:
                 note_col, del_col = st.columns([6, 1])
                 with note_col:
-                    at_txt = datetime.fromisoformat(note["at"]).strftime("%H:%M")
-                    st.caption(f"{at_txt} · {note['text']}")
+                    at_txt = datetime.fromisoformat(entry["at"]).strftime("%H:%M")
+                    who = entry["target"] or "Note libre"
+                    st.caption(f"{at_txt} · **{who}** — {entry['text']}")
                 with del_col:
-                    if st.button("×", key=f"j_delfree_{note['id']}"):
-                        sessions_store.remove_free_note(sess, note["id"])
+                    if st.button("×", key=f"j_deltl_{entry['id']}"):
+                        if entry["target"]:
+                            sessions_store.remove_item_note(sess, entry["target"], entry["id"])
+                        else:
+                            sessions_store.remove_free_note(sess, entry["id"])
                         sessions_store.save(sess)
                         st.rerun()
+        else:
+            _soft_caption("Aucune note pour l'instant.")
 
         if st.button("Cloturer la session", type="primary"):
             sessions_store.close_session(sess, sel, local_now(site))
@@ -870,6 +867,14 @@ with tab_journal:
                 if note != entry["note"]:
                     sessions_store.set_past_note(sess, entry["closedAt"], note)
                     sessions_store.save(sess)
+
+                past_timeline = sessions_store.timeline(entry)
+                if past_timeline:
+                    with st.expander(f"Voir le journal de cette nuit ({len(past_timeline)})"):
+                        for te in past_timeline:
+                            at_txt = datetime.fromisoformat(te["at"]).strftime("%H:%M")
+                            who = te["target"] or "Note libre"
+                            st.caption(f"{at_txt} · **{who}** — {te['text']}")
 
                 if st.button(
                     "Rouvrir cette sortie", key=f"j_reopen_{entry['closedAt']}", disabled=session_active,

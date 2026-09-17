@@ -148,6 +148,13 @@ class NoteOut(BaseModel):
     at: str
 
 
+class TimelineEntryOut(BaseModel):
+    id: str
+    at: str
+    text: str
+    target: str | None
+
+
 class SessionItemOut(BaseModel):
     designation: str
     addedAt: str
@@ -160,6 +167,7 @@ class CurrentSessionOut(BaseModel):
     scoreAtOpen: int | None
     items: list[SessionItemOut]
     freeNotes: list[NoteOut]
+    timeline: list[TimelineEntryOut]
 
 
 class PastSessionOut(BaseModel):
@@ -168,6 +176,7 @@ class PastSessionOut(BaseModel):
     targets: list[str]
     note: str
     closedAt: str
+    timeline: list[TimelineEntryOut]
 
 
 class SessionsOut(BaseModel):

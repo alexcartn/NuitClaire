@@ -137,6 +137,13 @@ export interface Note {
   at: string;
 }
 
+export interface TimelineEntry {
+  id: string;
+  at: string;
+  text: string;
+  target: string | null;
+}
+
 export interface SessionItem {
   designation: string;
   addedAt: string;
@@ -149,6 +156,7 @@ export interface CurrentSession {
   scoreAtOpen: number | null;
   items: SessionItem[];
   freeNotes: Note[];
+  timeline: TimelineEntry[];
 }
 
 export interface PastSession {
@@ -157,6 +165,7 @@ export interface PastSession {
   targets: string[];
   note: string;
   closedAt: string;
+  timeline: TimelineEntry[];
 }
 
 export interface Sessions {

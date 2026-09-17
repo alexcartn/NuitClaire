@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from sessions import add_free_note, add_item, add_item_note, close_session, default, load, \
     remove_free_note, remove_item, remove_item_note, reopen_session, save, set_past_note, \
-    toggle_item, DEFAULT
+    timeline, toggle_item, DEFAULT
 
 NOW = datetime(2026, 9, 16, 22, 4)
 TODAY = date(2026, 9, 16)
@@ -328,3 +328,37 @@ def test_reopen_session_migrates_legacy_item_note_shape():
     reopen_session(data, "2026-09-10T23:00:00")
 
     assert data["current"]["items"]["M27"]["notes"][0]["text"] == "vieille entree"
+
+
+def test_timeline_merges_item_and_free_notes_sorted_by_time():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    later = datetime(2026, 9, 16, 23, 30)
+    earlier = datetime(2026, 9, 16, 21, 0)
+    add_item_note(data, "M13", "Beau seeing", later)
+    add_free_note(data, "Nuages en approche", earlier, score_now=80)
+
+    entries = timeline(data["current"])
+
+    assert [e["text"] for e in entries] == ["Nuages en approche", "Beau seeing"]
+    assert entries[0]["target"] is None
+    assert entries[1]["target"] == "M13"
+
+
+def test_timeline_empty_when_no_notes():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    assert timeline(data["current"]) == []
+
+
+def test_timeline_tolerates_legacy_entry_without_items_or_free_notes():
+    assert timeline({"date": "2026-09-10", "targets": ["M27"], "note": "vieille entree"}) == []
+
+
+def test_timeline_works_on_past_entry_after_close():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    add_item_note(data, "M13", "Beau seeing", NOW)
+    add_free_note(data, "Ciel degage", NOW, score_now=80)
+    close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
+
+    entries = timeline(data["past"][0])
+
+    assert {e["text"] for e in entries} == {"Beau seeing", "Ciel degage"}

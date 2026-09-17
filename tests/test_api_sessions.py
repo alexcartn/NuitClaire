@@ -2,7 +2,7 @@ def test_get_sessions_returns_empty_defaults(api_client):
     r = api_client.get("/api/sessions")
     assert r.status_code == 200
     assert r.json() == {
-        "current": {"openedAt": None, "scoreAtOpen": None, "items": [], "freeNotes": []},
+        "current": {"openedAt": None, "scoreAtOpen": None, "items": [], "freeNotes": [], "timeline": []},
         "past": [],
     }
 
@@ -164,3 +164,26 @@ def test_reopen_past_session_conflicts_when_current_open(api_client):
 def test_reopen_unknown_past_session_returns_404(api_client):
     r = api_client.post("/api/sessions/past/2026-01-01T00:00:00/reopen")
     assert r.status_code == 404
+
+
+def test_current_timeline_merges_item_and_free_notes_sorted(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.post("/api/sessions/current/notes", json={"text": "Ciel degage"})
+    api_client.post("/api/sessions/current/items/M13/notes", json={"text": "Beau seeing"})
+
+    r = api_client.get("/api/sessions")
+    entries = r.json()["current"]["timeline"]
+    assert [e["text"] for e in entries] == ["Ciel degage", "Beau seeing"]
+    assert entries[0]["target"] is None
+    assert entries[1]["target"] == "M13"
+
+
+def test_past_session_includes_timeline(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.post("/api/sessions/current/items/M13/notes", json={"text": "Belle nuit"})
+    closed = api_client.post("/api/sessions/current/close").json()
+
+    entries = closed["past"][0]["timeline"]
+    assert len(entries) == 1
+    assert entries[0]["text"] == "Belle nuit"
+    assert entries[0]["target"] == "M13"

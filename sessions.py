@@ -236,6 +236,26 @@ def set_past_note(data: dict, closed_at: str, note: str) -> dict:
     return data
 
 
+def timeline(cur: dict) -> list[dict]:
+    """Fil chronologique unique d'une session (en cours ou une entree de
+    `past`, meme forme `items`/`freeNotes`) : notes par cible et notes libres
+    fusionnees et triees par horodatage -- pour lire la nuit comme un vrai
+    carnet d'observation plutot que deux listes separees. `.get(...)` plutot
+    que `[...]` : une vieille entree `past` peut ne pas avoir `items`/
+    `freeNotes` du tout (creee avant leur introduction, voir `load`)."""
+    entries = [
+        {"id": note["id"], "at": note["at"], "text": note["text"], "target": designation}
+        for designation, item in cur.get("items", {}).items()
+        for note in item.get("notes", [])
+    ]
+    entries += [
+        {"id": note["id"], "at": note["at"], "text": note["text"], "target": None}
+        for note in cur.get("freeNotes", [])
+    ]
+    entries.sort(key=lambda e: e["at"])
+    return entries
+
+
 def reopen_session(data: dict, closed_at: str) -> dict:
     """Rouvre une sortie cloturee par erreur : la retire de `past` et restaure
     son etat (cibles, coches, notes par cible, notes libres) comme session en

@@ -1,5 +1,6 @@
 """Traduction des dicts internes (cles francaises/snake_case, voir `rows.py`
 et `config.SITE`) vers le contrat JSON camelCase de l'API mobile."""
+import sessions as sessions_store
 from rows import filter_label
 
 
@@ -14,10 +15,14 @@ def sessions_to_out(data: dict) -> dict:
         {"designation": designation, **item}
         for designation, item in sorted(cur["items"].items())
     ]
+    # `timeline` (notes par cible + notes libres fusionnees et triees, voir
+    # sessions.timeline) est calculee ici plutot que stockee : c'est une vue
+    # derivee de `items`/`freeNotes`, jamais une source de verite a part.
+    past = [{**entry, "timeline": sessions_store.timeline(entry)} for entry in data["past"]]
     return {
         "current": {"openedAt": cur["openedAt"], "scoreAtOpen": cur["scoreAtOpen"], "items": items,
-                    "freeNotes": cur["freeNotes"]},
-        "past": data["past"],
+                    "freeNotes": cur["freeNotes"], "timeline": sessions_store.timeline(cur)},
+        "past": past,
     }
 
 

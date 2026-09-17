@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
-import type { TargetRow } from "../types";
+import type { TargetRow, TimelineEntry } from "../types";
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -18,6 +18,39 @@ const inputStyle = {
   padding: "7px 9px", fontSize: 12, color: "var(--ink)", flex: 1,
 } as const;
 
+/** Fil chronologique d'une nuit : notes par cible et notes libres deja
+ * fusionnees/triees par le backend (voir sessions.timeline) -- on se
+ * contente de les rendre comme un carnet, sans reconstituer le tri ici. */
+function Timeline({ entries, onDelete }: { entries: TimelineEntry[]; onDelete?: (entry: TimelineEntry) => void }) {
+  if (entries.length === 0) {
+    return <p className="nc-caption" style={{ margin: 0 }}>Aucune note pour l'instant.</p>;
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {entries.map((e) => (
+        <div key={e.id} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ flex: 1, fontSize: 12, color: "var(--ink2)" }}>
+            <span className="nc-mono">{fmtTime(e.at)}</span>
+            {" · "}
+            {e.target ? <span style={{ color: "var(--ink)", fontWeight: 500 }}>{e.target}</span> : "Note libre"}
+            {" — "}
+            {e.text}
+          </span>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(e)}
+              style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 13, padding: 0 }}
+              title="Supprimer cette note"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) => void }) {
   const fetchSessions = useCallback(() => api.sessions(), []);
   const { data, loading, reload } = useFetch(fetchSessions, []);
@@ -25,6 +58,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
   const [reopening, setReopening] = useState<string | null>(null);
   const [reopenError, setReopenError] = useState<string | null>(null);
   const [pastNoteDraft, setPastNoteDraft] = useState<Record<string, string>>({});
+  const [openPast, setOpenPast] = useState<string | null>(null);
   const [itemNoteDraft, setItemNoteDraft] = useState<Record<string, string>>({});
   const [freeNoteDraft, setFreeNoteDraft] = useState("");
   const [targetQuery, setTargetQuery] = useState("");
@@ -67,11 +101,6 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
     reload();
   };
 
-  const removeFreeNote = async (noteId: string) => {
-    await api.deleteFreeNote(noteId);
-    reload();
-  };
-
   const toggleDone = async (designation: string, done: boolean) => {
     await api.updateSessionItem(designation, { done: !done });
     reload();
@@ -85,8 +114,9 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
     reload();
   };
 
-  const removeItemNote = async (designation: string, noteId: string) => {
-    await api.deleteItemNote(designation, noteId);
+  const deleteTimelineEntry = async (entry: TimelineEntry) => {
+    if (entry.target) await api.deleteItemNote(entry.target, entry.id);
+    else await api.deleteFreeNote(entry.id);
     reload();
   };
 
@@ -221,7 +251,10 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                     >
                       {item.designation}
                     </button>
-                    <span className="nc-caption" style={{ flex: 1 }}>ajoutee {fmtTime(item.addedAt)}</span>
+                    <span className="nc-caption" style={{ flex: 1 }}>
+                      ajoutee {fmtTime(item.addedAt)}
+                      {item.notes.length > 0 && ` · ${item.notes.length} note(s)`}
+                    </span>
                     <button
                       onClick={() => removeItem(item.designation)}
                       style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 16, padding: "0 4px" }}
@@ -230,25 +263,6 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                       ×
                     </button>
                   </div>
-
-                  {item.notes.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      {item.notes.map((n) => (
-                        <div key={n.id} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                          <span className="nc-caption" style={{ flex: 1 }}>
-                            <span className="nc-mono">{fmtTime(n.at)}</span> · {n.text}
-                          </span>
-                          <button
-                            onClick={() => removeItemNote(item.designation, n.id)}
-                            style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 13, padding: 0 }}
-                            title="Supprimer cette note"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
                   <div style={{ display: "flex", gap: 6 }}>
                     <input
@@ -272,25 +286,10 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
             </div>
           )}
 
-          {current.freeNotes.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div className="nc-eyebrow">Notes libres</div>
-              {current.freeNotes.map((n) => (
-                <div key={n.id} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span className="nc-caption" style={{ flex: 1 }}>
-                    <span className="nc-mono">{fmtTime(n.at)}</span> · {n.text}
-                  </span>
-                  <button
-                    onClick={() => removeFreeNote(n.id)}
-                    style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 13, padding: 0 }}
-                    title="Supprimer cette note"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div className="nc-eyebrow">Journal de la nuit</div>
+            <Timeline entries={current.timeline} onDelete={deleteTimelineEntry} />
+          </div>
 
           <button onClick={close} disabled={closing} className="nc-btn nc-btn-primary">
             {closing ? "..." : "Cloturer la session"}
@@ -325,6 +324,18 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   padding: "7px 9px", fontSize: 12, color: "var(--ink)",
                 }}
               />
+              {p.timeline.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setOpenPast((cur) => (cur === p.closedAt ? null : p.closedAt))}
+                    className="nc-caption"
+                    style={{ alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer", color: "var(--ink2)", padding: 0 }}
+                  >
+                    {openPast === p.closedAt ? "Masquer le journal de cette nuit" : `Voir le journal de cette nuit (${p.timeline.length})`}
+                  </button>
+                  {openPast === p.closedAt && <Timeline entries={p.timeline} />}
+                </>
+              )}
               <button
                 onClick={() => reopen(p.closedAt)}
                 disabled={sessionActive || reopening === p.closedAt}
