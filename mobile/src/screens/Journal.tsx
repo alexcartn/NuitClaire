@@ -16,7 +16,10 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
   const fetchSessions = useCallback(() => api.sessions(), []);
   const { data, loading, reload } = useFetch(fetchSessions, []);
   const [closing, setClosing] = useState(false);
+  const [reopening, setReopening] = useState<string | null>(null);
+  const [reopenError, setReopenError] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
+  const [pastNoteDraft, setPastNoteDraft] = useState<Record<string, string>>({});
 
   if (loading || !data) {
     return (
@@ -50,6 +53,24 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
       reload();
     } finally {
       setClosing(false);
+    }
+  };
+
+  const savePastNote = async (closedAt: string, note: string) => {
+    await api.updatePastSessionNote(closedAt, note);
+    reload();
+  };
+
+  const reopen = async (closedAt: string) => {
+    setReopening(closedAt);
+    setReopenError(null);
+    try {
+      await api.reopenSession(closedAt);
+      reload();
+    } catch (e) {
+      setReopenError(e instanceof Error ? e.message : "Impossible de rouvrir cette sortie.");
+    } finally {
+      setReopening(null);
     }
   };
 
@@ -137,6 +158,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
       {past.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 4 }}>
           <div className="nc-eyebrow">Sorties precedentes</div>
+          {reopenError && <p className="nc-caption" style={{ color: "var(--danger, #e2434f)" }}>{reopenError}</p>}
           {past.map((p) => (
             <div key={p.closedAt} className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -146,7 +168,28 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                 </div>
               </div>
               <div style={{ fontSize: 12, color: "var(--ink2)" }}>{p.targets.join(", ") || "aucune cible"}</div>
-              {p.note && <div className="nc-caption">{p.note}</div>}
+              <input
+                value={pastNoteDraft[p.closedAt] ?? p.note}
+                onChange={(e) => setPastNoteDraft((d) => ({ ...d, [p.closedAt]: e.target.value }))}
+                onBlur={(e) => savePastNote(p.closedAt, e.target.value)}
+                placeholder="Note de la sortie (facultatif)"
+                style={{
+                  background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
+                  padding: "7px 9px", fontSize: 12, color: "var(--ink)",
+                }}
+              />
+              <button
+                onClick={() => reopen(p.closedAt)}
+                disabled={current.items.length > 0 || reopening === p.closedAt}
+                className="nc-caption"
+                title={current.items.length > 0 ? "Cloturez la session en cours avant de rouvrir une sortie passee" : "Rouvrir cette sortie"}
+                style={{
+                  alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer",
+                  color: current.items.length > 0 ? "var(--ink3)" : "var(--accent)", padding: 0,
+                }}
+              >
+                {reopening === p.closedAt ? "..." : "Rouvrir cette sortie"}
+              </button>
             </div>
           ))}
         </div>

@@ -1,11 +1,13 @@
 """GET /api/sessions, POST /api/sessions/current/items,
 PUT/DELETE /api/sessions/current/items/{designation},
-POST /api/sessions/current/close -- journal de session (voir sessions.py)."""
+POST /api/sessions/current/close,
+PUT /api/sessions/past/{closed_at}, POST /api/sessions/past/{closed_at}/reopen
+-- journal de session (voir sessions.py)."""
 from fastapi import APIRouter, HTTPException
 
 import sessions as sessions_store
 from api.deps import current_night, current_score_pct, get_site, sessions_write_lock
-from api.schemas import AddSessionItem, SessionsOut, UpdateSessionItem
+from api.schemas import AddSessionItem, SessionsOut, UpdatePastSession, UpdateSessionItem
 from api.translate import sessions_to_out
 from astro import local_now
 
@@ -57,5 +59,31 @@ def close_session() -> dict:
         data = sessions_store.load()
         sel, _, _ = current_night(site)
         sessions_store.close_session(data, sel or local_now(site).date(), local_now(site))
+        sessions_store.save(data)
+        return sessions_to_out(data)
+
+
+@router.put("/api/sessions/past/{closed_at}", response_model=SessionsOut)
+def update_past_session(closed_at: str, body: UpdatePastSession) -> dict:
+    with sessions_write_lock:
+        data = sessions_store.load()
+        try:
+            sessions_store.set_past_note(data, closed_at, body.note)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        sessions_store.save(data)
+        return sessions_to_out(data)
+
+
+@router.post("/api/sessions/past/{closed_at}/reopen", response_model=SessionsOut)
+def reopen_past_session(closed_at: str) -> dict:
+    with sessions_write_lock:
+        data = sessions_store.load()
+        if data["current"]["items"]:
+            raise HTTPException(409, "Une session est deja en cours -- cloturez-la avant de rouvrir une sortie passee.")
+        try:
+            sessions_store.reopen_session(data, closed_at)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
         sessions_store.save(data)
         return sessions_to_out(data)

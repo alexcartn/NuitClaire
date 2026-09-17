@@ -66,4 +66,8 @@ export const api = {
   deleteSessionItem: (designation: string) =>
     request<Sessions>("DELETE", `/api/sessions/current/items/${encodeURIComponent(designation)}`),
   closeSession: () => request<Sessions>("POST", "/api/sessions/current/close"),
+  updatePastSessionNote: (closedAt: string, note: string) =>
+    request<Sessions>("PUT", `/api/sessions/past/${encodeURIComponent(closedAt)}`, { body: { note } }),
+  reopenSession: (closedAt: string) =>
+    request<Sessions>("POST", `/api/sessions/past/${encodeURIComponent(closedAt)}/reopen`),
 };

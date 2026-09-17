@@ -6,11 +6,13 @@ import { AltitudeChart } from "../components/AltitudeChart";
 export function Detail({
   designation,
   captured,
+  horizon,
   onBack,
   onCaptureChange,
 }: {
   designation: string;
   captured: Set<string>;
+  horizon?: Record<string, boolean>;
   onBack: () => void;
   onCaptureChange: () => void;
 }) {
@@ -73,7 +75,7 @@ export function Detail({
                 fenetre pointable
               </div>
             </div>
-            <AltitudeChart series={data.altitudeSeries} />
+            <AltitudeChart series={data.altitudeSeries} horizon={horizon} />
             <p style={{ margin: 0, fontSize: 11, color: "var(--ink2)" }}>
               Direction a l'altitude max : {data.peakSector} (azimut {Math.round(data.peakAz)}°) vers{" "}
               {new Date(data.peakTime).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.

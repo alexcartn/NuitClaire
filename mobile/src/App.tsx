@@ -39,6 +39,7 @@ export default function App() {
           <Detail
             designation={selected}
             captured={captured}
+            horizon={state?.horizon}
             onBack={() => setScreen(backTo)}
             onCaptureChange={reloadState}
           />

@@ -171,3 +171,7 @@ class AddSessionItem(BaseModel):
 class UpdateSessionItem(BaseModel):
     done: bool | None = None
     note: str | None = None
+
+
+class UpdatePastSession(BaseModel):
+    note: str

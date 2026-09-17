@@ -131,7 +131,12 @@ def set_note(data: dict, designation: str, note: str) -> dict:
 def close_session(data: dict, today: date, now: datetime) -> dict:
     """Cloture la session en cours : si elle contient au moins une cible, la
     range dans `past` (triee la plus recente en tete) puis la vide. Sans effet
-    si la session en cours est deja vide."""
+    si la session en cours est deja vide.
+
+    `openedAt` et `items` (copie complete, cochees/notes par cible incluses)
+    sont conserves dans l'entree passee en plus de `targets`/`note` (formes
+    resumees pour l'affichage) : c'est ce qui permet a `reopen_session` de
+    restaurer une sortie cloturee par erreur a l'identique plutot qu'a vide."""
     cur = data["current"]
     if cur["items"]:
         notes = [i["note"] for i in cur["items"].values() if i["note"]]
@@ -141,6 +146,43 @@ def close_session(data: dict, today: date, now: datetime) -> dict:
             "targets": sorted(cur["items"].keys()),
             "note": "; ".join(notes),
             "closedAt": now.isoformat(),
+            "openedAt": cur["openedAt"],
+            "items": {k: dict(v) for k, v in cur["items"].items()},
         })
     data["current"] = {"openedAt": None, "scoreAtOpen": None, "items": {}}
+    return data
+
+
+def set_past_note(data: dict, closed_at: str, note: str) -> dict:
+    """Modifie la note libre d'une sortie cloturee -- independamment des
+    notes par cible figees a la cloture, pour laisser un vrai journal de bord
+    (corriger ou completer apres-coup) sans devoir rouvrir la session."""
+    entry = next((p for p in data["past"] if p["closedAt"] == closed_at), None)
+    if entry is None:
+        raise ValueError(f"aucune sortie cloturee a {closed_at}")
+    entry["note"] = note
+    return data
+
+
+def reopen_session(data: dict, closed_at: str) -> dict:
+    """Rouvre une sortie cloturee par erreur : la retire de `past` et restaure
+    son etat (cibles, coches, notes par cible) comme session en cours.
+    Refuse si une session est deja en cours -- il n'y en a jamais deux a la
+    fois. Sur une entree ancienne sans `items`/`openedAt` (creee avant ce
+    champ), reconstruit des items neufs (non coches, sans note) a partir de
+    `targets` plutot que d'echouer."""
+    if data["current"]["items"]:
+        raise ValueError("une session est deja en cours")
+    idx = next((i for i, p in enumerate(data["past"]) if p["closedAt"] == closed_at), None)
+    if idx is None:
+        raise ValueError(f"aucune sortie cloturee a {closed_at}")
+    entry = data["past"].pop(idx)
+    items = entry.get("items")
+    if not items:
+        items = {t: {"addedAt": entry["closedAt"], "done": False, "note": ""} for t in entry["targets"]}
+    data["current"] = {
+        "openedAt": entry.get("openedAt") or entry["closedAt"],
+        "scoreAtOpen": entry["score"],
+        "items": items,
+    }
     return data

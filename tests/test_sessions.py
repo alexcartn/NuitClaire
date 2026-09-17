@@ -1,8 +1,8 @@
 import json
 from datetime import date, datetime
 
-from sessions import add_item, close_session, default, load, remove_item, save, set_note, \
-    toggle_item, DEFAULT
+from sessions import add_item, close_session, default, load, remove_item, reopen_session, save, \
+    set_note, set_past_note, toggle_item, DEFAULT
 
 NOW = datetime(2026, 9, 16, 22, 4)
 TODAY = date(2026, 9, 16)
@@ -123,3 +123,76 @@ def test_close_session_inserts_most_recent_first():
     add_item(data, "M27", NOW, score_now=60)
     close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
     assert [p["date"] for p in data["past"]] == ["2026-09-16", "2026-09-13"]
+
+
+def test_set_past_note_updates_matching_entry():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
+    closed_at = data["past"][0]["closedAt"]
+
+    set_past_note(data, closed_at, "Corrige apres coup")
+
+    assert data["past"][0]["note"] == "Corrige apres coup"
+
+
+def test_set_past_note_unknown_closed_at_raises():
+    data = default()
+    try:
+        set_past_note(data, "2026-01-01T00:00:00", "x")
+        assert False, "aurait du lever ValueError"
+    except ValueError:
+        pass
+
+
+def test_reopen_session_restores_items_and_pops_past_entry():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    set_note(data, "M13", "Beau seeing")
+    toggle_item(data, "M13")
+    close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
+    closed_at = data["past"][0]["closedAt"]
+
+    reopen_session(data, closed_at)
+
+    assert data["past"] == []
+    assert data["current"]["openedAt"] == NOW.isoformat()
+    assert data["current"]["scoreAtOpen"] == 80
+    assert data["current"]["items"]["M13"]["note"] == "Beau seeing"
+    assert data["current"]["items"]["M13"]["done"] is True
+
+
+def test_reopen_session_refuses_when_current_already_open():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
+    closed_at = data["past"][0]["closedAt"]
+    add_item(data, "M27", NOW, score_now=60)  # rouvre une nouvelle session en cours
+
+    try:
+        reopen_session(data, closed_at)
+        assert False, "aurait du lever ValueError"
+    except ValueError:
+        pass
+    assert len(data["past"]) == 1  # inchange
+
+
+def test_reopen_session_unknown_closed_at_raises():
+    data = default()
+    try:
+        reopen_session(data, "2026-01-01T00:00:00")
+        assert False, "aurait du lever ValueError"
+    except ValueError:
+        pass
+
+
+def test_reopen_session_rebuilds_items_for_legacy_entry_without_items():
+    data = default()
+    data["past"].append({
+        "date": "2026-09-10", "score": 55, "targets": ["M27"],
+        "note": "vieille entree", "closedAt": "2026-09-10T23:00:00",
+    })
+
+    reopen_session(data, "2026-09-10T23:00:00")
+
+    assert data["current"]["items"]["M27"] == {
+        "addedAt": "2026-09-10T23:00:00", "done": False, "note": "",
+    }
+    assert data["current"]["scoreAtOpen"] == 55

@@ -9,16 +9,19 @@ function fmtHour(iso: string): string {
 }
 
 /** Barres d'altitude 19h-6h (voir rows.day_frame) : teintees en accent quand
- * la cible est dans la plage utilisable du Seestar S50 (20-85deg), sans
- * recroiser l'horizon degage choisi par l'utilisateur -- simplification
- * deliberee par rapport au graphe Streamlit (bande verte + horizon), pour
- * garder cet ecran independant d'un appel /api/state supplementaire. */
-export function AltitudeChart({ series }: { series: AltitudePoint[] }) {
+ * la cible est a la fois dans la plage utilisable du Seestar S50 (20-85deg)
+ * ET dans un secteur d'horizon degage choisi par l'utilisateur -- meme regle
+ * que la bande verte du graphe Streamlit (app.py::_clear_horizon_runs). Sans
+ * `horizon` (ecran appele avant que /api/state ait repondu), on retombe sur
+ * le seul critere d'altitude plutot que de bloquer l'affichage. */
+export function AltitudeChart({ series, horizon }: { series: AltitudePoint[]; horizon?: Record<string, boolean> }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ height: 104, display: "flex", gap: 4, alignItems: "flex-end" }}>
         {series.map((p, i) => {
-          const pointable = p.alt >= MIN_ALT && p.alt <= MAX_ALT;
+          const inRange = p.alt >= MIN_ALT && p.alt <= MAX_ALT;
+          const sectorOpen = horizon ? !!horizon[p.sector] : true;
+          const pointable = inRange && sectorOpen;
           return (
             <div key={i} style={{ flex: 1, height: "100%", display: "flex", alignItems: "flex-end" }} title={`${p.sector} ${Math.round(p.az)}°`}>
               <div
