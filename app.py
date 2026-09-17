@@ -1,5 +1,5 @@
 """Tableau de bord Streamlit : score astro, cibles par direction/horizon, suivi Messier."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from html import escape
 from itertools import groupby
 from typing import Callable
@@ -23,6 +23,7 @@ from wiki import target_summary, wiki_title_candidates
 from components import TWILIGHT_BAR_CSS, CARD_CSS, twilight_bar_html, card_html
 from rows import common_row_fields, row_from_search, day_frame, filter_label, subtitle_with_ngc
 import progress as progress_store
+import sessions as sessions_store
 
 st.set_page_config(page_title="NuitClaire", page_icon="\U0001F52D", layout="wide")
 
@@ -112,9 +113,12 @@ if "site" not in st.session_state:
     st.session_state.site = dict(SITE)
 if "progress" not in st.session_state:
     st.session_state.progress = progress_store.load()
+if "sessions" not in st.session_state:
+    st.session_state.sessions = sessions_store.load()
 
 site = st.session_state.site
 prog = st.session_state.progress
+sess = st.session_state.sessions
 
 st.title("\U0001F52D NuitClaire")
 _catalog_size = len(load_targets()) + len(load_messier())
@@ -505,6 +509,18 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict, horizon
     if subtitle:
         _soft_caption(subtitle)
 
+    # Meme geste que le bouton "Journal" de la fiche detail mobile : ajoute la
+    # cible a la session en cours (l'ouvre si c'est la premiere de la nuit),
+    # sans quitter la modale. `pct` (score de la nuit affichee, calcule dans
+    # l'onglet "Ce soir" plus bas dans ce script) reste disponible ici via la
+    # portee globale du module, meme pattern que `prog`/`sess`.
+    in_journal = title in sess["current"]["items"]
+    if st.button("Ajoutee au journal ✓" if in_journal else "Ajouter au journal",
+                 key=f"journal_add_{title}", disabled=in_journal):
+        sessions_store.add_item(sess, title, local_now(site), pct)
+        sessions_store.save(sess)
+        st.rerun()
+
     series = target_altitude_series(day_frame(night_df, site), {"ra": row["RA"], "dec": row["Dec"]},
                                      site=site)
     if row.get("Image"):
@@ -566,7 +582,7 @@ if not nights:
     st.error("Aucune donnee de nuit disponible pour les prochains jours.")
     st.stop()
 
-tab_ce_soir, tab_messier = st.tabs(["Ce soir", "Catalogue Messier"])
+tab_ce_soir, tab_messier, tab_journal = st.tabs(["Ce soir", "Catalogue Messier", "Journal"])
 
 with tab_ce_soir:
     # Uniquement la nuit du jour meme : pas de strip multi-jours (previsions
@@ -730,3 +746,77 @@ with tab_messier:
                       card=_messier_card_html, extra=_messier_extra)
     else:
         st.info("Aucun objet Messier faisable ce soir (meteo, Lune ou horizon degage).")
+
+with tab_journal:
+    # Meme fonctionnalite que l'onglet "Journal" du mobile (sessions.py) :
+    # session en cours (cibles ajoutees depuis la modale de detail, cochees
+    # au fur et a mesure, note libre), cloture, puis historique des sorties
+    # -- avec ici en plus la possibilite de corriger la note d'une sortie
+    # cloturee ou de la rouvrir par erreur.
+    st.header("Journal de session")
+    current = sess["current"]
+    st.caption(f"{len(sess['past'])} sortie(s) enregistree(s)")
+
+    if current["items"]:
+        st.subheader("Session en cours")
+        if current["openedAt"]:
+            opened_txt = datetime.fromisoformat(current["openedAt"]).strftime("%H:%M")
+            score_txt = f"score {current['scoreAtOpen']}" if current["scoreAtOpen"] is not None else "score n/d"
+            _soft_caption(f"Ouverte a {opened_txt} → {score_txt}")
+
+        for designation, item in sorted(current["items"].items()):
+            with st.container(border=True):
+                col_done, col_name, col_remove = st.columns([1, 4, 2])
+                with col_done:
+                    done = st.checkbox("Coche", value=item["done"], key=f"j_done_{designation}",
+                                        label_visibility="collapsed")
+                    if done != item["done"]:
+                        sessions_store.toggle_item(sess, designation)
+                        sessions_store.save(sess)
+                        st.rerun()
+                with col_name:
+                    added_txt = datetime.fromisoformat(item["addedAt"]).strftime("%H:%M")
+                    st.markdown(f"**{designation}** &nbsp;·&nbsp; ajoutee {added_txt}")
+                with col_remove:
+                    if st.button("Retirer", key=f"j_remove_{designation}", use_container_width=True):
+                        sessions_store.remove_item(sess, designation)
+                        sessions_store.save(sess)
+                        st.rerun()
+                note = st.text_input("Note", value=item["note"], key=f"j_note_{designation}",
+                                      placeholder="Note (facultatif)", label_visibility="collapsed")
+                if note != item["note"]:
+                    sessions_store.set_note(sess, designation, note)
+                    sessions_store.save(sess)
+
+        if st.button("Cloturer la session", type="primary"):
+            sessions_store.close_session(sess, sel, local_now(site))
+            sessions_store.save(sess)
+            st.rerun()
+    else:
+        st.info("Aucune session en cours -- ouvrez la fiche detail d'une cible ('Ce soir' ou "
+                "'Catalogue Messier') puis cliquez sur 'Ajouter au journal'.")
+
+    if sess["past"]:
+        st.subheader("Sorties precedentes")
+        for entry in sess["past"]:
+            with st.container(border=True):
+                score_txt = f"score {entry['score']}" if entry["score"] is not None else "score n/d"
+                st.markdown(f"**{_format_date_fr(date.fromisoformat(entry['date']))}** — {score_txt}")
+                st.caption(", ".join(entry["targets"]) or "aucune cible")
+                note = st.text_input(
+                    "Note de la sortie", value=entry["note"], key=f"j_pastnote_{entry['closedAt']}",
+                    placeholder="Note de la sortie (facultatif)", label_visibility="collapsed",
+                )
+                if note != entry["note"]:
+                    sessions_store.set_past_note(sess, entry["closedAt"], note)
+                    sessions_store.save(sess)
+
+                reopen_blocked = bool(current["items"])
+                if st.button(
+                    "Rouvrir cette sortie", key=f"j_reopen_{entry['closedAt']}", disabled=reopen_blocked,
+                    help="Cloturez la session en cours avant de rouvrir une sortie passee."
+                    if reopen_blocked else "Restaure cette sortie comme session en cours.",
+                ):
+                    sessions_store.reopen_session(sess, entry["closedAt"])
+                    sessions_store.save(sess)
+                    st.rerun()

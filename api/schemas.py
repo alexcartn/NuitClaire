@@ -60,6 +60,10 @@ class StateOut(BaseModel):
 class HourlyPoint(BaseModel):
     time: str
     score: float
+    cloudCoverPct: float | None
+    windGustsKmh: float | None
+    temperatureC: float | None
+    dewPointC: float | None
 
 
 class CloudTrendOut(BaseModel):

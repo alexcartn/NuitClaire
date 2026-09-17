@@ -22,6 +22,10 @@ export interface AppState {
 export interface HourlyPoint {
   time: string;
   score: number;
+  cloudCoverPct: number | null;
+  windGustsKmh: number | null;
+  temperatureC: number | null;
+  dewPointC: number | null;
 }
 
 export interface CloudTrend {

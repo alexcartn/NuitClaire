@@ -17,6 +17,10 @@ from scoring import cloud_trend, dew_risk, night_summary, score_label_fr, view_w
 router = APIRouter()
 
 
+def _nan_to_none(value) -> float | None:
+    return None if value != value else float(value)  # NaN check sans importer pandas ici
+
+
 def _current_wind_gust(df, now):
     """Rafale de l'heure courante (ou la plus proche disponible) -- meme
     logique de recherche d'heure courante que `scoring.cloud_trend`, pour une
@@ -25,8 +29,7 @@ def _current_wind_gust(df, now):
         return None
     idx = df.index[df.index <= now] if now is not None else df.index[:0]
     current_t = idx.max() if not idx.empty else df.index.min()
-    value = df.loc[current_t, "wind_gusts_10m"]
-    return None if value != value else float(value)  # NaN check sans importer pandas ici
+    return _nan_to_none(df.loc[current_t, "wind_gusts_10m"])
 
 
 @router.get("/api/night", response_model=NightOut)
@@ -64,7 +67,17 @@ def get_night() -> dict:
             "nowPct": trend["now_pct"], "futurePct": trend["future_pct"], "delta": trend["delta"],
         } if trend else None,
         # Courbe complete (nuit entiere, non filtree par le mode de fenetre) :
-        # meme choix que `_render_score_chart(df)` dans app.py -- le mobile
-        # sous-echantillonne cote client pour la mini-viz de l'ecran d'accueil.
-        "hourly": [{"time": t.isoformat(), "score": v} for t, v in df["score"].items()],
+        # meme choix que `_render_score_chart(df)`/`_render_cloud_chart`/
+        # `_render_wind_chart`/`_render_time_series` dans app.py -- le mobile
+        # sous-echantillonne cote client pour ses propres mini-viz.
+        "hourly": [
+            {
+                "time": t.isoformat(), "score": df.at[t, "score"],
+                "cloudCoverPct": _nan_to_none(df.at[t, "cloud_cover"]),
+                "windGustsKmh": _nan_to_none(df.at[t, "wind_gusts_10m"]),
+                "temperatureC": _nan_to_none(df.at[t, "temperature_2m"]),
+                "dewPointC": _nan_to_none(df.at[t, "dew_point_2m"]),
+            }
+            for t in df.index
+        ],
     }

@@ -4,6 +4,9 @@ import { useFetch } from "../useFetch";
 import { ScoreCard } from "../components/ScoreCard";
 import { StatCard } from "../components/StatCard";
 import { SectorChips } from "../components/SectorChips";
+import { CloudChart } from "../components/CloudChart";
+import { WindChart } from "../components/WindChart";
+import { TempDewChart } from "../components/TempDewChart";
 
 const CLOUD_TREND_ICON: Record<string, string> = {
   amelioration: "🟢",
@@ -140,22 +143,37 @@ export function CeSoir({
       </button>
 
       {meteoOpen && (
-        <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {n.cloudTrend ? (
+        <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="nc-eyebrow">Nuages</div>
+            {n.cloudTrend ? (
+              <p style={{ margin: 0, fontSize: 13 }}>
+                {CLOUD_TREND_ICON[n.cloudTrend.direction]} {n.cloudTrend.label} attendue : nuages{" "}
+                {Math.round(n.cloudTrend.nowPct)}% → {Math.round(n.cloudTrend.futurePct)}% dans les prochaines
+                heures.
+              </p>
+            ) : (
+              <p className="nc-caption" style={{ margin: 0 }}>
+                Tendance nuages indisponible (nuit differente d'aujourd'hui, ou pas assez d'heures a venir).
+              </p>
+            )}
+            <CloudChart hourly={n.hourly} />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="nc-eyebrow">Point de rosee</div>
             <p style={{ margin: 0, fontSize: 13 }}>
-              {CLOUD_TREND_ICON[n.cloudTrend.direction]} {n.cloudTrend.label} attendue : nuages{" "}
-              {Math.round(n.cloudTrend.nowPct)}% → {Math.round(n.cloudTrend.futurePct)}% dans les prochaines
-              heures.
+              Ecart temperature/point de rosee : {n.dewSpread != null ? `${n.dewSpread.toFixed(1)}°` : "n/d"} (
+              {n.dewRisk.toLowerCase()}).
             </p>
-          ) : (
-            <p className="nc-caption" style={{ margin: 0 }}>
-              Tendance nuages indisponible (nuit differente d'aujourd'hui, ou pas assez d'heures a venir).
-            </p>
-          )}
-          <p style={{ margin: 0, fontSize: 13 }}>
-            Ecart temperature/point de rosee : {n.dewSpread != null ? `${n.dewSpread.toFixed(1)}°` : "n/d"} (
-            {n.dewRisk.toLowerCase()}).
-          </p>
+            <TempDewChart hourly={n.hourly} />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="nc-eyebrow">Vent</div>
+            <WindChart hourly={n.hourly} />
+          </div>
+
           <p className="nc-caption" style={{ margin: 0 }}>
             Open-Meteo AROME 1.3 km · seeing et transparence 7Timer ASTRO.
           </p>

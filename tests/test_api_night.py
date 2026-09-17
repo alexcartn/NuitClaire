@@ -12,6 +12,15 @@ def test_get_night_returns_score_twilight_and_hourly_fields(api_client):
     assert data["dewSpread"] == 4.0
     assert data["dewRisk"] == "Faible"
     assert data["windGustsKmh"] is not None
+    # Series horaires pour les graphes "Details meteo" du mobile (nuages,
+    # vent, temperature/rosee) -- memes colonnes que app.py::_cloud_chart/
+    # _wind_chart/_render_time_series, constantes dans le fixture (cloud_cover
+    # 20%, rafales 15 km/h, temp 12deg, rosee 8deg).
+    first = data["hourly"][0]
+    assert first["cloudCoverPct"] == 20.0
+    assert first["windGustsKmh"] == 15.0
+    assert first["temperatureC"] == 12.0
+    assert first["dewPointC"] == 8.0
 
 
 def test_get_night_twilight_times_are_ordered(api_client):
