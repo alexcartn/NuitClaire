@@ -1,0 +1,11 @@
+# Requirements du build Vercel (@vercel/python) pour api/main.py -- distinct
+# de requirements-api.txt (installe en local avec uvicorn pour le dev) et du
+# requirements.txt racine (Streamlit/Altair, inutiles ici et trop lourds pour
+# une fonction serverless). Pas de uvicorn : Vercel sert l'app FastAPI (ASGI)
+# directement, son propre serveur ASGI n'est utile qu'en local.
+fastapi
+cachetools
+requests
+pandas
+ephem
+supabase

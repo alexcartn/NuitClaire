@@ -59,6 +59,22 @@ Des que ces deux variables sont presentes, `db.py` bascule automatiquement les t
 stores sur Supabase (voir `db.enabled()`) ; absentes, comportement inchange (fichiers
 locaux). `pip install -r api/requirements-api.txt` installe le client `supabase`.
 
+### Deploiement : Vercel (frontend + API) + Supabase (persistance)
+
+Aucun hebergeur a disque persistant necessaire (Railway/Fly.io) une fois Supabase
+branche : `vercel.json` (racine du depot) construit `api/main.py` comme fonction
+serverless Python (`@vercel/python`), avec `api/requirements.txt` (deps runtime
+uniquement -- pas streamlit/altair/uvicorn, reserves au dev local). Deux projets
+Vercel separes sur le meme repo GitHub :
+
+1. Projet API -- Root Directory : racine du depot (les modules `catalog.py`,
+   `scoring.py`, etc. importes par `api/main.py` doivent etre inclus dans le build).
+   Variables d'environnement : `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `ALLOWED_ORIGIN` (l'URL du projet mobile ci-dessous, pour le CORS -- voir
+   `api/main.py`).
+2. Projet mobile -- Root Directory : `mobile/` (config deja dans `mobile/vercel.json`).
+   Variable d'environnement : `VITE_API_BASE` = URL du projet API ci-dessus.
+
 ## Sources
 - Open-Meteo, modele AROME Meteo-France (1.3 km) : nuages par couche, vent, rosee, pluie
 - 7Timer ASTRO (GFS, 3 h) : seeing et transparence
