@@ -59,12 +59,25 @@ export const api = {
   sessions: () => get<Sessions>("/api/sessions"),
   addSessionItem: (designation: string) =>
     request<Sessions>("POST", "/api/sessions/current/items", { body: { designation } }),
-  updateSessionItem: (designation: string, update: { done?: boolean; note?: string }) =>
+  updateSessionItem: (designation: string, update: { done?: boolean }) =>
     request<Sessions>("PUT", `/api/sessions/current/items/${encodeURIComponent(designation)}`, {
       body: update,
     }),
   deleteSessionItem: (designation: string) =>
     request<Sessions>("DELETE", `/api/sessions/current/items/${encodeURIComponent(designation)}`),
+  addItemNote: (designation: string, text: string) =>
+    request<Sessions>("POST", `/api/sessions/current/items/${encodeURIComponent(designation)}/notes`, {
+      body: { text },
+    }),
+  deleteItemNote: (designation: string, noteId: string) =>
+    request<Sessions>(
+      "DELETE",
+      `/api/sessions/current/items/${encodeURIComponent(designation)}/notes/${encodeURIComponent(noteId)}`,
+    ),
+  addFreeNote: (text: string) =>
+    request<Sessions>("POST", "/api/sessions/current/notes", { body: { text } }),
+  deleteFreeNote: (noteId: string) =>
+    request<Sessions>("DELETE", `/api/sessions/current/notes/${encodeURIComponent(noteId)}`),
   closeSession: () => request<Sessions>("POST", "/api/sessions/current/close"),
   updatePastSessionNote: (closedAt: string, note: string) =>
     request<Sessions>("PUT", `/api/sessions/past/${encodeURIComponent(closedAt)}`, { body: { note } }),

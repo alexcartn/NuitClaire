@@ -1,37 +1,39 @@
 """Persistance locale : journal de session d'observation -- session en cours
-(cibles ajoutees ce soir, cochees au fur et a mesure, note libre) et
-historique des sorties cloturees. Meme pattern default()/load()/save() que
-progress.py/settings.py, mais fichier separe : celui-ci grandit par
-accumulation (une entree par sortie cloturee) alors que les deux autres
-restent des blobs de taille fixe -- deux rythmes de croissance differents,
-deux fichiers.
+(cibles ajoutees ce soir, cochees au fur et a mesure, notes horodatees par
+cible et notes libres) et historique des sorties cloturees. Meme pattern
+default()/load()/save() que progress.py/settings.py, mais fichier separe :
+celui-ci grandit par accumulation (une entree par sortie cloturee) alors que
+les deux autres restent des blobs de taille fixe -- deux rythmes de
+croissance differents, deux fichiers.
 
 Aucune donnee fabriquee : contrairement au mockup de design (qui affichait
 un exemple du type "28 min - 84 poses retenues"), rien ici n'est mesure --
 le Seestar n'est pas integre a cette appli. Chaque entree ne contient que ce
-que l'utilisateur a explicitement saisi (une note libre) ou ce que l'appli
+que l'utilisateur a explicitement saisi (des notes libres) ou ce que l'appli
 sait reellement (l'heure d'ajout, le score de la nuit au moment de l'ouverture
-de la session). Ne jamais reformater `note` en un format qui ressemblerait a
-des statistiques d'exposition -- ce serait remettre la donnee fabriquee du
+de la session). Ne jamais reformater une note en un format qui ressemblerait
+a des statistiques d'exposition -- ce serait remettre la donnee fabriquee du
 mockup par la petite porte.
 
 Le score de la nuit est capture une seule fois, a l'ouverture de la session
-(premiere cible ajoutee) et reutilise tel quel a la cloture -- jamais
-re-interroge en direct a ce moment-la : c'est une prevision, pas une mesure
-retrospective, et cloturer une session au petit matin ne doit pas figer dans
-l'historique le score d'une tout autre nuit."""
+(premiere cible ou premiere note libre ajoutee) et reutilise tel quel a la
+cloture -- jamais re-interroge en direct a ce moment-la : c'est une
+prevision, pas une mesure retrospective, et cloturer une session au petit
+matin ne doit pas figer dans l'historique le score d'une tout autre nuit."""
 import json
 import os
 from datetime import date, datetime
 from pathlib import Path
 from types import MappingProxyType
+from uuid import uuid4
 
 import db
 
 SESSIONS_PATH = Path(__file__).parent / "data" / "sessions.json"
 
 _DEFAULT_FROZEN = MappingProxyType({
-    "current": MappingProxyType({"openedAt": None, "scoreAtOpen": None, "items": MappingProxyType({})}),
+    "current": MappingProxyType({"openedAt": None, "scoreAtOpen": None,
+                                  "items": MappingProxyType({}), "freeNotes": ()}),
     "past": (),
 })
 
@@ -39,12 +41,35 @@ _DEFAULT_FROZEN = MappingProxyType({
 def default() -> dict:
     """Retourne une copie fraiche et independante des valeurs par defaut."""
     return {
-        "current": {"openedAt": None, "scoreAtOpen": None, "items": {}},
+        "current": {"openedAt": None, "scoreAtOpen": None, "items": {}, "freeNotes": []},
         "past": [],
     }
 
 
 DEFAULT = default()
+
+
+def _new_note(text: str, at: datetime) -> dict:
+    return {"id": uuid4().hex, "text": text, "at": at.isoformat()}
+
+
+def _is_active(cur: dict) -> bool:
+    """Une session est "en cours" tant qu'elle contient au moins une cible ou
+    une note libre -- les deux ouvrent/referment la session de la meme facon
+    (voir add_item/add_free_note/remove_item/remove_free_note)."""
+    return bool(cur["items"] or cur["freeNotes"])
+
+
+def _migrate_item(item: dict) -> dict:
+    """Convertit une cible sauvegardee avant l'introduction des notes
+    multiples (`note`: str unique) vers la forme actuelle (`notes`: liste
+    horodatee) -- sans quoi charger un vieux sessions.json ferait planter
+    l'appli sur des donnees qu'elle a elle-meme ecrites."""
+    if "notes" in item:
+        return item
+    legacy_note = item.get("note", "")
+    notes = [_new_note(legacy_note, datetime.fromisoformat(item["addedAt"]))] if legacy_note else []
+    return {"addedAt": item["addedAt"], "done": bool(item.get("done", False)), "notes": notes}
 
 
 def load(path: Path = SESSIONS_PATH) -> dict:
@@ -61,9 +86,17 @@ def load(path: Path = SESSIONS_PATH) -> dict:
         merged["current"].update(current_override)
         if not isinstance(merged["current"].get("items"), dict):
             merged["current"]["items"] = {}
+        if not isinstance(merged["current"].get("freeNotes"), list):
+            merged["current"]["freeNotes"] = []
+    merged["current"]["items"] = {k: _migrate_item(v) for k, v in merged["current"]["items"].items()}
+
     past_override = raw.get("past")
     if isinstance(past_override, list):
         merged["past"] = past_override
+        for entry in merged["past"]:
+            entry.setdefault("freeNotes", [])
+            if entry.get("items"):
+                entry["items"] = {k: _migrate_item(v) for k, v in entry["items"].items()}
     return merged
 
 
@@ -97,20 +130,22 @@ def add_item(data: dict, designation: str, now: datetime, score_now: int | None)
     """Ajoute `designation` a la session en cours. Si la session est vide,
     l'ouvre (fige `openedAt`/`scoreAtOpen`) -- idempotent si la cible y est deja."""
     cur = data["current"]
-    if not cur["items"]:
+    if not _is_active(cur):
         cur["openedAt"] = now.isoformat()
         cur["scoreAtOpen"] = score_now
-    cur["items"].setdefault(designation, {"addedAt": now.isoformat(), "done": False, "note": ""})
+    cur["items"].setdefault(designation, {"addedAt": now.isoformat(), "done": False, "notes": []})
     return data
 
 
 def remove_item(data: dict, designation: str) -> dict:
     """Retire `designation` de la session en cours ; referme la session
-    (openedAt/scoreAtOpen remis a None) si c'etait la derniere cible."""
-    data["current"]["items"].pop(designation, None)
-    if not data["current"]["items"]:
-        data["current"]["openedAt"] = None
-        data["current"]["scoreAtOpen"] = None
+    (openedAt/scoreAtOpen remis a None) si elle est alors vide (plus aucune
+    cible ni note libre)."""
+    cur = data["current"]
+    cur["items"].pop(designation, None)
+    if not _is_active(cur):
+        cur["openedAt"] = None
+        cur["scoreAtOpen"] = None
     return data
 
 
@@ -121,42 +156,79 @@ def toggle_item(data: dict, designation: str) -> dict:
     return data
 
 
-def set_note(data: dict, designation: str, note: str) -> dict:
+def add_item_note(data: dict, designation: str, text: str, now: datetime) -> dict:
+    """Ajoute une note horodatee a une cible deja dans la session en cours --
+    plusieurs notes possibles par cible (ex. une remarque a 22h, une autre
+    apres un changement de filtre a 23h30), jamais d'ecrasement."""
     item = data["current"]["items"].get(designation)
-    if item is not None:
-        item["note"] = note
+    if item is None:
+        raise ValueError(f"« {designation} » n'est pas dans la session en cours.")
+    item["notes"].append(_new_note(text, now))
+    return data
+
+
+def remove_item_note(data: dict, designation: str, note_id: str) -> dict:
+    item = data["current"]["items"].get(designation)
+    if item is None:
+        raise ValueError(f"« {designation} » n'est pas dans la session en cours.")
+    item["notes"] = [n for n in item["notes"] if n["id"] != note_id]
+    return data
+
+
+def add_free_note(data: dict, text: str, now: datetime, score_now: int | None) -> dict:
+    """Ajoute une note libre (sans cible associee) a la session en cours --
+    l'ouvre si c'est la toute premiere entree de la nuit, meme regle que
+    `add_item` (une note libre a 21h avant la premiere cible pointee compte
+    comme le debut de la sortie)."""
+    cur = data["current"]
+    if not _is_active(cur):
+        cur["openedAt"] = now.isoformat()
+        cur["scoreAtOpen"] = score_now
+    cur["freeNotes"].append(_new_note(text, now))
+    return data
+
+
+def remove_free_note(data: dict, note_id: str) -> dict:
+    cur = data["current"]
+    cur["freeNotes"] = [n for n in cur["freeNotes"] if n["id"] != note_id]
+    if not _is_active(cur):
+        cur["openedAt"] = None
+        cur["scoreAtOpen"] = None
     return data
 
 
 def close_session(data: dict, today: date, now: datetime) -> dict:
-    """Cloture la session en cours : si elle contient au moins une cible, la
-    range dans `past` (triee la plus recente en tete) puis la vide. Sans effet
-    si la session en cours est deja vide.
+    """Cloture la session en cours : si elle contient au moins une cible ou
+    une note libre, la range dans `past` (triee la plus recente en tete) puis
+    la vide. Sans effet si la session en cours est deja vide.
 
-    `openedAt` et `items` (copie complete, cochees/notes par cible incluses)
-    sont conserves dans l'entree passee en plus de `targets`/`note` (formes
-    resumees pour l'affichage) : c'est ce qui permet a `reopen_session` de
-    restaurer une sortie cloturee par erreur a l'identique plutot qu'a vide."""
+    `openedAt`, `items` et `freeNotes` (copie complete : cochees et toutes
+    les notes horodatees incluses) sont conserves dans l'entree passee en
+    plus de `targets`/`note` (formes resumees pour l'affichage) : c'est ce
+    qui permet a `reopen_session` de restaurer une sortie cloturee par
+    erreur a l'identique plutot qu'a vide."""
     cur = data["current"]
-    if cur["items"]:
-        notes = [i["note"] for i in cur["items"].values() if i["note"]]
+    if _is_active(cur):
+        texts = [n["text"] for item in cur["items"].values() for n in item["notes"]]
+        texts += [n["text"] for n in cur["freeNotes"]]
         data["past"].insert(0, {
             "date": today.isoformat(),
             "score": cur["scoreAtOpen"],
             "targets": sorted(cur["items"].keys()),
-            "note": "; ".join(notes),
+            "note": "; ".join(texts),
             "closedAt": now.isoformat(),
             "openedAt": cur["openedAt"],
-            "items": {k: dict(v) for k, v in cur["items"].items()},
+            "items": {k: {**v, "notes": list(v["notes"])} for k, v in cur["items"].items()},
+            "freeNotes": list(cur["freeNotes"]),
         })
-    data["current"] = {"openedAt": None, "scoreAtOpen": None, "items": {}}
+    data["current"] = default()["current"]
     return data
 
 
 def set_past_note(data: dict, closed_at: str, note: str) -> dict:
-    """Modifie la note libre d'une sortie cloturee -- independamment des
-    notes par cible figees a la cloture, pour laisser un vrai journal de bord
-    (corriger ou completer apres-coup) sans devoir rouvrir la session."""
+    """Modifie la note-resume d'une sortie cloturee -- independamment des
+    notes horodatees (par cible ou libres) figees a la cloture, pour laisser
+    corriger ou completer ce resume apres-coup sans devoir rouvrir la session."""
     entry = next((p for p in data["past"] if p["closedAt"] == closed_at), None)
     if entry is None:
         raise ValueError(f"aucune sortie cloturee a {closed_at}")
@@ -166,12 +238,11 @@ def set_past_note(data: dict, closed_at: str, note: str) -> dict:
 
 def reopen_session(data: dict, closed_at: str) -> dict:
     """Rouvre une sortie cloturee par erreur : la retire de `past` et restaure
-    son etat (cibles, coches, notes par cible) comme session en cours.
-    Refuse si une session est deja en cours -- il n'y en a jamais deux a la
-    fois. Sur une entree ancienne sans `items`/`openedAt` (creee avant ce
-    champ), reconstruit des items neufs (non coches, sans note) a partir de
-    `targets` plutot que d'echouer."""
-    if data["current"]["items"]:
+    son etat (cibles, coches, notes par cible, notes libres) comme session en
+    cours. Refuse si une session est deja en cours -- il n'y en a jamais deux
+    a la fois. Sur une entree ancienne sans `items`/`openedAt`/`freeNotes`
+    (creee avant ces champs), reconstruit un etat minimal plutot que d'echouer."""
+    if _is_active(data["current"]):
         raise ValueError("une session est deja en cours")
     idx = next((i for i, p in enumerate(data["past"]) if p["closedAt"] == closed_at), None)
     if idx is None:
@@ -179,10 +250,13 @@ def reopen_session(data: dict, closed_at: str) -> dict:
     entry = data["past"].pop(idx)
     items = entry.get("items")
     if not items:
-        items = {t: {"addedAt": entry["closedAt"], "done": False, "note": ""} for t in entry["targets"]}
+        items = {t: {"addedAt": entry["closedAt"], "done": False, "notes": []} for t in entry["targets"]}
+    else:
+        items = {k: _migrate_item(dict(v)) for k, v in items.items()}
     data["current"] = {
         "openedAt": entry.get("openedAt") or entry["closedAt"],
         "scoreAtOpen": entry["score"],
         "items": items,
+        "freeNotes": list(entry.get("freeNotes") or []),
     }
     return data

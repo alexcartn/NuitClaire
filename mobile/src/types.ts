@@ -131,17 +131,24 @@ export interface GeocodeResult {
   displayName: string;
 }
 
+export interface Note {
+  id: string;
+  text: string;
+  at: string;
+}
+
 export interface SessionItem {
   designation: string;
   addedAt: string;
   done: boolean;
-  note: string;
+  notes: Note[];
 }
 
 export interface CurrentSession {
   openedAt: string | null;
   scoreAtOpen: number | null;
   items: SessionItem[];
+  freeNotes: Note[];
 }
 
 export interface PastSession {

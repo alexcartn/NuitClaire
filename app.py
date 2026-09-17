@@ -749,15 +749,45 @@ with tab_messier:
 
 with tab_journal:
     # Meme fonctionnalite que l'onglet "Journal" du mobile (sessions.py) :
-    # session en cours (cibles ajoutees depuis la modale de detail, cochees
-    # au fur et a mesure, note libre), cloture, puis historique des sorties
-    # -- avec ici en plus la possibilite de corriger la note d'une sortie
-    # cloturee ou de la rouvrir par erreur.
+    # ajout de cibles/notes libres, session en cours (cochees au fur et a
+    # mesure, plusieurs notes horodatees possibles par cible), cloture, puis
+    # historique des sorties -- avec ici en plus la possibilite de corriger
+    # la note-resume d'une sortie cloturee ou de la rouvrir par erreur.
     st.header("Journal de session")
-    current = sess["current"]
     st.caption(f"{len(sess['past'])} sortie(s) enregistree(s)")
 
-    if current["items"]:
+    st.subheader("Ajouter a la session")
+    with st.form("journal_add_target_form", clear_on_submit=True):
+        col_q, col_btn = st.columns([4, 1])
+        with col_q:
+            add_query = st.text_input("Ajouter une cible", label_visibility="collapsed",
+                                       placeholder="Ajouter une cible : M31, NGC7380, IC434...")
+        with col_btn:
+            add_submitted = st.form_submit_button("Ajouter", use_container_width=True)
+    if add_submitted and add_query:
+        found = find_target(add_query)
+        if found:
+            sessions_store.add_item(sess, found["name"], local_now(site), pct)
+            sessions_store.save(sess)
+            st.rerun()
+        else:
+            st.warning(f"Aucun objet trouve pour « {add_query} ».")
+
+    with st.form("journal_add_free_note_form", clear_on_submit=True):
+        free_note_draft = st.text_input(
+            "Note libre", label_visibility="collapsed",
+            placeholder="Note libre, sans cible (ex : conditions, materiel...)",
+        )
+        free_note_submitted = st.form_submit_button("Ajouter une note libre")
+    if free_note_submitted and free_note_draft.strip():
+        sessions_store.add_free_note(sess, free_note_draft.strip(), local_now(site), pct)
+        sessions_store.save(sess)
+        st.rerun()
+
+    current = sess["current"]
+    session_active = bool(current["items"] or current["freeNotes"])
+
+    if session_active:
         st.subheader("Session en cours")
         if current["openedAt"]:
             opened_txt = datetime.fromisoformat(current["openedAt"]).strftime("%H:%M")
@@ -782,19 +812,49 @@ with tab_journal:
                         sessions_store.remove_item(sess, designation)
                         sessions_store.save(sess)
                         st.rerun()
-                note = st.text_input("Note", value=item["note"], key=f"j_note_{designation}",
-                                      placeholder="Note (facultatif)", label_visibility="collapsed")
-                if note != item["note"]:
-                    sessions_store.set_note(sess, designation, note)
+
+                for note in item["notes"]:
+                    note_col, del_col = st.columns([6, 1])
+                    with note_col:
+                        at_txt = datetime.fromisoformat(note["at"]).strftime("%H:%M")
+                        st.caption(f"{at_txt} · {note['text']}")
+                    with del_col:
+                        if st.button("×", key=f"j_delnote_{designation}_{note['id']}"):
+                            sessions_store.remove_item_note(sess, designation, note["id"])
+                            sessions_store.save(sess)
+                            st.rerun()
+
+                with st.form(f"j_addnote_form_{designation}", clear_on_submit=True):
+                    note_col, add_col = st.columns([4, 1])
+                    with note_col:
+                        new_note_text = st.text_input("Nouvelle note", label_visibility="collapsed",
+                                                        placeholder="Ajouter une note...")
+                    with add_col:
+                        note_submitted = st.form_submit_button("+", use_container_width=True)
+                if note_submitted and new_note_text.strip():
+                    sessions_store.add_item_note(sess, designation, new_note_text.strip(), local_now(site))
                     sessions_store.save(sess)
+                    st.rerun()
+
+        if current["freeNotes"]:
+            st.markdown("**Notes libres**")
+            for note in current["freeNotes"]:
+                note_col, del_col = st.columns([6, 1])
+                with note_col:
+                    at_txt = datetime.fromisoformat(note["at"]).strftime("%H:%M")
+                    st.caption(f"{at_txt} · {note['text']}")
+                with del_col:
+                    if st.button("×", key=f"j_delfree_{note['id']}"):
+                        sessions_store.remove_free_note(sess, note["id"])
+                        sessions_store.save(sess)
+                        st.rerun()
 
         if st.button("Cloturer la session", type="primary"):
             sessions_store.close_session(sess, sel, local_now(site))
             sessions_store.save(sess)
             st.rerun()
     else:
-        st.info("Aucune session en cours -- ouvrez la fiche detail d'une cible ('Ce soir' ou "
-                "'Catalogue Messier') puis cliquez sur 'Ajouter au journal'.")
+        st.info("Aucune session en cours -- ajoutez une cible ou une note libre ci-dessus.")
 
     if sess["past"]:
         st.subheader("Sorties precedentes")
@@ -811,11 +871,10 @@ with tab_journal:
                     sessions_store.set_past_note(sess, entry["closedAt"], note)
                     sessions_store.save(sess)
 
-                reopen_blocked = bool(current["items"])
                 if st.button(
-                    "Rouvrir cette sortie", key=f"j_reopen_{entry['closedAt']}", disabled=reopen_blocked,
+                    "Rouvrir cette sortie", key=f"j_reopen_{entry['closedAt']}", disabled=session_active,
                     help="Cloturez la session en cours avant de rouvrir une sortie passee."
-                    if reopen_blocked else "Restaure cette sortie comme session en cours.",
+                    if session_active else "Restaure cette sortie comme session en cours.",
                 ):
                     sessions_store.reopen_session(sess, entry["closedAt"])
                     sessions_store.save(sess)

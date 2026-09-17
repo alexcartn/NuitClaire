@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import type { TargetRow } from "../types";
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -12,14 +13,23 @@ function fmtDate(isoDate: string): string {
   return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 }
 
+const inputStyle = {
+  background: "var(--surf)", border: "1px solid var(--line)", borderRadius: 8,
+  padding: "7px 9px", fontSize: 12, color: "var(--ink)", flex: 1,
+} as const;
+
 export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) => void }) {
   const fetchSessions = useCallback(() => api.sessions(), []);
   const { data, loading, reload } = useFetch(fetchSessions, []);
   const [closing, setClosing] = useState(false);
   const [reopening, setReopening] = useState<string | null>(null);
   const [reopenError, setReopenError] = useState<string | null>(null);
-  const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
   const [pastNoteDraft, setPastNoteDraft] = useState<Record<string, string>>({});
+  const [itemNoteDraft, setItemNoteDraft] = useState<Record<string, string>>({});
+  const [freeNoteDraft, setFreeNoteDraft] = useState("");
+  const [targetQuery, setTargetQuery] = useState("");
+  const [targetResults, setTargetResults] = useState<TargetRow[] | null>(null);
+  const [searchingTarget, setSearchingTarget] = useState(false);
 
   if (loading || !data) {
     return (
@@ -30,14 +40,53 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
   }
 
   const { current, past } = data;
+  const sessionActive = current.items.length > 0 || current.freeNotes.length > 0;
+
+  const searchTargets = async () => {
+    if (!targetQuery.trim()) return;
+    setSearchingTarget(true);
+    try {
+      setTargetResults(await api.search(targetQuery.trim()));
+    } finally {
+      setSearchingTarget(false);
+    }
+  };
+
+  const addTarget = async (designation: string) => {
+    await api.addSessionItem(designation);
+    setTargetResults(null);
+    setTargetQuery("");
+    reload();
+  };
+
+  const submitFreeNote = async () => {
+    const text = freeNoteDraft.trim();
+    if (!text) return;
+    await api.addFreeNote(text);
+    setFreeNoteDraft("");
+    reload();
+  };
+
+  const removeFreeNote = async (noteId: string) => {
+    await api.deleteFreeNote(noteId);
+    reload();
+  };
 
   const toggleDone = async (designation: string, done: boolean) => {
     await api.updateSessionItem(designation, { done: !done });
     reload();
   };
 
-  const saveNote = async (designation: string, note: string) => {
-    await api.updateSessionItem(designation, { note });
+  const submitItemNote = async (designation: string) => {
+    const text = (itemNoteDraft[designation] ?? "").trim();
+    if (!text) return;
+    await api.addItemNote(designation, text);
+    setItemNoteDraft((d) => ({ ...d, [designation]: "" }));
+    reload();
+  };
+
+  const removeItemNote = async (designation: string, noteId: string) => {
+    await api.deleteItemNote(designation, noteId);
     reload();
   };
 
@@ -81,7 +130,56 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
         <div className="nc-title">{past.length} sortie(s) enregistree(s)</div>
       </div>
 
-      {current.items.length > 0 ? (
+      <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+        <div className="nc-eyebrow">Ajouter a la session</div>
+        <form onSubmit={(e) => { e.preventDefault(); searchTargets(); }} style={{ display: "flex", gap: 8 }}>
+          <input
+            value={targetQuery}
+            onChange={(e) => setTargetQuery(e.target.value)}
+            placeholder="Ajouter une cible : M31, NGC7380..."
+            className="nc-mono"
+            style={inputStyle}
+          />
+          <button type="submit" className="nc-btn" style={{ flex: "none" }} disabled={searchingTarget}>
+            {searchingTarget ? "..." : "Chercher"}
+          </button>
+        </form>
+        {targetResults && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {targetResults.length === 0 && (
+              <p className="nc-caption" style={{ margin: 0 }}>Aucun objet trouve pour « {targetQuery} ».</p>
+            )}
+            {targetResults.map((r) => (
+              <div key={r.designation} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="nc-mono" style={{ fontSize: 12, width: 70, flex: "none" }}>{r.designation}</span>
+                <span className="nc-caption" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.commonName || r.type}
+                </span>
+                <button onClick={() => addTarget(r.designation)} className="nc-btn" style={{ flex: "none", padding: "5px 10px", fontSize: 12 }}>
+                  Ajouter
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ height: 1, background: "var(--line)" }} />
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            value={freeNoteDraft}
+            onChange={(e) => setFreeNoteDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitFreeNote()}
+            placeholder="Note libre, sans cible (ex : conditions, materiel...)"
+            style={inputStyle}
+          />
+          <button onClick={submitFreeNote} disabled={!freeNoteDraft.trim()} className="nc-btn" style={{ flex: "none" }}>
+            Ajouter
+          </button>
+        </div>
+      </div>
+
+      {sessionActive ? (
         <div className="nc-card" style={{ borderColor: "var(--accent)", display: "flex", flexDirection: "column", gap: 13 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <div style={{ fontSize: 15 }}>Session en cours</div>
@@ -92,58 +190,107 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
             )}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {current.items.map((item) => (
-              <div
-                key={item.designation}
-                style={{
-                  background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 11,
-                  padding: "12px 13px", display: "flex", flexDirection: "column", gap: 8,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          {current.items.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {current.items.map((item) => (
+                <div
+                  key={item.designation}
+                  style={{
+                    background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 11,
+                    padding: "12px 13px", display: "flex", flexDirection: "column", gap: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                    <button
+                      onClick={() => toggleDone(item.designation, item.done)}
+                      className="nc-mono"
+                      style={{
+                        width: 22, height: 22, flex: "none", borderRadius: 6, cursor: "pointer",
+                        border: `1px solid ${item.done ? "var(--accent)" : "var(--ink3)"}`,
+                        background: item.done ? "var(--accent)" : "transparent",
+                        color: item.done ? "var(--onaccent)" : "transparent",
+                        fontSize: 12, lineHeight: "20px", padding: 0,
+                      }}
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={() => onOpenTarget(item.designation)}
+                      className="nc-mono"
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink)", fontSize: 13, fontWeight: 500, padding: 0 }}
+                    >
+                      {item.designation}
+                    </button>
+                    <span className="nc-caption" style={{ flex: 1 }}>ajoutee {fmtTime(item.addedAt)}</span>
+                    <button
+                      onClick={() => removeItem(item.designation)}
+                      style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 16, padding: "0 4px" }}
+                      title="Retirer du journal"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  {item.notes.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {item.notes.map((n) => (
+                        <div key={n.id} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                          <span className="nc-caption" style={{ flex: 1 }}>
+                            <span className="nc-mono">{fmtTime(n.at)}</span> · {n.text}
+                          </span>
+                          <button
+                            onClick={() => removeItemNote(item.designation, n.id)}
+                            style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 13, padding: 0 }}
+                            title="Supprimer cette note"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      value={itemNoteDraft[item.designation] ?? ""}
+                      onChange={(e) => setItemNoteDraft((d) => ({ ...d, [item.designation]: e.target.value }))}
+                      onKeyDown={(e) => e.key === "Enter" && submitItemNote(item.designation)}
+                      placeholder="Ajouter une note..."
+                      style={inputStyle}
+                    />
+                    <button
+                      onClick={() => submitItemNote(item.designation)}
+                      disabled={!(itemNoteDraft[item.designation] ?? "").trim()}
+                      className="nc-btn"
+                      style={{ flex: "none", padding: "5px 10px", fontSize: 12 }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {current.freeNotes.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="nc-eyebrow">Notes libres</div>
+              {current.freeNotes.map((n) => (
+                <div key={n.id} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span className="nc-caption" style={{ flex: 1 }}>
+                    <span className="nc-mono">{fmtTime(n.at)}</span> · {n.text}
+                  </span>
                   <button
-                    onClick={() => toggleDone(item.designation, item.done)}
-                    className="nc-mono"
-                    style={{
-                      width: 22, height: 22, flex: "none", borderRadius: 6, cursor: "pointer",
-                      border: `1px solid ${item.done ? "var(--accent)" : "var(--ink3)"}`,
-                      background: item.done ? "var(--accent)" : "transparent",
-                      color: item.done ? "var(--onaccent)" : "transparent",
-                      fontSize: 12, lineHeight: "20px", padding: 0,
-                    }}
-                  >
-                    ✓
-                  </button>
-                  <button
-                    onClick={() => onOpenTarget(item.designation)}
-                    className="nc-mono"
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink)", fontSize: 13, fontWeight: 500, padding: 0 }}
-                  >
-                    {item.designation}
-                  </button>
-                  <span className="nc-caption" style={{ flex: 1 }}>ajoutee {fmtTime(item.addedAt)}</span>
-                  <button
-                    onClick={() => removeItem(item.designation)}
-                    style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 16, padding: "0 4px" }}
-                    title="Retirer du journal"
+                    onClick={() => removeFreeNote(n.id)}
+                    style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 13, padding: 0 }}
+                    title="Supprimer cette note"
                   >
                     ×
                   </button>
                 </div>
-                <input
-                  value={noteDraft[item.designation] ?? item.note}
-                  onChange={(e) => setNoteDraft((d) => ({ ...d, [item.designation]: e.target.value }))}
-                  onBlur={(e) => saveNote(item.designation, e.target.value)}
-                  placeholder="Note (facultatif)"
-                  style={{
-                    background: "var(--surf)", border: "1px solid var(--line)", borderRadius: 8,
-                    padding: "7px 9px", fontSize: 12, color: "var(--ink)",
-                  }}
-                />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <button onClick={close} disabled={closing} className="nc-btn nc-btn-primary">
             {closing ? "..." : "Cloturer la session"}
@@ -151,7 +298,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
         </div>
       ) : (
         <p className="nc-caption">
-          Aucune session en cours -- ajoutez une cible au journal depuis sa fiche detail.
+          Aucune session en cours -- ajoutez une cible ou une note libre ci-dessus.
         </p>
       )}
 
@@ -180,12 +327,12 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
               />
               <button
                 onClick={() => reopen(p.closedAt)}
-                disabled={current.items.length > 0 || reopening === p.closedAt}
+                disabled={sessionActive || reopening === p.closedAt}
                 className="nc-caption"
-                title={current.items.length > 0 ? "Cloturez la session en cours avant de rouvrir une sortie passee" : "Rouvrir cette sortie"}
+                title={sessionActive ? "Cloturez la session en cours avant de rouvrir une sortie passee" : "Rouvrir cette sortie"}
                 style={{
                   alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer",
-                  color: current.items.length > 0 ? "var(--ink3)" : "var(--accent)", padding: 0,
+                  color: sessionActive ? "var(--ink3)" : "var(--accent)", padding: 0,
                 }}
               >
                 {reopening === p.closedAt ? "..." : "Rouvrir cette sortie"}

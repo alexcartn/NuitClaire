@@ -142,17 +142,24 @@ class TargetDetailOut(TargetRowOut):
     wiki: dict | None
 
 
+class NoteOut(BaseModel):
+    id: str
+    text: str
+    at: str
+
+
 class SessionItemOut(BaseModel):
     designation: str
     addedAt: str
     done: bool
-    note: str
+    notes: list[NoteOut]
 
 
 class CurrentSessionOut(BaseModel):
     openedAt: str | None
     scoreAtOpen: int | None
     items: list[SessionItemOut]
+    freeNotes: list[NoteOut]
 
 
 class PastSessionOut(BaseModel):
@@ -174,7 +181,10 @@ class AddSessionItem(BaseModel):
 
 class UpdateSessionItem(BaseModel):
     done: bool | None = None
-    note: str | None = None
+
+
+class AddNote(BaseModel):
+    text: str
 
 
 class UpdatePastSession(BaseModel):

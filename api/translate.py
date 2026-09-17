@@ -15,7 +15,8 @@ def sessions_to_out(data: dict) -> dict:
         for designation, item in sorted(cur["items"].items())
     ]
     return {
-        "current": {"openedAt": cur["openedAt"], "scoreAtOpen": cur["scoreAtOpen"], "items": items},
+        "current": {"openedAt": cur["openedAt"], "scoreAtOpen": cur["scoreAtOpen"], "items": items,
+                    "freeNotes": cur["freeNotes"]},
         "past": data["past"],
     }
 
