@@ -44,15 +44,28 @@ _wiki_cache: TTLCache = TTLCache(maxsize=256, ttl=86400)
 _wiki_lock = threading.Lock()
 
 
+def site_from_settings(s: dict) -> dict:
+    """Site effectif a partir d'un blob settings deja charge -- extrait de
+    `get_site()` pour que les appelants qui ont deja besoin du blob complet
+    (site + window_mode, voir GET/PUT /api/settings et /api/state) ne
+    relisent pas `settings.json`/Supabase une seconde fois juste pour le
+    site."""
+    saved = s.get("site")
+    return saved if saved else dict(SITE)
+
+
 def get_site() -> dict:
     """Site effectif : reglages persistes (`data/settings.json`) si presents,
     sinon `config.SITE`. A la difference de `st.session_state.site` cote
     Streamlit (ephemere, reinitialise a `config.SITE` a chaque session de
     navigateur), ce reglage est durable -- les deux frontends peuvent donc
     diverger sur la position active si l'un des deux change de site (choix
-    delibere, voir le commentaire en tete de `settings.py`)."""
-    saved = settings_store.load().get("site")
-    return saved if saved else dict(SITE)
+    delibere, voir le commentaire en tete de `settings.py`).
+
+    Pour un appelant qui a aussi besoin de `window_mode`/`alerts` dans la
+    meme requete, preferer `settings_store.load()` une fois puis
+    `site_from_settings(s)` -- sinon deux lectures du meme blob pour rien."""
+    return site_from_settings(settings_store.load())
 
 
 def get_horizon() -> dict:

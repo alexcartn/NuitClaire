@@ -4,7 +4,7 @@ allers-retours separes a l'ouverture de l'appli."""
 from fastapi import APIRouter
 
 import settings as settings_store
-from api.deps import get_progress, get_site
+from api.deps import get_progress, site_from_settings
 from api.schemas import StateOut
 from api.translate import site_to_out
 
@@ -16,7 +16,7 @@ def get_state() -> dict:
     prog = get_progress()
     s = settings_store.load()
     return {
-        "site": site_to_out(get_site()),
+        "site": site_to_out(site_from_settings(s)),
         "horizon": prog["horizon"],
         "windowMode": s["window_mode"],
         "messierCaptured": prog["messier_captured"],

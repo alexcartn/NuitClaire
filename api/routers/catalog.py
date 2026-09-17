@@ -7,8 +7,9 @@ Streamlit, est reparti entre `feasible_rows`/`_row_from_search` (liste) et
 resume Wikipedia."""
 from fastapi import APIRouter, HTTPException, Query
 
+import settings as settings_store
 from api.deps import cached_wiki_summary, current_night, feasible_rows, get_horizon, get_site, \
-    get_window_mode
+    site_from_settings
 from api.schemas import TargetDetailOut, TargetRowOut
 from api.translate import row_to_target_out
 from catalog import find_target
@@ -21,7 +22,9 @@ router = APIRouter()
 
 @router.get("/api/targets", response_model=list[TargetRowOut])
 def list_targets(types: list[str] | None = Query(default=None)) -> list[dict]:
-    site, horizon, window_mode = get_site(), get_horizon(), get_window_mode()
+    s = settings_store.load()
+    site, window_mode = site_from_settings(s), s["window_mode"]
+    horizon = get_horizon()
     sel, df, _ = current_night(site)
     if sel is None:
         return []

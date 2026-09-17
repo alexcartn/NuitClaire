@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException
 
 import settings as settings_store
-from api.deps import get_site, settings_write_lock
+from api.deps import settings_write_lock, site_from_settings
 from api.schemas import GeocodeRequest, GeocodeResult, SettingsOut, SettingsUpdate
 from api.translate import site_to_out
 from geocode import GeocodeError, geocode
@@ -15,7 +15,7 @@ _VALID_WINDOW_MODES = ("complete", "habituelle")
 @router.get("/api/settings", response_model=SettingsOut)
 def get_settings() -> dict:
     s = settings_store.load()
-    return {"site": site_to_out(get_site()), "windowMode": s["window_mode"], "alerts": s["alerts"]}
+    return {"site": site_to_out(site_from_settings(s)), "windowMode": s["window_mode"], "alerts": s["alerts"]}
 
 
 @router.put("/api/settings", response_model=SettingsOut)
@@ -29,7 +29,7 @@ def update_settings(body: SettingsUpdate) -> dict:
             # Nominatim (voir POST /api/geocode) ne renvoie ni elevation ni
             # fuseau horaire : on les conserve du site effectif precedent,
             # meme logique que la barre laterale de app.py.
-            current = get_site()
+            current = site_from_settings(s)
             s["site"] = {**current, "name": body.site.name, "lat": body.site.lat, "lon": body.site.lon}
         if body.windowMode is not None:
             s["window_mode"] = body.windowMode
@@ -37,7 +37,7 @@ def update_settings(body: SettingsUpdate) -> dict:
             s["alerts"] = {**s["alerts"], **body.alerts}
         settings_store.save(s)
 
-    return {"site": site_to_out(get_site()), "windowMode": s["window_mode"], "alerts": s["alerts"]}
+    return {"site": site_to_out(site_from_settings(s)), "windowMode": s["window_mode"], "alerts": s["alerts"]}
 
 
 @router.post("/api/geocode", response_model=GeocodeResult)

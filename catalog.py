@@ -1,6 +1,7 @@
 """Chargement du catalogue de cibles (genere par scripts/build_catalog.py)."""
 import csv
 import re
+from functools import lru_cache
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -27,13 +28,21 @@ def _load_csv(path: Path) -> list[dict]:
     return rows
 
 
+@lru_cache(maxsize=1)
 def load_targets() -> list[dict]:
-    """Catalogue large (cibles jugees imageables au Seestar S50)."""
+    """Catalogue large (cibles jugees imageables au Seestar S50). Mis en
+    cache en memoire (processus long-lived Streamlit/uvicorn) : ce fichier
+    est un artefact statique regenere hors ligne par scripts/build_catalog.py,
+    jamais modifie a l'execution -- sans quoi cet appel reparsait ~1700 lignes
+    CSV a chaque rerun Streamlit (tout widget declenche un rerun complet du
+    script) et a chaque recherche (`find_target` l'appelle a chaque fois)."""
     return _load_csv(DATA_DIR / "ngc_seestar.csv")
 
 
+@lru_cache(maxsize=1)
 def load_messier() -> list[dict]:
-    """Les 110 objets du catalogue Messier."""
+    """Les 110 objets du catalogue Messier -- mis en cache, meme rationale
+    que `load_targets`."""
     return _load_csv(DATA_DIR / "messier.csv")
 
 
