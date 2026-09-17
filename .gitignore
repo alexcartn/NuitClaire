@@ -1,6 +1,9 @@
 __pycache__/
 .worktrees/
 .pytest_cache/
+.env
+.env.*
+!.env.example
 data/progress.json
 data/settings.json
 data/sessions.json
