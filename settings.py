@@ -17,6 +17,8 @@ import os
 from pathlib import Path
 from types import MappingProxyType
 
+import db
+
 SETTINGS_PATH = Path(__file__).parent / "data" / "settings.json"
 
 _DEFAULT_FROZEN = MappingProxyType({
@@ -43,36 +45,46 @@ DEFAULT = default()
 
 
 def load(path: Path = SETTINGS_PATH) -> dict:
-    """Charge les reglages depuis `path`. Retombe sur les valeurs par defaut
-    si le fichier est absent, illisible ou corrompu (JSON invalide ou racine
-    non-objet), pour ne jamais faire planter l'API sur un fichier edite a la
-    main."""
-    if not path.exists():
-        return default()
-
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            raise TypeError("le fichier de reglages doit contenir un objet JSON")
-    except (json.JSONDecodeError, TypeError, ValueError, OSError):
+    """Charge les reglages -- depuis Supabase si configure (voir db.py),
+    sinon depuis `path`. Retombe sur les valeurs par defaut si la source est
+    absente, illisible ou corrompue (JSON invalide ou racine non-objet),
+    pour ne jamais faire planter l'API sur des donnees editees a la main."""
+    raw = db.load_blob("settings") if db.enabled() else _read_file(path)
+    if raw is None:
         return default()
 
     merged = default()
-    merged.update(data)
-    alerts_override = data.get("alerts")
+    merged.update(raw)
+    alerts_override = raw.get("alerts")
     if not isinstance(alerts_override, dict):
         alerts_override = {}
     merged["alerts"] = {**_DEFAULT_FROZEN["alerts"], **alerts_override}
     return merged
 
 
+def _read_file(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise TypeError("le fichier de reglages doit contenir un objet JSON")
+    except (json.JSONDecodeError, TypeError, ValueError, OSError):
+        return None
+    return data
+
+
 def save(data: dict, path: Path = SETTINGS_PATH) -> None:
-    """Ecriture atomique (fichier temporaire + `os.replace`) : un crash ou une
+    """Ecrit les reglages -- sur Supabase si configure, sinon sur `path` en
+    ecriture atomique (fichier temporaire + `os.replace`) : un crash ou une
     coupure en plein milieu de l'ecriture laisse l'ancien fichier intact
     plutot qu'un JSON tronque -- important une fois ce fichier ecrit par une
     API qui peut recevoir plusieurs requetes concurrentes (contrairement au
     script Streamlit, execute une requete a la fois)."""
+    if db.enabled():
+        db.save_blob("settings", data)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:

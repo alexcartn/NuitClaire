@@ -26,6 +26,8 @@ from datetime import date, datetime
 from pathlib import Path
 from types import MappingProxyType
 
+import db
+
 SESSIONS_PATH = Path(__file__).parent / "data" / "sessions.json"
 
 _DEFAULT_FROZEN = MappingProxyType({
@@ -46,33 +48,44 @@ DEFAULT = default()
 
 
 def load(path: Path = SESSIONS_PATH) -> dict:
-    """Charge le journal depuis `path`. Retombe sur les valeurs par defaut si
-    le fichier est absent, illisible ou corrompu."""
-    if not path.exists():
+    """Charge le journal -- depuis Supabase si configure (voir db.py), sinon
+    depuis `path`. Retombe sur les valeurs par defaut si la source est
+    absente, illisible ou corrompue."""
+    raw = db.load_blob("sessions") if db.enabled() else _read_file(path)
+    if raw is None:
         return default()
 
+    merged = default()
+    current_override = raw.get("current")
+    if isinstance(current_override, dict):
+        merged["current"].update(current_override)
+        if not isinstance(merged["current"].get("items"), dict):
+            merged["current"]["items"] = {}
+    past_override = raw.get("past")
+    if isinstance(past_override, list):
+        merged["past"] = past_override
+    return merged
+
+
+def _read_file(path: Path) -> dict | None:
+    if not path.exists():
+        return None
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, dict):
             raise TypeError("le fichier de journal doit contenir un objet JSON")
     except (json.JSONDecodeError, TypeError, ValueError, OSError):
-        return default()
-
-    merged = default()
-    current_override = data.get("current")
-    if isinstance(current_override, dict):
-        merged["current"].update(current_override)
-        if not isinstance(merged["current"].get("items"), dict):
-            merged["current"]["items"] = {}
-    past_override = data.get("past")
-    if isinstance(past_override, list):
-        merged["past"] = past_override
-    return merged
+        return None
+    return data
 
 
 def save(data: dict, path: Path = SESSIONS_PATH) -> None:
-    """Ecriture atomique (fichier temporaire + `os.replace`)."""
+    """Ecrit le journal -- sur Supabase si configure, sinon sur `path` en
+    ecriture atomique (fichier temporaire + `os.replace`)."""
+    if db.enabled():
+        db.save_blob("sessions", data)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:

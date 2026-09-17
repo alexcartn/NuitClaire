@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from types import MappingProxyType
 
+import db
+
 PROGRESS_PATH = Path(__file__).parent / "data" / "progress.json"
 
 # Source de verite interne, totalement figee (MappingProxyType) : aucun code,
@@ -37,38 +39,48 @@ DEFAULT = default()
 
 
 def load(path: Path = PROGRESS_PATH) -> dict:
-    """Charge la progression depuis `path`. Retombe sur les valeurs par defaut
-    si le fichier est absent, illisible ou corrompu (JSON invalide ou racine
-    non-objet), pour ne jamais faire planter l'appli sur un fichier edite
-    a la main."""
-    if not path.exists():
-        return default()
-
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            raise TypeError("le fichier de progression doit contenir un objet JSON")
-    except (json.JSONDecodeError, TypeError, ValueError, OSError):
+    """Charge la progression -- depuis Supabase si configure (voir db.py),
+    sinon depuis `path`. Retombe sur les valeurs par defaut si la source est
+    absente, illisible ou corrompue (JSON invalide ou racine non-objet),
+    pour ne jamais faire planter l'appli sur des donnees editees a la main."""
+    raw = db.load_blob("progress") if db.enabled() else _read_file(path)
+    if raw is None:
         return default()
 
     merged = default()
-    merged.update(data)
+    merged.update(raw)
     # Fusion cle-par-cle de "horizon" pour ne pas perdre les secteurs absents
-    # d'un fichier partiel (un simple dict.update ecraserait tout le sous-dict).
-    horizon_override = data.get("horizon")
+    # d'une source partielle (un simple dict.update ecraserait tout le sous-dict).
+    horizon_override = raw.get("horizon")
     if not isinstance(horizon_override, dict):
         horizon_override = {}
     merged["horizon"] = {**_DEFAULT_FROZEN["horizon"], **horizon_override}
     return merged
 
 
+def _read_file(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise TypeError("le fichier de progression doit contenir un objet JSON")
+    except (json.JSONDecodeError, TypeError, ValueError, OSError):
+        return None
+    return data
+
+
 def save(data: dict, path: Path = PROGRESS_PATH) -> None:
-    """Ecriture atomique (fichier temporaire + `os.replace`) : un crash ou une
+    """Ecrit la progression -- sur Supabase si configure, sinon sur `path` en
+    ecriture atomique (fichier temporaire + `os.replace`) : un crash ou une
     coupure en plein milieu de l'ecriture laisse l'ancien fichier intact
     plutot qu'un JSON tronque -- important maintenant que ce fichier peut
     aussi etre ecrit par l'API mobile (requetes concurrentes possibles,
     contrairement au script Streamlit qui traite une requete a la fois)."""
+    if db.enabled():
+        db.save_blob("progress", data)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
