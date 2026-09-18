@@ -70,3 +70,33 @@ def test_target_detail_includes_exposure_log_entries(api_client):
 def test_target_detail_unknown_designation_returns_404(api_client):
     r = api_client.get("/api/targets/NOTAREALTARGET999")
     assert r.status_code == 404
+
+
+def test_search_suggest_returns_multiple_lightweight_matches(api_client):
+    # limit eleve : le catalogue est trie par ascension droite, pas par
+    # designation, donc "M3" (loin dans le fichier) n'est garanti present
+    # qu'avec assez de marge (11 correspondances possibles : M3, M30..M39).
+    r = api_client.get("/api/search/suggest", params={"q": "M3", "limit": 20})
+    assert r.status_code == 200
+    data = r.json()
+    designations = {s["designation"] for s in data}
+    assert "M3" in designations
+    assert "M31" in designations
+    # Legeres : pas de fenetre de visibilite, contrairement a /api/search.
+    assert "hours" not in data[0]
+    assert set(data[0].keys()) == {"designation", "isMessier", "messierId", "commonName", "type"}
+
+
+def test_search_suggest_respects_limit(api_client):
+    r = api_client.get("/api/search/suggest", params={"q": "NG", "limit": 3})
+    assert len(r.json()) <= 3
+
+
+def test_search_suggest_empty_for_no_match(api_client):
+    r = api_client.get("/api/search/suggest", params={"q": "ZZ999notreal"})
+    assert r.json() == []
+
+
+def test_search_suggest_requires_min_length_query(api_client):
+    r = api_client.get("/api/search/suggest", params={"q": ""})
+    assert r.status_code == 422

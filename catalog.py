@@ -56,6 +56,32 @@ def _normalize_designation(text: str) -> str:
     return f"{m.group(1)}{m.group(2)}" if m else compact
 
 
+def search_prefix(query: str, limit: int = 8) -> list[dict]:
+    """Recherche par prefixe de designation (M##, NGC####, IC####), sur le
+    catalogue Messier puis le catalogue large -- pour l'auto-completion
+    pendant la frappe (contrairement a `find_target`, qui exige une
+    designation complete et n'en renvoie qu'une). Renvoie au plus `limit`
+    resultats, Messier d'abord (catalogue plus restreint, plus susceptible
+    d'etre ce que l'utilisateur cherche). Liste vide si `query` normalise
+    a moins de 2 caracteres -- une seule lettre ("M", "N"...) matcherait
+    des centaines d'objets, pas assez precis pour etre utile."""
+    normalized = _normalize_designation(query)
+    if len(normalized) < 2:
+        return []
+    results = []
+    seen = set()
+    for tgt in load_messier() + load_targets():
+        if tgt["name"] in seen:
+            continue
+        candidates = (tgt["name"], tgt.get("ngc_name") or "")
+        if any(_normalize_designation(c).startswith(normalized) for c in candidates if c):
+            results.append(tgt)
+            seen.add(tgt["name"])
+            if len(results) >= limit:
+                break
+    return results
+
+
 def find_target(query: str) -> dict | None:
     """Cherche un objet par designation exacte (M##, NGC####, IC####), dans le
     catalogue Messier puis le catalogue large -- pas de recherche par nom

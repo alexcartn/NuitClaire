@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from catalog import _load_csv, find_target
+from catalog import _load_csv, find_target, search_prefix
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_catalog.csv"
 
@@ -60,3 +60,44 @@ def test_find_target_returns_none_when_not_found():
 def test_find_target_returns_none_for_empty_query():
     assert find_target("") is None
     assert find_target("   ") is None
+
+
+def test_search_prefix_matches_multiple_designations():
+    names = {tgt["name"] for tgt in search_prefix("M3", limit=20)}
+    assert "M3" in names
+    assert "M31" in names  # meme prefixe normalise ("M3")
+    assert "M13" not in names  # prefixe different
+
+
+def test_search_prefix_is_case_and_space_insensitive():
+    exact = {tgt["name"] for tgt in search_prefix("m31")}
+    assert "M31" in exact
+    assert {tgt["name"] for tgt in search_prefix("  M31  ")} == exact
+
+
+def test_search_prefix_matches_ngc_designation():
+    names = {tgt.get("ngc_name") for tgt in search_prefix("NGC738")}
+    assert "NGC7380" in names
+
+
+def test_search_prefix_respects_limit():
+    results = search_prefix("M", limit=3)
+    # "M" seul est sous le seuil (2 caracteres) -- verifie plutot avec un
+    # prefixe assez large pour depasser la limite (beaucoup d'objets NGC).
+    results = search_prefix("NG", limit=3)
+    assert len(results) <= 3
+
+
+def test_search_prefix_returns_empty_below_min_length():
+    assert search_prefix("M") == []
+    assert search_prefix("") == []
+
+
+def test_search_prefix_returns_empty_when_no_match():
+    assert search_prefix("ZZ999notreal") == []
+
+
+def test_search_prefix_never_returns_duplicate_names():
+    results = search_prefix("M31")
+    names = [tgt["name"] for tgt in results]
+    assert len(names) == len(set(names))

@@ -1,19 +1,19 @@
-"""GET /api/targets, /api/messier, /api/search, /api/targets/{designation} --
-mêmes lignes que les catalogues 'Cibles faisables'/'Catalogue Messier' de
-app.py (via `api.deps.feasible_rows`, qui appelle les memes fonctions
-partagees), plus une fiche detail qui assemble en un seul appel ce qui, cote
-Streamlit, est reparti entre `feasible_rows`/`_row_from_search` (liste) et
-`_target_detail_dialog` (modale) : altitude series, temps de pose indicatif,
-resume Wikipedia."""
+"""GET /api/targets, /api/messier, /api/search, /api/search/suggest,
+/api/targets/{designation} -- mêmes lignes que les catalogues 'Cibles
+faisables'/'Catalogue Messier' de app.py (via `api.deps.feasible_rows`, qui
+appelle les memes fonctions partagees), plus une fiche detail qui assemble
+en un seul appel ce qui, cote Streamlit, est reparti entre
+`feasible_rows`/`_row_from_search` (liste) et `_target_detail_dialog`
+(modale) : altitude series, temps de pose indicatif, resume Wikipedia."""
 from fastapi import APIRouter, HTTPException, Query
 
 import progress as progress_store
 import settings as settings_store
 from api.deps import cached_wiki_summary, current_night, feasible_rows, get_horizon, get_site, \
     site_from_settings
-from api.schemas import TargetDetailOut, TargetRowOut
+from api.schemas import TargetDetailOut, TargetRowOut, TargetSuggestionOut
 from api.translate import row_to_target_out
-from catalog import find_target
+from catalog import find_target, search_prefix
 from rows import day_frame, row_from_search
 from scoring import recommended_exposure_minutes, target_altitude_series
 from wiki import wiki_title_candidates
@@ -59,6 +59,24 @@ def search(q: str = Query(min_length=1)) -> list[dict]:
     if not found:
         return []
     return [row_to_target_out(row_from_search(found, df, horizon, site))]
+
+
+@router.get("/api/search/suggest", response_model=list[TargetSuggestionOut])
+def search_suggest(q: str = Query(min_length=1), limit: int = Query(default=8, ge=1, le=20)) -> list[dict]:
+    """Suggestions par prefixe pendant la frappe -- volontairement legeres
+    (pas de fenetre de visibilite/score, qui demanderaient de calculer
+    `target_windows` pour chaque candidat a chaque frappe) : juste de quoi
+    distinguer les resultats et naviguer vers la fiche detail, qui elle
+    calcule tout pour la cible choisie."""
+    found = search_prefix(q, limit=limit)
+    return [
+        {
+            "designation": tgt["name"], "isMessier": bool(tgt.get("messier")),
+            "messierId": tgt.get("messier"), "commonName": tgt.get("common_name") or "",
+            "type": tgt.get("type_fr") or "",
+        }
+        for tgt in found
+    ]
 
 
 @router.get("/api/targets/{designation}", response_model=TargetDetailOut)

@@ -89,6 +89,14 @@ export interface TargetRow {
   feasibleTonight: boolean | null;
 }
 
+export interface TargetSuggestion {
+  designation: string;
+  isMessier: boolean;
+  messierId: string | null;
+  commonName: string;
+  type: string;
+}
+
 export interface AltitudePoint {
   time: string;
   alt: number;

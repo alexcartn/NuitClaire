@@ -41,6 +41,14 @@ et plage mini/maxi de la nuit -- pour savoir d'un coup d'oeil s'il faut un mante
 ouvrir "Details meteo"), calculee par `scoring.temperature_range` sur la fenetre
 d'affichage active (Habituelle ou Nuit complete) et exposee via `GET /api/night`.
 
+La recherche par designation est en auto-detection (`catalog.search_prefix` + `GET
+/api/search/suggest`) : plus besoin de valider, les resultats (jusqu'a 8, legers --
+sans fenetre de visibilite) s'affichent au fur et a mesure de la frappe, avec un
+debounce de 300ms cote mobile et une reactivite native (`st.text_input` hors formulaire)
+cote Streamlit. Recherche par prefixe, pas par nom courant (couverture OpenNGC trop
+partielle) ; la designation exacte (`catalog.find_target`, `GET /api/search`) reste
+utilisee pour l'ajout direct au journal de session.
+
 La fiche detail d'une cible (Cibles/Catalogue Messier) permet aussi d'ajouter du temps
 d'expo directement, sans passer par le journal de session -- pratique pour rattraper des
 prises anterieures a l'usage de l'appli. C'est un journal libre par cible (`progress.py`,

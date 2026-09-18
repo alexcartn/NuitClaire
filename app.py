@@ -17,7 +17,7 @@ from scoring import (score_frame, night_summary, target_windows, score_label_fr,
                       target_altitude_series, recommended_exposure_minutes, wind_quality,
                       target_feasibility_reasons, cloud_trend, CLOUD_TREND_WINDOW_HOURS,
                       dew_risk, discovery_sort_key, temperature_range, view_window_df)
-from catalog import load_targets, load_messier, find_target
+from catalog import load_targets, load_messier, find_target, search_prefix
 from geocode import geocode, GeocodeError
 from wiki import target_summary, wiki_title_candidates
 from components import TWILIGHT_BAR_CSS, CARD_CSS, twilight_bar_html, card_html
@@ -651,18 +651,22 @@ with tab_ce_soir:
     # Recherche par designation (pas par nom commun : trop peu de couverture
     # dans OpenNGC pour etre fiable, voir catalog.find_target) -- fonctionne
     # meme pour une cible infaisable ce soir, avec les raisons dans la modale.
-    with st.form("search_form"):
-        col_q, col_btn = st.columns([4, 1])
-        with col_q:
-            query = st.text_input("Rechercher un objet", label_visibility="collapsed",
-                                   placeholder="Rechercher une designation : M31, NGC7380, IC434...")
-        with col_btn:
-            searched = st.form_submit_button("Rechercher", use_container_width=True)
-    if searched and query:
-        found = find_target(query)
-        if found:
-            _target_detail_dialog(row_from_search(found, df, prog["horizon"], site), df, site,
-                                   prog["horizon"])
+    # Auto-detection : pas de bouton "Rechercher" -- un simple text_input hors
+    # formulaire declenche un rerun Streamlit (donc une recherche) a chaque
+    # frappe. Suggestions par prefixe (catalog.search_prefix, plusieurs
+    # resultats possibles) plutot que designation exacte (catalog.find_target,
+    # un seul resultat) : necessaire pour ne pas afficher un mauvais objet le
+    # temps que la frappe se termine (ex. "M3" -> M3 puis "M31" -> Andromede).
+    query = st.text_input("Rechercher un objet", label_visibility="collapsed",
+                           placeholder="Rechercher une designation : M31, NGC7380, IC434...")
+    if len(query.strip()) >= 2:
+        suggestions = search_prefix(query, limit=8)
+        if suggestions:
+            for tgt in suggestions:
+                label = f"{tgt['name']} — {tgt.get('common_name') or tgt.get('type_fr', '')}"
+                if st.button(label, key=f"search_suggest_{tgt['name']}", use_container_width=True):
+                    _target_detail_dialog(row_from_search(tgt, df, prog["horizon"], site), df, site,
+                                           prog["horizon"])
         else:
             st.warning(f"Aucun objet trouve pour « {query} ». Essayez une designation "
                        "comme M31, NGC7380 ou IC434.")

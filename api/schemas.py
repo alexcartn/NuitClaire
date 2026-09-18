@@ -137,6 +137,14 @@ class TargetRowOut(BaseModel):
     feasibleTonight: bool | None = None
 
 
+class TargetSuggestionOut(BaseModel):
+    designation: str
+    isMessier: bool
+    messierId: str | None
+    commonName: str
+    type: str
+
+
 class AltitudePoint(BaseModel):
     time: str
     alt: float

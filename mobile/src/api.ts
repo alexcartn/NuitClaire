@@ -9,6 +9,7 @@ import type {
   Stats,
   TargetDetail,
   TargetRow,
+  TargetSuggestion,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
@@ -55,6 +56,8 @@ export const api = {
   messier: (onlyFeasible?: boolean) =>
     get<TargetRow[]>("/api/messier", onlyFeasible ? { onlyFeasible: "true" } : undefined),
   search: (q: string) => get<TargetRow[]>("/api/search", { q }),
+  searchSuggest: (q: string, limit = 8) =>
+    get<TargetSuggestion[]>("/api/search/suggest", { q, limit: String(limit) }),
   targetDetail: (designation: string) =>
     get<TargetDetail>(`/api/targets/${encodeURIComponent(designation)}`),
 
