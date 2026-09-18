@@ -33,6 +33,11 @@ pas de suite de tests JS (verification faite via Playwright manuel).
 
 "Cibles" et "Catalogue Messier" ont un filtre magnitude (curseur) en plus du filtre par
 type -- calcule cote client sur les lignes deja chargees, pas d'appel API supplementaire.
+
+L'onglet/ecran "Ce soir" affiche une carte Temperature (temperature exterieure actuelle
+et plage mini/maxi de la nuit -- pour savoir d'un coup d'oeil s'il faut un manteau, sans
+ouvrir "Details meteo"), calculee par `scoring.temperature_range` sur la fenetre
+d'affichage active (Habituelle ou Nuit complete) et exposee via `GET /api/night`.
 "Journal" permet de saisir un temps d'expo (minutes, un champ par cible et par sortie,
 facultatif -- jamais mesure ni estime par l'appli, voir l'en-tete de `sessions.py`) et
 affiche une section Statistiques (nombre de sorties, score moyen des sorties reussies,

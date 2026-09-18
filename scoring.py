@@ -179,6 +179,32 @@ def dew_risk(df: pd.DataFrame) -> dict:
     return {"spread": round(float(spread), 1), "risk": risk, "advice": advice}
 
 
+def temperature_range(df: pd.DataFrame, now: pd.Timestamp | None) -> dict:
+    """Plage de temperature exterieure sur `df` (memes bornes que la fenetre
+    d'affichage active, Habituelle ou Nuit complete) : mini/maxi observes sur
+    la fenetre, plus la valeur "maintenant" -- pour savoir en un coup d'oeil
+    s'il faut un manteau, sans aller lire la courbe detaillee.
+
+    `now_c` retombe sur la premiere heure de `df` quand `now` est vide ou
+    avant le debut de la fenetre (meme repli que `_current_wind_gust` dans
+    l'API : on consulte typiquement cette carte avant que la fenetre du soir
+    ne commence, "n/d" serait moins utile qu'une temperature indicative pour
+    decider s'il faut un manteau). `min_c`/`max_c` restent `None` sur un
+    `df` vide ou sans la colonne."""
+    if "temperature_2m" not in df or df.empty:
+        return {"now_c": None, "min_c": None, "max_c": None}
+    temps = df["temperature_2m"]
+    idx = df.index[df.index <= now] if now is not None else df.index[:0]
+    current_t = idx.max() if not idx.empty else df.index.min()
+    now_c = temps.loc[current_t]
+    min_c, max_c = temps.min(), temps.max()
+    return {
+        "now_c": round(float(now_c), 1) if pd.notna(now_c) else None,
+        "min_c": round(float(min_c), 1) if pd.notna(min_c) else None,
+        "max_c": round(float(max_c), 1) if pd.notna(max_c) else None,
+    }
+
+
 _CADRAGE_RANK = {"cadre unique": 0, "mosaique 2x": 1, "mosaique large": 2}
 
 

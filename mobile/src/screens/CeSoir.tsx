@@ -85,7 +85,25 @@ export function CeSoir({
 
       <ScoreCard night={n} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 9 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 9 }}>
+        <StatCard
+          label="Temperature"
+          value={
+            n.tempNowC != null ? (
+              <>
+                {Math.round(n.tempNowC)}
+                <span style={{ fontSize: 13, color: "var(--ink3)" }}>°C</span>
+              </>
+            ) : (
+              "n/d"
+            )
+          }
+          sub={
+            n.tempMinC != null && n.tempMaxC != null
+              ? `${Math.round(n.tempMinC)}° → ${Math.round(n.tempMaxC)}° cette nuit`
+              : undefined
+          }
+        />
         <StatCard
           label="Lune"
           value={

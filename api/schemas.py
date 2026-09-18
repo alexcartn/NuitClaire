@@ -93,6 +93,9 @@ class NightOut(BaseModel):
     dewSpread: float | None
     dewRisk: str
     dewAdvice: str
+    tempNowC: float | None
+    tempMinC: float | None
+    tempMaxC: float | None
     windGustsKmh: float | None
     windQuality: float
     cloudTrend: CloudTrendOut | None

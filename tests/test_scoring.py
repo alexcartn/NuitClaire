@@ -2,7 +2,8 @@ import pandas as pd
 
 from scoring import (score_label_fr, best_window, target_windows, target_altitude_series,
                      recommended_exposure_minutes, wind_quality, target_feasibility_reasons,
-                     hourly_score, cloud_trend, dew_risk, discovery_sort_key, view_window_df)
+                     hourly_score, cloud_trend, dew_risk, discovery_sort_key, temperature_range,
+                     view_window_df)
 
 
 def test_score_label_fr_buckets():
@@ -258,6 +259,34 @@ def test_dew_risk_medium_at_threshold():
 def test_dew_risk_unknown_when_columns_missing_values():
     df = pd.DataFrame({"temperature_2m": [None], "dew_point_2m": [None]})
     assert dew_risk(df) == {"spread": None, "risk": "Inconnu", "advice": "donnees manquantes"}
+
+
+def _make_temp_df():
+    idx = pd.date_range("2026-09-15 20:00", periods=5, freq="1h")
+    return pd.DataFrame({"temperature_2m": [10.0, 8.0, 5.0, 3.0, 4.0]}, index=idx)
+
+
+def test_temperature_range_reports_min_max_and_now():
+    df = _make_temp_df()
+    r = temperature_range(df, pd.Timestamp("2026-09-15 22:00"))
+    assert r == {"now_c": 5.0, "min_c": 3.0, "max_c": 10.0}
+
+
+def test_temperature_range_falls_back_to_first_hour_when_now_is_none():
+    r = temperature_range(_make_temp_df(), None)
+    assert r["now_c"] == 10.0  # premiere heure de la fenetre
+    assert r["min_c"] == 3.0 and r["max_c"] == 10.0
+
+
+def test_temperature_range_falls_back_to_first_hour_when_now_before_df():
+    r = temperature_range(_make_temp_df(), pd.Timestamp("2026-09-15 10:00"))
+    assert r["now_c"] == 10.0
+
+
+def test_temperature_range_empty_df():
+    assert temperature_range(pd.DataFrame(), pd.Timestamp("2026-09-15 20:00")) == {
+        "now_c": None, "min_c": None, "max_c": None,
+    }
 
 
 def test_discovery_sort_key_prioritizes_uncaptured_messier():

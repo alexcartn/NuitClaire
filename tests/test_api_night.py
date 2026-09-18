@@ -21,6 +21,10 @@ def test_get_night_returns_score_twilight_and_hourly_fields(api_client):
     assert first["windGustsKmh"] == 15.0
     assert first["temperatureC"] == 12.0
     assert first["dewPointC"] == 8.0
+    # Temperature constante (12deg) dans le fixture : min/max/maintenant identiques.
+    assert data["tempNowC"] == 12.0
+    assert data["tempMinC"] == 12.0
+    assert data["tempMaxC"] == 12.0
 
 
 def test_get_night_twilight_times_are_ordered(api_client):

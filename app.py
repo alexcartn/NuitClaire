@@ -16,7 +16,7 @@ from astro import (night_hours, sky_frame, twilight_times, COMPASS_SECTORS,
 from scoring import (score_frame, night_summary, target_windows, score_label_fr,
                       target_altitude_series, recommended_exposure_minutes, wind_quality,
                       target_feasibility_reasons, cloud_trend, CLOUD_TREND_WINDOW_HOURS,
-                      dew_risk, discovery_sort_key, view_window_df)
+                      dew_risk, discovery_sort_key, temperature_range, view_window_df)
 from catalog import load_targets, load_messier, find_target
 from geocode import geocode, GeocodeError
 from wiki import target_summary, wiki_title_candidates
@@ -630,7 +630,20 @@ with tab_ce_soir:
             st.warning(f"Aucun objet trouve pour « {query} ». Essayez une designation "
                        "comme M31, NGC7380 ou IC434.")
 
-    c1, c2, c3 = st.columns(3)
+    # Repere "maintenant" uniquement si la nuit affichee est bien celle de ce
+    # soir (toujours vrai sauf repli sur `next(iter(nights))` ci-dessus).
+    # Calcule ici (avant les cartes) pour etre reutilisable par la carte
+    # Temperature ci-dessous, pas seulement par la frise crepuscule plus bas.
+    now_local = local_now(site) if sel == date.today() else None
+
+    c0, c1, c2, c3 = st.columns(4)
+    with c0:
+        temp = temperature_range(view_df, now_local)
+        temp_value = f'{temp["now_c"]:.0f}°C' if temp["now_c"] is not None else "n/d"
+        temp_sub = (f'{temp["min_c"]:.0f}° → {temp["max_c"]:.0f}° cette nuit'
+                    if temp["min_c"] is not None and temp["max_c"] is not None else "n/d")
+        st.markdown(f'<div class="card"><h4>Temperature</h4><div class="value">{temp_value}</div>'
+                    f'<div class="sub">{temp_sub}</div></div>', unsafe_allow_html=True)
     with c1:
         st.markdown(f'<div class="card"><h4>Astro score</h4><div class="value">{pct}/100</div>'
                     f'<div class="sub">{label}</div></div>', unsafe_allow_html=True)
@@ -650,11 +663,9 @@ with tab_ce_soir:
                     f'<div class="sub">{trend} · {moon["size_arcmin"]:.1f}\'</div></div>',
                     unsafe_allow_html=True)
 
-    # Repere "maintenant" uniquement si la nuit affichee est bien celle de ce
-    # soir (toujours vrai sauf repli sur `next(iter(nights))` ci-dessus). Plus
-    # de surlignage "meilleure fenetre" : ca donnait l'impression trompeuse
-    # que le vert marquait toute la session astro plutot qu'un sous-interval.
-    now_local = local_now(site) if sel == date.today() else None
+    # Plus de surlignage "meilleure fenetre" dans la frise : ca donnait
+    # l'impression trompeuse que le vert marquait toute la session astro
+    # plutot qu'un sous-interval.
     st.markdown(twilight_bar_html(tw, now=now_local), unsafe_allow_html=True)
 
     st.subheader("Score astro")

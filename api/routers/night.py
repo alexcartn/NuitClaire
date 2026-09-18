@@ -12,7 +12,8 @@ from fastapi import APIRouter, HTTPException
 from api.deps import current_night, get_site, get_window_mode
 from api.schemas import NightOut
 from astro import local_now, moon_status
-from scoring import cloud_trend, dew_risk, night_summary, score_label_fr, view_window_df, wind_quality
+from scoring import cloud_trend, dew_risk, night_summary, score_label_fr, temperature_range, \
+    view_window_df, wind_quality
 
 router = APIRouter()
 
@@ -51,6 +52,7 @@ def get_night() -> dict:
     now = local_now(site) if sel == date.today() else None
     trend = cloud_trend(df, now)
     gust = _current_wind_gust(df, now)
+    temp = temperature_range(view_df, now)
 
     return {
         "date": sel.isoformat(),
@@ -61,6 +63,7 @@ def get_night() -> dict:
         "goHours": s["go_hours"], "bestWindow": s["best_window"],
         "moonIllum": moon["illum"], "moonWaxing": moon["waxing"], "moonSizeArcmin": moon["size_arcmin"],
         "dewSpread": dew["spread"], "dewRisk": dew["risk"], "dewAdvice": dew["advice"],
+        "tempNowC": temp["now_c"], "tempMinC": temp["min_c"], "tempMaxC": temp["max_c"],
         "windGustsKmh": gust, "windQuality": wind_quality(gust or 0),
         "cloudTrend": {
             "direction": trend["direction"], "label": trend["label"],

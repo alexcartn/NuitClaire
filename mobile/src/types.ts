@@ -55,6 +55,9 @@ export interface Night {
   dewSpread: number | null;
   dewRisk: string;
   dewAdvice: string;
+  tempNowC: number | null;
+  tempMinC: number | null;
+  tempMaxC: number | null;
   windGustsKmh: number | null;
   windQuality: number;
   cloudTrend: CloudTrend | null;
