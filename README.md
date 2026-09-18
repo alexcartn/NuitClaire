@@ -31,8 +31,10 @@ d'infrastructure de notification) ; "Ma position" prend les coordonnees GPS sans
 inverse (pas de nom d'adresse) ; pas de PWA installable (pas de manifest/service worker) ;
 pas de suite de tests JS (verification faite via Playwright manuel).
 
-"Cibles" et "Catalogue Messier" ont un filtre magnitude (curseur) en plus du filtre par
-type -- calcule cote client sur les lignes deja chargees, pas d'appel API supplementaire.
+"Cibles" et "Catalogue Messier" ont un filtre magnitude (curseur a deux poignees, mini et
+maxi independants -- `RangeSlider` cote mobile, `st.slider` en mode plage cote Streamlit)
+en plus du filtre par type -- calcule cote client sur les lignes deja chargees, pas
+d'appel API supplementaire.
 
 L'onglet/ecran "Ce soir" affiche une carte Temperature (temperature exterieure actuelle
 et plage mini/maxi de la nuit -- pour savoir d'un coup d'oeil s'il faut un manteau, sans

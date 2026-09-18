@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { RangeSlider } from "../components/RangeSlider";
 import { TargetRowCard } from "../components/TargetRow";
 
 const PAGE_SIZE = 24;
@@ -13,7 +14,7 @@ export function Cibles({
   onOpenTarget: (designation: string) => void;
 }) {
   const [types, setTypes] = useState<string[]>([]);
-  const [maxMag, setMaxMag] = useState<number | null>(null);
+  const [magRange, setMagRange] = useState<[number, number] | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   const fetchTargets = useCallback(() => api.targets(types.length ? types : undefined), [types]);
@@ -40,10 +41,11 @@ export function Cibles({
   // Filtre magnitude cote client : les cibles sont deja chargees (feasibles
   // ce soir), pas besoin d'un aller-retour API pour affiner sur une colonne
   // deja presente dans les lignes recues.
-  const filtered = useMemo(
-    () => (rows ?? []).filter((r) => maxMag == null || r.mag == null || r.mag <= maxMag),
-    [rows, maxMag],
-  );
+  const filtered = useMemo(() => {
+    if (!magRange) return rows ?? [];
+    const [lo, hi] = magRange;
+    return (rows ?? []).filter((r) => r.mag == null || (r.mag >= lo && r.mag <= hi));
+  }, [rows, magRange]);
 
   const shown = showAll ? filtered : filtered.slice(0, PAGE_SIZE);
   const rest = filtered.length - shown.length;
@@ -57,18 +59,17 @@ export function Cibles({
       </div>
 
       {magBounds && magBounds.max > magBounds.min && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="nc-caption" style={{ margin: 0, flex: "none" }}>
-            Magnitude max {(maxMag ?? magBounds.max).toFixed(1)}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span className="nc-caption" style={{ margin: 0 }}>
+            Magnitude {(magRange ?? [magBounds.min, magBounds.max])[0].toFixed(1)} →{" "}
+            {(magRange ?? [magBounds.min, magBounds.max])[1].toFixed(1)}
           </span>
-          <input
-            type="range"
+          <RangeSlider
             min={magBounds.min}
             max={magBounds.max}
             step={0.5}
-            value={maxMag ?? magBounds.max}
-            onChange={(e) => setMaxMag(Number(e.target.value))}
-            style={{ flex: 1 }}
+            value={magRange ?? [magBounds.min, magBounds.max]}
+            onChange={setMagRange}
           />
         </div>
       )}

@@ -754,8 +754,9 @@ with tab_ce_soir:
 
         mags = [r["Mag"] for r in rows if r.get("Mag") is not None]
         if mags and max(mags) > min(mags):
-            max_mag = st.slider("Magnitude max", float(min(mags)), float(max(mags)), float(max(mags)), 0.5)
-            rows = [r for r in rows if r.get("Mag") is None or r["Mag"] <= max_mag]
+            mag_lo, mag_hi = st.slider("Magnitude", float(min(mags)), float(max(mags)),
+                                        (float(min(mags)), float(max(mags))), 0.5)
+            rows = [r for r in rows if r.get("Mag") is None or mag_lo <= r["Mag"] <= mag_hi]
 
         shown, rest = rows[:GALLERY_PAGE_SIZE], rows[GALLERY_PAGE_SIZE:]
         _target_grid(shown, df, site, prog["horizon"], "soir", GALLERY_COLS,
@@ -796,9 +797,10 @@ with tab_messier:
 
     messier_mags = [r["Mag"] for r in rows if r.get("Mag") is not None]
     if messier_mags and max(messier_mags) > min(messier_mags):
-        max_messier_mag = st.slider("Magnitude max", float(min(messier_mags)), float(max(messier_mags)),
-                                     float(max(messier_mags)), 0.5, key="messier_mag_slider")
-        rows = [r for r in rows if r.get("Mag") is None or r["Mag"] <= max_messier_mag]
+        messier_mag_lo, messier_mag_hi = st.slider(
+            "Magnitude", float(min(messier_mags)), float(max(messier_mags)),
+            (float(min(messier_mags)), float(max(messier_mags))), 0.5, key="messier_mag_slider")
+        rows = [r for r in rows if r.get("Mag") is None or messier_mag_lo <= r["Mag"] <= messier_mag_hi]
 
     def _messier_extra(row: dict) -> None:
         new_val = st.checkbox("Capturee", value=row["Capture"], key=f"cap_{row['id']}")

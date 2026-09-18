@@ -193,3 +193,52 @@ a {
 .nc-tab-label {
   font: 400 10px/1.2 "Helvetica Neue", Helvetica, sans-serif;
 }
+
+/* Poignee d'un RangeSlider (voir components/RangeSlider.tsx) : deux <input
+   type="range"> superposes sur toute la largeur, piste rendue transparente
+   (le trait visible est un div separe dans le composant) -- seule la
+   poignee doit capter les clics, d'ou pointer-events:none sur l'input et
+   :auto uniquement sur le thumb. */
+.nc-range-thumb {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.nc-range-thumb::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+.nc-range-thumb::-moz-range-track {
+  background: transparent;
+}
+
+.nc-range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surf);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.nc-range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surf);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
