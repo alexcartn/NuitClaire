@@ -7,6 +7,7 @@ Streamlit, est reparti entre `feasible_rows`/`_row_from_search` (liste) et
 resume Wikipedia."""
 from fastapi import APIRouter, HTTPException, Query
 
+import progress as progress_store
 import settings as settings_store
 from api.deps import cached_wiki_summary, current_night, feasible_rows, get_horizon, get_site, \
     site_from_settings
@@ -79,6 +80,12 @@ def target_detail(designation: str) -> dict:
     low, high = recommended_exposure_minutes(row.get("TypeCode", ""), row.get("Mag"))
     wiki = cached_wiki_summary(wiki_title_candidates(row))
 
+    # Journal d'expo libre par cible (voir progress.py) -- independant du
+    # temps saisi par session (sessions.py), affiche ici pour pouvoir
+    # ajouter/consulter du temps d'expo directement depuis la fiche detail,
+    # sans passer par le journal de session.
+    exposure_log = progress_store.load()["exposure_log"].get(out["designation"], [])
+
     out.update({
         "altitudeSeries": [
             {"time": t.isoformat(), "alt": a["alt"], "az": a["az"], "sector": a["sector"],
@@ -88,5 +95,7 @@ def target_detail(designation: str) -> dict:
         "peakSector": peak["sector"], "peakAz": peak["az"], "peakTime": peak_t.isoformat(),
         "exposureLowMin": low, "exposureHighMin": high,
         "wiki": wiki,
+        "exposureLog": exposure_log,
+        "exposureTotalMin": sum(e["minutes"] for e in exposure_log),
     })
     return out

@@ -1,8 +1,19 @@
-"""Persistance locale : secteurs d'horizon degages et Messiers captures."""
+"""Persistance locale : secteurs d'horizon degages, Messiers captures, et
+journal d'expo par cible (`exposure_log`).
+
+`exposure_log` est un complement independant du temps d'expo par session
+(voir `sessions.py`, `set_item_exposure`) : ce dernier suit le rythme d'une
+sortie (ouverte/cloturee), alors qu'ici chaque entree n'est qu'une addition
+libre, sans notion de nuit -- pratique pour rattraper des prises anterieures
+a l'usage de l'appli (rien a "ouvrir", juste une cible et des minutes) ou
+pour logger depuis la fiche detail d'une cible plutot que depuis le journal.
+Les deux sources sont sommees par `stats.py` pour le total par cible."""
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
+from uuid import uuid4
 
 import db
 
@@ -18,6 +29,7 @@ _DEFAULT_FROZEN = MappingProxyType({
     "horizon": MappingProxyType({"N": True, "NE": True, "E": False, "SE": False,
                                   "S": False, "SW": False, "W": False, "NW": False}),
     "messier_captured": (),
+    "exposure_log": MappingProxyType({}),
 })
 
 
@@ -26,6 +38,7 @@ def default() -> dict:
     return {
         "horizon": dict(_DEFAULT_FROZEN["horizon"]),
         "messier_captured": list(_DEFAULT_FROZEN["messier_captured"]),
+        "exposure_log": dict(_DEFAULT_FROZEN["exposure_log"]),
     }
 
 
@@ -55,6 +68,9 @@ def load(path: Path = PROGRESS_PATH) -> dict:
     if not isinstance(horizon_override, dict):
         horizon_override = {}
     merged["horizon"] = {**_DEFAULT_FROZEN["horizon"], **horizon_override}
+
+    exposure_override = raw.get("exposure_log")
+    merged["exposure_log"] = exposure_override if isinstance(exposure_override, dict) else {}
     return merged
 
 
@@ -98,3 +114,36 @@ def toggle_messier(data: dict, messier_id: str) -> dict:
     # consequence pour l'instant, rien ne depend d'un ordre numerique ici.
     data["messier_captured"] = sorted(captured)
     return data
+
+
+def add_exposure(data: dict, designation: str, minutes: int, now: datetime) -> dict:
+    """Ajoute une entree d'expo libre pour `designation` -- pas de session a
+    ouvrir, juste une addition horodatee (meme forme d'entree que les notes
+    de sessions.py : id/valeur/horodatage). Plusieurs entrees possibles par
+    cible, jamais d'ecrasement -- pratique pour cumuler plusieurs prises
+    (avant ou apres l'usage de l'appli) sans devoir tout mettre dans une
+    seule valeur."""
+    entry = {"id": uuid4().hex, "minutes": minutes, "at": now.isoformat()}
+    data["exposure_log"].setdefault(designation, []).append(entry)
+    return data
+
+
+def remove_exposure(data: dict, designation: str, entry_id: str) -> dict:
+    """Retire une entree precise (correction d'une saisie erronee) -- sans
+    effet si la cible ou l'entree n'existe pas."""
+    entries = data["exposure_log"].get(designation)
+    if entries is not None:
+        data["exposure_log"][designation] = [e for e in entries if e["id"] != entry_id]
+    return data
+
+
+def exposure_totals(data: dict) -> dict[str, int]:
+    """Minutes d'expo cumulees par cible, toutes entrees confondues --
+    ignore les cibles dont le total tombe a zero (toutes leurs entrees ont
+    ete retirees)."""
+    totals = {}
+    for designation, entries in data["exposure_log"].items():
+        total = sum(e["minutes"] for e in entries)
+        if total:
+            totals[designation] = total
+    return totals

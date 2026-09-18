@@ -1,6 +1,10 @@
 import json
+from datetime import datetime
 
-from progress import default, load, save, toggle_messier, DEFAULT
+from progress import add_exposure, default, exposure_totals, load, remove_exposure, save, \
+    toggle_messier, DEFAULT
+
+NOW = datetime(2026, 9, 16, 22, 0)
 
 
 def test_load_returns_default_when_file_missing(tmp_path):
@@ -67,3 +71,73 @@ def test_mutating_public_default_does_not_corrupt_future_defaults(tmp_path):
         assert load(tmp_path / "progress.json")["messier_captured"] == []
     finally:
         DEFAULT["messier_captured"].remove("999")
+
+
+# --- Journal d'expo libre par cible ---
+
+def test_add_exposure_appends_entry():
+    data = default()
+    add_exposure(data, "M31", 30, NOW)
+    entries = data["exposure_log"]["M31"]
+    assert len(entries) == 1
+    assert entries[0]["minutes"] == 30
+    assert entries[0]["at"] == NOW.isoformat()
+    assert "id" in entries[0]
+
+
+def test_add_exposure_multiple_entries_accumulate_without_overwriting():
+    data = default()
+    add_exposure(data, "M31", 30, NOW)
+    add_exposure(data, "M31", 45, datetime(2026, 9, 20, 21, 0))
+    assert [e["minutes"] for e in data["exposure_log"]["M31"]] == [30, 45]
+
+
+def test_remove_exposure_deletes_matching_id_only():
+    data = default()
+    add_exposure(data, "M31", 30, NOW)
+    add_exposure(data, "M31", 45, NOW)
+    entry_id = data["exposure_log"]["M31"][0]["id"]
+
+    remove_exposure(data, "M31", entry_id)
+
+    remaining = data["exposure_log"]["M31"]
+    assert len(remaining) == 1
+    assert remaining[0]["minutes"] == 45
+
+
+def test_remove_exposure_unknown_target_is_noop():
+    data = default()
+    remove_exposure(data, "NOPE", "some-id")  # ne doit pas lever
+    assert data == default()
+
+
+def test_exposure_totals_sums_per_target_and_skips_zero():
+    data = default()
+    add_exposure(data, "M31", 30, NOW)
+    add_exposure(data, "M31", 20, NOW)
+    add_exposure(data, "M13", 15, NOW)
+    entry_id = data["exposure_log"]["M13"][0]["id"]
+    remove_exposure(data, "M13", entry_id)  # M13 retombe a zero -> exclu
+
+    assert exposure_totals(data) == {"M31": 50}
+
+
+def test_load_defaults_exposure_log_to_empty_dict(tmp_path):
+    path = tmp_path / "progress.json"
+    path.write_text(json.dumps({"messier_captured": ["1"]}), encoding="utf-8")
+    assert load(path)["exposure_log"] == {}
+
+
+def test_save_then_load_roundtrips_exposure_log(tmp_path):
+    path = tmp_path / "progress.json"
+    data = add_exposure(default(), "M31", 30, NOW)
+    save(data, path)
+    assert load(path)["exposure_log"] == {"M31": [
+        {"id": data["exposure_log"]["M31"][0]["id"], "minutes": 30, "at": NOW.isoformat()},
+    ]}
+
+
+def test_load_falls_back_to_empty_exposure_log_when_malformed(tmp_path):
+    path = tmp_path / "progress.json"
+    path.write_text(json.dumps({"exposure_log": ["not", "a", "dict"]}), encoding="utf-8")
+    assert load(path)["exposure_log"] == {}

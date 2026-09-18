@@ -2,7 +2,7 @@
 mobile, traduit depuis les dicts internes (cles francaises, voir `rows.py`)
 par les routers. Les modeles documentent/valident la forme ; la traduction
 elle-meme vit dans chaque router, au plus pres des donnees qu'il assemble."""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SiteOut(BaseModel):
@@ -48,6 +48,16 @@ class HorizonUpdate(BaseModel):
 
 class MessierCaptureUpdate(BaseModel):
     captured: bool
+
+
+class ExposureEntryOut(BaseModel):
+    id: str
+    minutes: int
+    at: str
+
+
+class AddExposure(BaseModel):
+    minutes: int = Field(gt=0)
 
 
 class StateOut(BaseModel):
@@ -143,6 +153,8 @@ class TargetDetailOut(TargetRowOut):
     exposureLowMin: int
     exposureHighMin: int
     wiki: dict | None
+    exposureLog: list[ExposureEntryOut]
+    exposureTotalMin: int
 
 
 class NoteOut(BaseModel):

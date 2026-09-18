@@ -104,6 +104,12 @@ export interface WikiSummary {
   lang: string;
 }
 
+export interface ExposureEntry {
+  id: string;
+  minutes: number;
+  at: string;
+}
+
 export interface TargetDetail extends TargetRow {
   altitudeSeries: AltitudePoint[];
   peakSector: string;
@@ -112,6 +118,8 @@ export interface TargetDetail extends TargetRow {
   exposureLowMin: number;
   exposureHighMin: number;
   wiki: WikiSummary | null;
+  exposureLog: ExposureEntry[];
+  exposureTotalMin: number;
 }
 
 export const COMPASS_SECTORS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;

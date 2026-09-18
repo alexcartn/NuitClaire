@@ -1,5 +1,6 @@
 import type {
   AppState,
+  ExposureEntry,
   GeocodeResult,
   Night,
   Sessions,
@@ -86,4 +87,14 @@ export const api = {
     request<Sessions>("POST", `/api/sessions/past/${encodeURIComponent(closedAt)}/reopen`),
 
   stats: () => get<Stats>("/api/stats"),
+
+  addTargetExposure: (designation: string, minutes: number) =>
+    request<ExposureEntry[]>("POST", `/api/progress/exposure/${encodeURIComponent(designation)}`, {
+      body: { minutes },
+    }),
+  deleteTargetExposure: (designation: string, entryId: string) =>
+    request<ExposureEntry[]>(
+      "DELETE",
+      `/api/progress/exposure/${encodeURIComponent(designation)}/${encodeURIComponent(entryId)}`,
+    ),
 };

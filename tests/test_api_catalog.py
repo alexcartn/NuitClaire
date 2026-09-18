@@ -52,6 +52,19 @@ def test_target_detail_includes_altitude_series_and_exposure(api_client, monkeyp
     assert data["exposureLowMin"] > 0 and data["exposureHighMin"] >= data["exposureLowMin"]
     assert data["peakSector"] in ("N", "NE", "E", "SE", "S", "SW", "W", "NW")
     assert data["wiki"] is None
+    assert data["exposureLog"] == []
+    assert data["exposureTotalMin"] == 0
+
+
+def test_target_detail_includes_exposure_log_entries(api_client):
+    api_client.post("/api/progress/exposure/M31", json={"minutes": 20})
+    api_client.post("/api/progress/exposure/M31", json={"minutes": 25})
+
+    r = api_client.get("/api/targets/M31")
+    data = r.json()
+
+    assert len(data["exposureLog"]) == 2
+    assert data["exposureTotalMin"] == 45
 
 
 def test_target_detail_unknown_designation_returns_404(api_client):

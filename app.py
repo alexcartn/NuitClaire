@@ -560,6 +560,43 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict, horizon
         st.markdown(f"**Temps de pose indicatif** : {low}–{high} min "
                      "(estimation, pas une mesure)")
 
+    # Journal d'expo libre par cible (voir progress.py) : ajoute directement
+    # ici, independamment du journal de session -- pratique pour rattraper
+    # des prises anterieures a l'usage de l'appli (rien a ouvrir/cloturer).
+    st.markdown("**Temps d'expo**")
+    existing_entries = prog["exposure_log"].get(title, [])
+    total_min = sum(e["minutes"] for e in existing_entries)
+    if total_min:
+        total_h, total_m = divmod(total_min, 60)
+        total_txt = f"{total_h} h {total_m:02d}" if total_h else f"{total_m} min"
+        _soft_caption(f"{total_txt} au total (journal de session inclus si applicable).")
+    else:
+        _soft_caption("Ajoute directement ici, sans passer par le journal -- pratique pour "
+                       "rattraper des prises anterieures a l'usage de l'appli.")
+
+    with st.form(f"expo_add_form_{title}", clear_on_submit=True):
+        expo_col, expo_btn_col = st.columns([3, 1])
+        with expo_col:
+            expo_minutes = st.number_input("Minutes", min_value=0, step=5, value=0,
+                                            label_visibility="collapsed", key=f"expo_input_{title}")
+        with expo_btn_col:
+            expo_submitted = st.form_submit_button("Ajouter", use_container_width=True)
+    if expo_submitted and expo_minutes > 0:
+        progress_store.add_exposure(prog, title, int(expo_minutes), local_now(site))
+        progress_store.save(prog)
+        st.rerun()
+
+    for entry in existing_entries:
+        e_col, del_col = st.columns([5, 1])
+        with e_col:
+            at_txt = datetime.fromisoformat(entry["at"]).strftime("%d/%m %H:%M")
+            st.caption(f"{at_txt} · {entry['minutes']} min")
+        with del_col:
+            if st.button("×", key=f"expo_del_{title}_{entry['id']}"):
+                progress_store.remove_exposure(prog, title, entry["id"])
+                progress_store.save(prog)
+                st.rerun()
+
     # Absent du catalogue OpenNGC (donnees purement astrometriques) : recherche
     # en direct sur Wikipedia (fr puis en), section masquee si rien de trouve.
     summary = _cached_wiki_summary(tuple(wiki_title_candidates(row)))
@@ -785,7 +822,7 @@ with tab_journal:
     st.header("Journal de session")
     st.caption(f"{len(sess['past'])} sortie(s) enregistree(s)")
 
-    journal_stats = stats_store.compute(sess)
+    journal_stats = stats_store.compute(sess, prog)
     if journal_stats["totalOutings"] > 0:
         with st.expander("Statistiques", expanded=False):
             sc1, sc2, sc3, sc4 = st.columns(4)

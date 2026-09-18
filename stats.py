@@ -5,6 +5,7 @@ cochees, temps d'expo) : aucune moyenne ou estimation fabriquee au-dela des
 agregations elementaires (compter, sommer, moyenner) decrites ci-dessous."""
 from collections import Counter
 
+import progress as progress_store
 import sessions as sessions_store
 
 
@@ -47,23 +48,28 @@ def avg_score_successful(past: list[dict]) -> tuple[float | None, int]:
     return avg, len(successful)
 
 
-def exposure_by_target(data: dict) -> list[dict]:
-    """Minutes d'expo cumulees par cible (voir sessions.exposure_totals),
-    triees par temps decroissant puis designation."""
-    totals = sessions_store.exposure_totals(data)
+def exposure_by_target(sessions_data: dict, progress_data: dict) -> list[dict]:
+    """Minutes d'expo cumulees par cible, deux sources sommees : le temps
+    saisi par session (sessions.exposure_totals) et le journal d'expo libre
+    par cible (progress.exposure_totals, voir progress.py) -- une meme
+    cible peut avoir des entrees dans les deux, ca s'additionne. Triees par
+    temps decroissant puis designation."""
+    totals = sessions_store.exposure_totals(sessions_data)
+    for designation, minutes in progress_store.exposure_totals(progress_data).items():
+        totals[designation] = totals.get(designation, 0) + minutes
     return sorted(
         ({"designation": d, "totalMin": m} for d, m in totals.items()),
         key=lambda x: (-x["totalMin"], x["designation"]),
     )
 
 
-def compute(data: dict) -> dict:
-    """Agrege toutes les statistiques du journal en un seul appel -- forme
-    consommee telle quelle par l'API (`GET /api/stats`) et par les deux
-    frontends (onglet/ecran Journal)."""
-    past = data["past"]
+def compute(sessions_data: dict, progress_data: dict) -> dict:
+    """Agrege toutes les statistiques en un seul appel -- forme consommee
+    telle quelle par l'API (`GET /api/stats`) et par les deux frontends
+    (onglet/ecran Journal)."""
+    past = sessions_data["past"]
     avg_score, nb_successful = avg_score_successful(past)
-    exposure = exposure_by_target(data)
+    exposure = exposure_by_target(sessions_data, progress_data)
     return {
         "totalOutings": len(past),
         "outingsByMonth": outings_by_month(past),

@@ -38,6 +38,12 @@ L'onglet/ecran "Ce soir" affiche une carte Temperature (temperature exterieure a
 et plage mini/maxi de la nuit -- pour savoir d'un coup d'oeil s'il faut un manteau, sans
 ouvrir "Details meteo"), calculee par `scoring.temperature_range` sur la fenetre
 d'affichage active (Habituelle ou Nuit complete) et exposee via `GET /api/night`.
+
+La fiche detail d'une cible (Cibles/Catalogue Messier) permet aussi d'ajouter du temps
+d'expo directement, sans passer par le journal de session -- pratique pour rattraper des
+prises anterieures a l'usage de l'appli. C'est un journal libre par cible (`progress.py`,
+`exposure_log`), independant du temps saisi par session (`sessions.py`) ; les deux sources
+sont sommees par `stats.py` pour le total affiche dans les statistiques.
 "Journal" permet de saisir un temps d'expo (minutes, un champ par cible et par sortie,
 facultatif -- jamais mesure ni estime par l'appli, voir l'en-tete de `sessions.py`) et
 affiche une section Statistiques (nombre de sorties, score moyen des sorties reussies,

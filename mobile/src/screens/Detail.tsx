@@ -3,6 +3,11 @@ import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { AltitudeChart } from "../components/AltitudeChart";
 
+function fmtExposureDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
 export function Detail({
   designation,
   captured,
@@ -17,9 +22,29 @@ export function Detail({
   onCaptureChange: () => void;
 }) {
   const fetchDetail = useCallback(() => api.targetDetail(designation), [designation]);
-  const { data, loading, error } = useFetch(fetchDetail, [designation]);
+  const { data, loading, error, reload } = useFetch(fetchDetail, [designation]);
   const [addedToJournal, setAddedToJournal] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [exposureDraft, setExposureDraft] = useState("");
+  const [addingExposure, setAddingExposure] = useState(false);
+
+  const addExposure = async () => {
+    const minutes = Math.round(Number(exposureDraft));
+    if (!Number.isFinite(minutes) || minutes <= 0) return;
+    setAddingExposure(true);
+    try {
+      await api.addTargetExposure(designation, minutes);
+      setExposureDraft("");
+      reload();
+    } finally {
+      setAddingExposure(false);
+    }
+  };
+
+  const deleteExposure = async (entryId: string) => {
+    await api.deleteTargetExposure(designation, entryId);
+    reload();
+  };
 
   const toggleCapture = async () => {
     if (!data?.messierId) return;
@@ -106,6 +131,71 @@ export function Detail({
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div className="nc-eyebrow">Temps d'expo</div>
+              {data.exposureTotalMin > 0 && (
+                <div className="nc-mono" style={{ fontSize: 13, color: "var(--ink)" }}>
+                  {Math.floor(data.exposureTotalMin / 60) > 0
+                    ? `${Math.floor(data.exposureTotalMin / 60)} h ${String(data.exposureTotalMin % 60).padStart(2, "0")}`
+                    : `${data.exposureTotalMin} min`}{" "}
+                  au total
+                </div>
+              )}
+            </div>
+
+            <p className="nc-caption" style={{ margin: 0 }}>
+              Ajoute directement ici, sans passer par le journal -- pratique pour rattraper des prises
+              anterieures a l'usage de l'appli.
+            </p>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="number"
+                min={1}
+                inputMode="numeric"
+                value={exposureDraft}
+                onChange={(e) => setExposureDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addExposure()}
+                placeholder="Minutes"
+                style={{
+                  flex: 1, background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
+                  padding: "7px 9px", fontSize: 12, color: "var(--ink)",
+                }}
+              />
+              <button
+                onClick={addExposure}
+                disabled={addingExposure || !exposureDraft.trim()}
+                className="nc-btn"
+                style={{ flex: "none", padding: "5px 14px", fontSize: 12 }}
+              >
+                Ajouter
+              </button>
+            </div>
+
+            {data.exposureLog.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {data.exposureLog.map((e) => (
+                  <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="nc-mono" style={{ fontSize: 11, color: "var(--ink3)", width: 48, flex: "none" }}>
+                      {fmtExposureDate(e.at)}
+                    </span>
+                    <span className="nc-mono" style={{ fontSize: 12, flex: 1 }}>
+                      {e.minutes} min
+                    </span>
+                    <button
+                      onClick={() => deleteExposure(e.id)}
+                      style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 15, padding: "0 4px" }}
+                      title="Supprimer cette entree"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {data.reasons.length > 0 && (

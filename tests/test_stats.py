@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import progress
 from sessions import add_item, close_session, default, set_item_exposure
 from stats import avg_score_successful, captures_by_month, compute, exposure_by_target, \
     outings_by_month, successful_outings
@@ -67,9 +68,20 @@ def test_exposure_by_target_sorted_by_descending_total():
     add_item(data, "M27", NOW, score_now=80)
     set_item_exposure(data, "M27", 45)
 
-    result = exposure_by_target(data)
+    result = exposure_by_target(data, progress.default())
 
     assert result == [{"designation": "M27", "totalMin": 45}, {"designation": "M13", "totalMin": 20}]
+
+
+def test_exposure_by_target_combines_session_and_free_log():
+    sessions_data = add_item(default(), "M13", NOW, score_now=80)
+    set_item_exposure(sessions_data, "M13", 20)
+    progress_data = progress.add_exposure(progress.default(), "M13", 15, NOW)
+    progress.add_exposure(progress_data, "M27", 10, NOW)
+
+    result = exposure_by_target(sessions_data, progress_data)
+
+    assert result == [{"designation": "M13", "totalMin": 35}, {"designation": "M27", "totalMin": 10}]
 
 
 def test_compute_aggregates_everything():
@@ -78,20 +90,21 @@ def test_compute_aggregates_everything():
     from sessions import toggle_item
     toggle_item(data, "M13")
     close_session(data, NOW.date(), datetime(2026, 9, 17, 5, 0))
+    progress_data = progress.add_exposure(progress.default(), "M13", 15, NOW)
 
-    result = compute(data)
+    result = compute(data, progress_data)
 
     assert result["totalOutings"] == 1
     assert result["successfulOutings"] == 1
     assert result["avgScoreSuccessful"] == 80.0
-    assert result["totalExposureMin"] == 30
-    assert result["exposureByTarget"] == [{"designation": "M13", "totalMin": 30}]
+    assert result["totalExposureMin"] == 45
+    assert result["exposureByTarget"] == [{"designation": "M13", "totalMin": 45}]
     assert result["capturesByMonth"] == [{"month": "2026-09", "count": 1}]
     assert result["outingsByMonth"] == [{"month": "2026-09", "count": 1}]
 
 
 def test_compute_on_empty_journal():
-    result = compute(default())
+    result = compute(default(), progress.default())
     assert result == {
         "totalOutings": 0, "outingsByMonth": [], "capturesByMonth": [],
         "successfulOutings": 0, "avgScoreSuccessful": None,

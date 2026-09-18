@@ -33,3 +33,18 @@ def test_stats_exposure_accumulates_across_outings(api_client):
 
     r = api_client.get("/api/stats")
     assert r.json()["exposureByTarget"] == [{"designation": "M13", "totalMin": 45}]
+
+
+def test_stats_combines_session_and_free_target_exposure(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.put("/api/sessions/current/items/M13", json={"exposureMin": 20})
+    api_client.post("/api/progress/exposure/M13", json={"minutes": 15})
+    api_client.post("/api/progress/exposure/M27", json={"minutes": 10})
+
+    r = api_client.get("/api/stats")
+    data = r.json()
+
+    assert data["exposureByTarget"] == [
+        {"designation": "M13", "totalMin": 35}, {"designation": "M27", "totalMin": 10},
+    ]
+    assert data["totalExposureMin"] == 45
