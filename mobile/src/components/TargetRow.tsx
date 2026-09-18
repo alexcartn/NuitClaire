@@ -23,7 +23,7 @@ export function TargetRowCard({
         style={{ width: 78, height: 78, flex: "none", borderRadius: 11, background: "var(--surf2)", overflow: "hidden" }}
       >
         {row.imageUrl && (
-          <img src={row.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={row.imageUrl} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         )}
       </div>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>

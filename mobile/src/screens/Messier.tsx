@@ -4,6 +4,7 @@ import { useFetch } from "../useFetch";
 import { RangeSlider } from "../components/RangeSlider";
 
 const MESSIER_TOTAL = 110;
+const PAGE_SIZE = 24;
 
 export function Messier({
   captured,
@@ -17,6 +18,7 @@ export function Messier({
   const [onlyFeasible, setOnlyFeasible] = useState(false);
   const [types, setTypes] = useState<string[]>([]);
   const [magRange, setMagRange] = useState<[number, number] | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const fetchMessier = useCallback(() => api.messier(onlyFeasible), [onlyFeasible]);
   const { data: rows, loading } = useFetch(fetchMessier, [onlyFeasible]);
@@ -42,6 +44,9 @@ export function Messier({
       (r) => (types.length === 0 || types.includes(r.type)) && (r.mag == null || (r.mag >= lo && r.mag <= hi)),
     );
   }, [rows, types, magRange]);
+
+  const shown = showAll ? filtered : filtered.slice(0, PAGE_SIZE);
+  const rest = filtered.length - shown.length;
 
   const capturedPct = Math.round((captured.size / MESSIER_TOTAL) * 100);
 
@@ -108,7 +113,7 @@ export function Messier({
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-        {filtered.map((row) => {
+        {shown.map((row) => {
           const isCaptured = !!row.messierId && captured.has(row.messierId);
           return (
             <div key={row.designation} className="nc-card" style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -116,22 +121,29 @@ export function Messier({
                 onClick={() => onOpenTarget(row.designation)}
                 className="nc-strip"
                 style={{
-                  height: 84, background: "var(--surf2)", border: "none",
-                  borderBottom: "1px solid var(--line)", cursor: "pointer",
-                  display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: 8,
-                  backgroundImage: row.imageUrl ? `url(${row.imageUrl})` : undefined,
-                  backgroundSize: "cover", backgroundPosition: "center",
+                  position: "relative", height: 84, background: "var(--surf2)", border: "none",
+                  borderBottom: "1px solid var(--line)", cursor: "pointer", padding: 0, overflow: "hidden",
                 }}
               >
-                <span className="nc-mono" style={{ fontSize: 13, color: "var(--ink)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}>
-                  {row.designation}
-                </span>
-                <span
-                  className="nc-mono"
-                  style={{ fontSize: 9, color: row.feasibleTonight ? "var(--good)" : "var(--ink3)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}
-                >
-                  {row.feasibleTonight ? "CE SOIR" : "—"}
-                </span>
+                {row.imageUrl && (
+                  <img
+                    src={row.imageUrl}
+                    alt=""
+                    loading="lazy"
+                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                )}
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: 8 }}>
+                  <span className="nc-mono" style={{ fontSize: 13, color: "var(--ink)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}>
+                    {row.designation}
+                  </span>
+                  <span
+                    className="nc-mono"
+                    style={{ fontSize: 9, color: row.feasibleTonight ? "var(--good)" : "var(--ink3)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}
+                  >
+                    {row.feasibleTonight ? "CE SOIR" : "—"}
+                  </span>
+                </div>
               </button>
               <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ fontSize: 11, color: "var(--ink2)", minHeight: 30 }}>
@@ -157,6 +169,12 @@ export function Messier({
           );
         })}
       </div>
+
+      {!showAll && rest > 0 && (
+        <button onClick={() => setShowAll(true)} className="nc-caption" style={{ background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+          Voir {rest} objet(s) de plus
+        </button>
+      )}
     </div>
   );
 }

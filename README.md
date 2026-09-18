@@ -49,6 +49,17 @@ cote Streamlit. Recherche par prefixe, pas par nom courant (couverture OpenNGC t
 partielle) ; la designation exacte (`catalog.find_target`, `GET /api/search`) reste
 utilisee pour l'ajout direct au journal de session.
 
+### Performance mobile
+
+Deux optimisations en place : la fonction API Vercel est epinglee sur la region `cdg1`
+(Paris, `vercel.json`) pour reduire la latence reseau depuis la France (a verifier au
+prochain deploiement -- la selection de region peut etre limitee selon le plan Vercel) ;
+l'onglet "Catalogue Messier" pagine desormais comme "Cibles" (24 objets, "Voir N de plus")
+et charge ses vignettes via `<img loading="lazy">` au lieu d'un fond CSS charge d'un bloc,
+pour ne pas declencher jusqu'a 110 requetes d'images externes simultanees a l'ouverture.
+Connu comme non fait : pas de cache client entre ecrans (chaque navigation refetch tout),
+ni de mitigation du cold start serverless Vercel apres une periode d'inactivite.
+
 La fiche detail d'une cible (Cibles/Catalogue Messier) permet aussi d'ajouter du temps
 d'expo directement, sans passer par le journal de session -- pratique pour rattraper des
 prises anterieures a l'usage de l'appli. C'est un journal libre par cible (`progress.py`,
