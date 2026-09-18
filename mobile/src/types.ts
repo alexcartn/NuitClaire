@@ -149,6 +149,7 @@ export interface SessionItem {
   addedAt: string;
   done: boolean;
   notes: Note[];
+  exposureMin: number | null;
 }
 
 export interface CurrentSession {
@@ -171,4 +172,24 @@ export interface PastSession {
 export interface Sessions {
   current: CurrentSession;
   past: PastSession[];
+}
+
+export interface MonthCount {
+  month: string;
+  count: number;
+}
+
+export interface TargetExposure {
+  designation: string;
+  totalMin: number;
+}
+
+export interface Stats {
+  totalOutings: number;
+  outingsByMonth: MonthCount[];
+  capturesByMonth: MonthCount[];
+  successfulOutings: number;
+  avgScoreSuccessful: number | null;
+  exposureByTarget: TargetExposure[];
+  totalExposureMin: number;
 }

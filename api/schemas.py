@@ -160,6 +160,7 @@ class SessionItemOut(BaseModel):
     addedAt: str
     done: bool
     notes: list[NoteOut]
+    exposureMin: int | None = None
 
 
 class CurrentSessionOut(BaseModel):
@@ -190,6 +191,7 @@ class AddSessionItem(BaseModel):
 
 class UpdateSessionItem(BaseModel):
     done: bool | None = None
+    exposureMin: int | None = None
 
 
 class AddNote(BaseModel):
@@ -198,3 +200,23 @@ class AddNote(BaseModel):
 
 class UpdatePastSession(BaseModel):
     note: str
+
+
+class MonthCountOut(BaseModel):
+    month: str
+    count: int
+
+
+class TargetExposureOut(BaseModel):
+    designation: str
+    totalMin: int
+
+
+class StatsOut(BaseModel):
+    totalOutings: int
+    outingsByMonth: list[MonthCountOut]
+    capturesByMonth: list[MonthCountOut]
+    successfulOutings: int
+    avgScoreSuccessful: float | None
+    exposureByTarget: list[TargetExposureOut]
+    totalExposureMin: int

@@ -1,9 +1,9 @@
 import json
 from datetime import date, datetime
 
-from sessions import add_free_note, add_item, add_item_note, close_session, default, load, \
-    remove_free_note, remove_item, remove_item_note, reopen_session, save, set_past_note, \
-    timeline, toggle_item, DEFAULT
+from sessions import add_free_note, add_item, add_item_note, close_session, default, \
+    exposure_totals, load, remove_free_note, remove_item, remove_item_note, reopen_session, \
+    save, set_item_exposure, set_past_note, timeline, toggle_item, DEFAULT
 
 NOW = datetime(2026, 9, 16, 22, 4)
 TODAY = date(2026, 9, 16)
@@ -311,7 +311,7 @@ def test_reopen_session_rebuilds_items_for_legacy_entry_without_items():
     reopen_session(data, "2026-09-10T23:00:00")
 
     assert data["current"]["items"]["M27"] == {
-        "addedAt": "2026-09-10T23:00:00", "done": False, "notes": [],
+        "addedAt": "2026-09-10T23:00:00", "done": False, "notes": [], "exposureMin": None,
     }
     assert data["current"]["scoreAtOpen"] == 55
     assert data["current"]["freeNotes"] == []
@@ -362,3 +362,63 @@ def test_timeline_works_on_past_entry_after_close():
     entries = timeline(data["past"][0])
 
     assert {e["text"] for e in entries} == {"Beau seeing", "Ciel degage"}
+
+
+def test_new_item_has_no_exposure_by_default():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    assert data["current"]["items"]["M13"]["exposureMin"] is None
+
+
+def test_set_item_exposure_sets_value():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    set_item_exposure(data, "M13", 45)
+    assert data["current"]["items"]["M13"]["exposureMin"] == 45
+
+
+def test_set_item_exposure_overwrites_previous_value():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    set_item_exposure(data, "M13", 20)
+    set_item_exposure(data, "M13", 35)
+    assert data["current"]["items"]["M13"]["exposureMin"] == 35
+
+
+def test_set_item_exposure_unknown_designation_raises():
+    data = default()
+    try:
+        set_item_exposure(data, "NOPE", 10)
+        assert False, "aurait du lever ValueError"
+    except ValueError:
+        pass
+
+
+def test_exposure_totals_empty_when_nothing_set():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    assert exposure_totals(data) == {}
+
+
+def test_exposure_totals_sums_current_and_past_sessions():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    set_item_exposure(data, "M13", 30)
+    close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
+
+    add_item(data, "M13", NOW, score_now=60)
+    set_item_exposure(data, "M13", 25)
+    add_item(data, "M27", NOW, score_now=60)
+    set_item_exposure(data, "M27", 10)
+
+    assert exposure_totals(data) == {"M13": 55, "M27": 10}
+
+
+def test_exposure_totals_ignores_items_without_exposure():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    add_item(data, "M27", NOW, score_now=80)
+    set_item_exposure(data, "M13", 15)
+    assert exposure_totals(data) == {"M13": 15}
+
+
+def test_migrate_legacy_item_gets_exposure_field():
+    data = default()
+    data["current"]["items"]["M27"] = {"addedAt": NOW.isoformat(), "done": True, "note": "vieille entree"}
+    from sessions import _migrate_item
+    migrated = _migrate_item(data["current"]["items"]["M27"])
+    assert migrated["exposureMin"] is None

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
 
@@ -14,9 +14,34 @@ export function Messier({
   onCaptureChange: () => void;
 }) {
   const [onlyFeasible, setOnlyFeasible] = useState(false);
+  const [types, setTypes] = useState<string[]>([]);
+  const [maxMag, setMaxMag] = useState<number | null>(null);
 
   const fetchMessier = useCallback(() => api.messier(onlyFeasible), [onlyFeasible]);
   const { data: rows, loading } = useFetch(fetchMessier, [onlyFeasible]);
+
+  const allTypes = useMemo(() => {
+    const seen = new Set<string>();
+    (rows ?? []).forEach((r) => seen.add(r.type));
+    return [...seen].sort();
+  }, [rows]);
+
+  const magBounds = useMemo(() => {
+    const values = (rows ?? []).map((r) => r.mag).filter((m): m is number => m != null);
+    if (!values.length) return null;
+    return { min: Math.floor(Math.min(...values)), max: Math.ceil(Math.max(...values)) };
+  }, [rows]);
+
+  const toggleType = (t: string) =>
+    setTypes((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]));
+
+  const filtered = useMemo(
+    () =>
+      (rows ?? []).filter(
+        (r) => (types.length === 0 || types.includes(r.type)) && (maxMag == null || r.mag == null || r.mag <= maxMag),
+      ),
+    [rows, types, maxMag],
+  );
 
   const capturedPct = Math.round((captured.size / MESSIER_TOTAL) * 100);
 
@@ -46,10 +71,45 @@ export function Messier({
         Faisable ce soir uniquement
       </button>
 
+      {allTypes.length > 0 && (
+        <div style={{ display: "flex", gap: 7, overflow: "auto", margin: "0 -18px", padding: "0 18px 2px" }}>
+          {allTypes.map((t) => (
+            <button
+              key={t}
+              onClick={() => toggleType(t)}
+              className={`nc-chip ${types.includes(t) ? "nc-chip-active" : ""}`}
+              style={{ flex: "none" }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {magBounds && magBounds.max > magBounds.min && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="nc-caption" style={{ margin: 0, flex: "none" }}>
+            Magnitude max {(maxMag ?? magBounds.max).toFixed(1)}
+          </span>
+          <input
+            type="range"
+            min={magBounds.min}
+            max={magBounds.max}
+            step={0.5}
+            value={maxMag ?? magBounds.max}
+            onChange={(e) => setMaxMag(Number(e.target.value))}
+            style={{ flex: 1 }}
+          />
+        </div>
+      )}
+
       {loading && <p className="nc-caption">Chargement...</p>}
+      {rows && filtered.length === 0 && (
+        <p className="nc-caption">Aucun objet ne correspond a ces filtres.</p>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-        {(rows ?? []).map((row) => {
+        {filtered.map((row) => {
           const isCaptured = !!row.messierId && captured.has(row.messierId);
           return (
             <div key={row.designation} className="nc-card" style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>

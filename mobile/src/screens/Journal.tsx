@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { StatCard } from "../components/StatCard";
 import type { TargetRow, TimelineEntry } from "../types";
 
 function fmtTime(iso: string): string {
@@ -11,6 +12,14 @@ function fmtTime(iso: string): string {
 function fmtDate(isoDate: string): string {
   const d = new Date(isoDate + "T00:00");
   return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+}
+
+/** '125' minutes -> "2 h 05" ; en-dessous de l'heure, "45 min". */
+function fmtExposure(totalMin: number): string {
+  if (totalMin <= 0) return "0 min";
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
 }
 
 const inputStyle = {
@@ -54,12 +63,15 @@ function Timeline({ entries, onDelete }: { entries: TimelineEntry[]; onDelete?: 
 export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) => void }) {
   const fetchSessions = useCallback(() => api.sessions(), []);
   const { data, loading, reload } = useFetch(fetchSessions, []);
+  const fetchStats = useCallback(() => api.stats(), []);
+  const { data: stats, reload: reloadStats } = useFetch(fetchStats, []);
   const [closing, setClosing] = useState(false);
   const [reopening, setReopening] = useState<string | null>(null);
   const [reopenError, setReopenError] = useState<string | null>(null);
   const [pastNoteDraft, setPastNoteDraft] = useState<Record<string, string>>({});
   const [openPast, setOpenPast] = useState<string | null>(null);
   const [itemNoteDraft, setItemNoteDraft] = useState<Record<string, string>>({});
+  const [exposureDraft, setExposureDraft] = useState<Record<string, string>>({});
   const [freeNoteDraft, setFreeNoteDraft] = useState("");
   const [targetQuery, setTargetQuery] = useState("");
   const [targetResults, setTargetResults] = useState<TargetRow[] | null>(null);
@@ -106,6 +118,16 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
     reload();
   };
 
+  const saveExposure = async (designation: string, raw: string) => {
+    const trimmed = raw.trim();
+    if (trimmed === "") return;
+    const minutes = Math.round(Number(trimmed));
+    if (!Number.isFinite(minutes) || minutes < 0) return;
+    await api.updateSessionItem(designation, { exposureMin: minutes });
+    reload();
+    reloadStats();
+  };
+
   const submitItemNote = async (designation: string) => {
     const text = (itemNoteDraft[designation] ?? "").trim();
     if (!text) return;
@@ -130,6 +152,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
     try {
       await api.closeSession();
       reload();
+      reloadStats();
     } finally {
       setClosing(false);
     }
@@ -146,6 +169,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
     try {
       await api.reopenSession(closedAt);
       reload();
+      reloadStats();
     } catch (e) {
       setReopenError(e instanceof Error ? e.message : "Impossible de rouvrir cette sortie.");
     } finally {
@@ -159,6 +183,37 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
         <div className="nc-eyebrow">Journal de session</div>
         <div className="nc-title">{past.length} sortie(s) enregistree(s)</div>
       </div>
+
+      {stats && stats.totalOutings > 0 && (
+        <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          <div className="nc-eyebrow">Statistiques</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+            <StatCard label="Sorties" value={stats.totalOutings} sub={`${stats.successfulOutings} reussie(s)`} />
+            <StatCard
+              label="Score moyen"
+              value={stats.avgScoreSuccessful != null ? stats.avgScoreSuccessful : "n/d"}
+              sub="sorties reussies"
+            />
+            <StatCard label="Expo totale" value={fmtExposure(stats.totalExposureMin)} />
+            <StatCard
+              label="Ce mois"
+              value={stats.capturesByMonth.find((m) => m.month === new Date().toISOString().slice(0, 7))?.count ?? 0}
+              sub="cible(s) capturee(s)"
+            />
+          </div>
+          {stats.exposureByTarget.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="nc-caption" style={{ margin: 0 }}>Expo cumulee par cible</div>
+              {stats.exposureByTarget.slice(0, 6).map((e) => (
+                <div key={e.designation} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                  <span className="nc-mono">{e.designation}</span>
+                  <span className="nc-mono" style={{ color: "var(--ink2)" }}>{fmtExposure(e.totalMin)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
         <div className="nc-eyebrow">Ajouter a la session</div>
@@ -280,6 +335,25 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                     >
                       +
                     </button>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="nc-caption" style={{ margin: 0, flex: "none" }}>Expo (min)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={exposureDraft[item.designation] ?? item.exposureMin ?? ""}
+                      onChange={(e) => setExposureDraft((d) => ({ ...d, [item.designation]: e.target.value }))}
+                      onBlur={(e) => saveExposure(item.designation, e.target.value)}
+                      placeholder="0"
+                      style={{ ...inputStyle, flex: "none", width: 64 }}
+                    />
+                    {item.exposureMin != null && (
+                      <span className="nc-mono" style={{ fontSize: 11, color: "var(--ink3)" }}>
+                        {fmtExposure(item.exposureMin)} cette sortie
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}

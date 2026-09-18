@@ -13,6 +13,7 @@ export function Cibles({
   onOpenTarget: (designation: string) => void;
 }) {
   const [types, setTypes] = useState<string[]>([]);
+  const [maxMag, setMaxMag] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   const fetchTargets = useCallback(() => api.targets(types.length ? types : undefined), [types]);
@@ -24,19 +25,53 @@ export function Cibles({
     return [...seen].sort();
   }, [rows]);
 
+  // Bornes de magnitude derivees des cibles chargees (pas fixes) : la plage
+  // varie selon le catalogue (targets vs types selectionnes), donc le
+  // curseur doit toujours couvrir tout ce qui est effectivement affichable.
+  const magBounds = useMemo(() => {
+    const values = (rows ?? []).map((r) => r.mag).filter((m): m is number => m != null);
+    if (!values.length) return null;
+    return { min: Math.floor(Math.min(...values)), max: Math.ceil(Math.max(...values)) };
+  }, [rows]);
+
   const toggleType = (t: string) =>
     setTypes((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]));
 
-  const shown = showAll ? rows ?? [] : (rows ?? []).slice(0, PAGE_SIZE);
-  const rest = (rows?.length ?? 0) - shown.length;
+  // Filtre magnitude cote client : les cibles sont deja chargees (feasibles
+  // ce soir), pas besoin d'un aller-retour API pour affiner sur une colonne
+  // deja presente dans les lignes recues.
+  const filtered = useMemo(
+    () => (rows ?? []).filter((r) => maxMag == null || r.mag == null || r.mag <= maxMag),
+    [rows, maxMag],
+  );
+
+  const shown = showAll ? filtered : filtered.slice(0, PAGE_SIZE);
+  const rest = filtered.length - shown.length;
 
   return (
     <div className="nc-screen">
       <div>
         <div className="nc-eyebrow">Cibles faisables</div>
-        <div className="nc-title">{rows ? `${rows.length} cibles · nuit complete` : "Chargement..."}</div>
+        <div className="nc-title">{rows ? `${filtered.length} cibles · nuit complete` : "Chargement..."}</div>
         <div className="nc-sub">Triees par Messier manquants, puis cadrage simple, puis heures disponibles.</div>
       </div>
+
+      {magBounds && magBounds.max > magBounds.min && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="nc-caption" style={{ margin: 0, flex: "none" }}>
+            Magnitude max {(maxMag ?? magBounds.max).toFixed(1)}
+          </span>
+          <input
+            type="range"
+            min={magBounds.min}
+            max={magBounds.max}
+            step={0.5}
+            value={maxMag ?? magBounds.max}
+            onChange={(e) => setMaxMag(Number(e.target.value))}
+            style={{ flex: 1 }}
+          />
+        </div>
+      )}
 
       {allTypes.length > 0 && (
         <div style={{ display: "flex", gap: 7, overflow: "auto", margin: "0 -18px", padding: "0 18px 2px" }}>
@@ -72,6 +107,9 @@ export function Cibles({
       )}
       {rows && rows.length === 0 && (
         <p className="nc-caption">Aucune cible exploitable cette nuit (meteo, Lune ou horizon degage).</p>
+      )}
+      {rows && rows.length > 0 && filtered.length === 0 && (
+        <p className="nc-caption">Aucune cible ne correspond a ces filtres.</p>
       )}
     </div>
   );

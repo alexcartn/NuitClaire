@@ -31,6 +31,14 @@ d'infrastructure de notification) ; "Ma position" prend les coordonnees GPS sans
 inverse (pas de nom d'adresse) ; pas de PWA installable (pas de manifest/service worker) ;
 pas de suite de tests JS (verification faite via Playwright manuel).
 
+"Cibles" et "Catalogue Messier" ont un filtre magnitude (curseur) en plus du filtre par
+type -- calcule cote client sur les lignes deja chargees, pas d'appel API supplementaire.
+"Journal" permet de saisir un temps d'expo (minutes, un champ par cible et par sortie,
+facultatif -- jamais mesure ni estime par l'appli, voir l'en-tete de `sessions.py`) et
+affiche une section Statistiques (nombre de sorties, score moyen des sorties reussies,
+cibles capturees ce mois-ci, temps d'expo cumule par cible) calculee par `stats.py` a
+partir du journal existant, exposee via `GET /api/stats`.
+
     pip install -r api/requirements-api.txt
     uvicorn api.main:app --reload --port 8000        # depuis la racine du depot
 
@@ -91,7 +99,8 @@ Vercel separes sur le meme repo GitHub :
 - imagery.py            : vignettes de reference (hips2fits/CDS) a partir de RA/Dec
 - progress.py           : persistance (horizon configure, Messiers captures) -- fichier local ou Supabase
 - settings.py           : persistance (position, mode de fenetre, preferences d'alerte) -- fichier local ou Supabase
-- sessions.py            : persistance (journal de session : cibles cochees, historique) -- fichier local ou Supabase
+- sessions.py            : persistance (journal de session : cibles cochees, temps d'expo, historique) -- fichier local ou Supabase
+- stats.py               : statistiques agregees calculees a partir du journal (sessions.py) -- lecture seule, rien de fabrique
 - db.py                 : backend Supabase optionnel partage par les trois stores ci-dessus
 - supabase/schema.sql   : schema SQL de la table `app_state` (Supabase)
 - catalog.py             : chargement des catalogues (CSV generes)

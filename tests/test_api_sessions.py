@@ -187,3 +187,28 @@ def test_past_session_includes_timeline(api_client):
     assert len(entries) == 1
     assert entries[0]["text"] == "Belle nuit"
     assert entries[0]["target"] == "M13"
+
+
+def test_new_session_item_has_no_exposure(api_client):
+    r = api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    assert r.json()["current"]["items"][0]["exposureMin"] is None
+
+
+def test_update_item_sets_exposure(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    r = api_client.put("/api/sessions/current/items/M13", json={"exposureMin": 45})
+    assert r.status_code == 200
+    assert r.json()["current"]["items"][0]["exposureMin"] == 45
+
+
+def test_update_item_sets_exposure_and_done_together(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    r = api_client.put("/api/sessions/current/items/M13", json={"done": True, "exposureMin": 20})
+    item = r.json()["current"]["items"][0]
+    assert item["done"] is True
+    assert item["exposureMin"] == 20
+
+
+def test_update_unknown_item_exposure_returns_404(api_client):
+    r = api_client.put("/api/sessions/current/items/M13", json={"exposureMin": 10})
+    assert r.status_code == 404

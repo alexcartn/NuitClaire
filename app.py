@@ -24,6 +24,7 @@ from components import TWILIGHT_BAR_CSS, CARD_CSS, twilight_bar_html, card_html
 from rows import common_row_fields, row_from_search, day_frame, filter_label, subtitle_with_ngc
 import progress as progress_store
 import sessions as sessions_store
+import stats as stats_store
 
 st.set_page_config(page_title="NuitClaire", page_icon="\U0001F52D", layout="wide")
 
@@ -703,6 +704,11 @@ with tab_ce_soir:
         if chosen_types:
             rows = [r for r in rows if r["Type"] in chosen_types]
 
+        mags = [r["Mag"] for r in rows if r.get("Mag") is not None]
+        if mags and max(mags) > min(mags):
+            max_mag = st.slider("Magnitude max", float(min(mags)), float(max(mags)), float(max(mags)), 0.5)
+            rows = [r for r in rows if r.get("Mag") is None or r["Mag"] <= max_mag]
+
         shown, rest = rows[:GALLERY_PAGE_SIZE], rows[GALLERY_PAGE_SIZE:]
         _target_grid(shown, df, site, prog["horizon"], "soir", GALLERY_COLS,
                      card=lambda r: card_html(**_target_card(r)))
@@ -734,6 +740,18 @@ with tab_messier:
     if only_feasible:
         rows = [r for r in rows if r["Faisable ce soir"] == "Oui"]
 
+    messier_types = sorted({r["Type"] for r in rows if r["Type"]})
+    chosen_messier_types = st.pills("Filtrer par type", messier_types, selection_mode="multi",
+                                     key="messier_type_pills")
+    if chosen_messier_types:
+        rows = [r for r in rows if r["Type"] in chosen_messier_types]
+
+    messier_mags = [r["Mag"] for r in rows if r.get("Mag") is not None]
+    if messier_mags and max(messier_mags) > min(messier_mags):
+        max_messier_mag = st.slider("Magnitude max", float(min(messier_mags)), float(max(messier_mags)),
+                                     float(max(messier_mags)), 0.5, key="messier_mag_slider")
+        rows = [r for r in rows if r.get("Mag") is None or r["Mag"] <= max_messier_mag]
+
     def _messier_extra(row: dict) -> None:
         new_val = st.checkbox("Capturee", value=row["Capture"], key=f"cap_{row['id']}")
         if new_val != row["Capture"]:
@@ -755,6 +773,29 @@ with tab_journal:
     # la note-resume d'une sortie cloturee ou de la rouvrir par erreur.
     st.header("Journal de session")
     st.caption(f"{len(sess['past'])} sortie(s) enregistree(s)")
+
+    journal_stats = stats_store.compute(sess)
+    if journal_stats["totalOutings"] > 0:
+        with st.expander("Statistiques", expanded=False):
+            sc1, sc2, sc3, sc4 = st.columns(4)
+            sc1.metric("Sorties", journal_stats["totalOutings"], help="dont "
+                       f"{journal_stats['successfulOutings']} reussie(s) (au moins une cible capturee)")
+            sc2.metric("Score moyen (reussies)",
+                       journal_stats["avgScoreSuccessful"] if journal_stats["avgScoreSuccessful"] is not None
+                       else "n/d")
+            total_h, total_m = divmod(journal_stats["totalExposureMin"], 60)
+            sc3.metric("Expo totale", f"{total_h} h {total_m:02d}" if total_h else f"{total_m} min")
+            this_month = date.today().isoformat()[:7]
+            captures_this_month = next((m["count"] for m in journal_stats["capturesByMonth"]
+                                         if m["month"] == this_month), 0)
+            sc4.metric("Captures ce mois", captures_this_month)
+
+            if journal_stats["exposureByTarget"]:
+                st.caption("Expo cumulee par cible")
+                for entry in journal_stats["exposureByTarget"][:10]:
+                    h, m = divmod(entry["totalMin"], 60)
+                    txt = f"{h} h {m:02d}" if h else f"{m} min"
+                    st.markdown(f"**{entry['designation']}** &nbsp;·&nbsp; {txt}")
 
     st.subheader("Ajouter a la session")
     with st.form("journal_add_target_form", clear_on_submit=True):
@@ -823,6 +864,15 @@ with tab_journal:
                         note_submitted = st.form_submit_button("+", use_container_width=True)
                 if note_submitted and new_note_text.strip():
                     sessions_store.add_item_note(sess, designation, new_note_text.strip(), local_now(site))
+                    sessions_store.save(sess)
+                    st.rerun()
+
+                new_exposure = st.number_input(
+                    "Temps d'expo (min)", min_value=0, step=5, value=item.get("exposureMin") or 0,
+                    key=f"j_expo_{designation}",
+                )
+                if new_exposure != (item.get("exposureMin") or 0):
+                    sessions_store.set_item_exposure(sess, designation, new_exposure or None)
                     sessions_store.save(sess)
                     st.rerun()
 

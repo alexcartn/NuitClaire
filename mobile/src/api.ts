@@ -5,6 +5,7 @@ import type {
   Sessions,
   Settings,
   SettingsUpdate,
+  Stats,
   TargetDetail,
   TargetRow,
 } from "./types";
@@ -59,7 +60,7 @@ export const api = {
   sessions: () => get<Sessions>("/api/sessions"),
   addSessionItem: (designation: string) =>
     request<Sessions>("POST", "/api/sessions/current/items", { body: { designation } }),
-  updateSessionItem: (designation: string, update: { done?: boolean }) =>
+  updateSessionItem: (designation: string, update: { done?: boolean; exposureMin?: number }) =>
     request<Sessions>("PUT", `/api/sessions/current/items/${encodeURIComponent(designation)}`, {
       body: update,
     }),
@@ -83,4 +84,6 @@ export const api = {
     request<Sessions>("PUT", `/api/sessions/past/${encodeURIComponent(closedAt)}`, { body: { note } }),
   reopenSession: (closedAt: string) =>
     request<Sessions>("POST", `/api/sessions/past/${encodeURIComponent(closedAt)}/reopen`),
+
+  stats: () => get<Stats>("/api/stats"),
 };

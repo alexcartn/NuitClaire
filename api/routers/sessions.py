@@ -39,6 +39,8 @@ def update_session_item(designation: str, body: UpdateSessionItem) -> dict:
             raise HTTPException(404, f"« {designation} » n'est pas dans la session en cours.")
         if body.done is not None and body.done != data["current"]["items"][designation]["done"]:
             sessions_store.toggle_item(data, designation)
+        if body.exposureMin is not None:
+            sessions_store.set_item_exposure(data, designation, body.exposureMin)
         sessions_store.save(data)
         return sessions_to_out(data)
 

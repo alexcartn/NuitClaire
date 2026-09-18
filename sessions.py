@@ -9,11 +9,14 @@ croissance differents, deux fichiers.
 Aucune donnee fabriquee : contrairement au mockup de design (qui affichait
 un exemple du type "28 min - 84 poses retenues"), rien ici n'est mesure --
 le Seestar n'est pas integre a cette appli. Chaque entree ne contient que ce
-que l'utilisateur a explicitement saisi (des notes libres) ou ce que l'appli
-sait reellement (l'heure d'ajout, le score de la nuit au moment de l'ouverture
-de la session). Ne jamais reformater une note en un format qui ressemblerait
-a des statistiques d'exposition -- ce serait remettre la donnee fabriquee du
-mockup par la petite porte.
+que l'utilisateur a explicitement saisi (des notes libres, un temps d'expo
+en minutes) ou ce que l'appli sait reellement (l'heure d'ajout, le score de
+la nuit au moment de l'ouverture de la session). Le temps d'expo
+(`exposureMin`, voir `set_item_exposure`) suit la meme regle : un champ que
+l'utilisateur remplit lui-meme apres coup, jamais une valeur calculee ou
+estimee par l'appli. Ne jamais reformater une note en un format qui
+ressemblerait a des statistiques d'exposition -- ce serait remettre la
+donnee fabriquee du mockup par la petite porte.
 
 Le score de la nuit est capture une seule fois, a l'ouverture de la session
 (premiere cible ou premiere note libre ajoutee) et reutilise tel quel a la
@@ -62,14 +65,16 @@ def _is_active(cur: dict) -> bool:
 
 def _migrate_item(item: dict) -> dict:
     """Convertit une cible sauvegardee avant l'introduction des notes
-    multiples (`note`: str unique) vers la forme actuelle (`notes`: liste
-    horodatee) -- sans quoi charger un vieux sessions.json ferait planter
+    multiples (`note`: str unique) ou du temps d'expo (`exposureMin`) vers la
+    forme actuelle -- sans quoi charger un vieux sessions.json ferait planter
     l'appli sur des donnees qu'elle a elle-meme ecrites."""
     if "notes" in item:
+        item.setdefault("exposureMin", None)
         return item
     legacy_note = item.get("note", "")
     notes = [_new_note(legacy_note, datetime.fromisoformat(item["addedAt"]))] if legacy_note else []
-    return {"addedAt": item["addedAt"], "done": bool(item.get("done", False)), "notes": notes}
+    return {"addedAt": item["addedAt"], "done": bool(item.get("done", False)), "notes": notes,
+            "exposureMin": None}
 
 
 def load(path: Path = SESSIONS_PATH) -> dict:
@@ -133,7 +138,8 @@ def add_item(data: dict, designation: str, now: datetime, score_now: int | None)
     if not _is_active(cur):
         cur["openedAt"] = now.isoformat()
         cur["scoreAtOpen"] = score_now
-    cur["items"].setdefault(designation, {"addedAt": now.isoformat(), "done": False, "notes": []})
+    cur["items"].setdefault(designation, {"addedAt": now.isoformat(), "done": False, "notes": [],
+                                           "exposureMin": None})
     return data
 
 
@@ -154,6 +160,34 @@ def toggle_item(data: dict, designation: str) -> dict:
     if item is not None:
         item["done"] = not item["done"]
     return data
+
+
+def set_item_exposure(data: dict, designation: str, minutes: int | None) -> dict:
+    """Fixe le temps d'expo (minutes) d'une cible de la session en cours --
+    un seul champ par cible et par sortie (pas d'historique d'increments,
+    contrairement aux notes) : la valeur saisie remplace la precedente. Comme
+    pour les notes, c'est l'utilisateur qui saisit cette valeur -- l'appli ne
+    mesure rien (voir l'en-tete du module)."""
+    item = data["current"]["items"].get(designation)
+    if item is None:
+        raise ValueError(f"« {designation} » n'est pas dans la session en cours.")
+    item["exposureMin"] = minutes
+    return data
+
+
+def exposure_totals(data: dict) -> dict[str, int]:
+    """Minutes d'expo cumulees par designation, sur la session en cours et
+    tout l'historique -- seule agregation qui a du sens ici : une meme cible
+    peut etre pointee sur plusieurs sorties, le temps d'integration s'ajoute
+    d'une nuit a l'autre. Ignore les cibles sans valeur saisie."""
+    totals: dict[str, int] = {}
+    entries = [data["current"]["items"], *(p.get("items", {}) for p in data["past"])]
+    for items in entries:
+        for designation, item in items.items():
+            minutes = item.get("exposureMin")
+            if minutes:
+                totals[designation] = totals.get(designation, 0) + minutes
+    return totals
 
 
 def add_item_note(data: dict, designation: str, text: str, now: datetime) -> dict:
@@ -270,7 +304,8 @@ def reopen_session(data: dict, closed_at: str) -> dict:
     entry = data["past"].pop(idx)
     items = entry.get("items")
     if not items:
-        items = {t: {"addedAt": entry["closedAt"], "done": False, "notes": []} for t in entry["targets"]}
+        items = {t: {"addedAt": entry["closedAt"], "done": False, "notes": [], "exposureMin": None}
+                 for t in entry["targets"]}
     else:
         items = {k: _migrate_item(dict(v)) for k, v in items.items()}
     data["current"] = {
