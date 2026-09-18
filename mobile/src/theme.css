@@ -179,15 +179,14 @@ a {
   color: var(--ink);
 }
 
-.nc-tab-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 4px;
-  background: var(--bar);
+.nc-tab-icon {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink3);
 }
 
-.nc-tab-active .nc-tab-dot {
-  background: var(--accent);
+.nc-tab-active .nc-tab-icon {
+  color: var(--accent);
 }
 
 .nc-tab-label {
