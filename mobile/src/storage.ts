@@ -42,3 +42,19 @@ export function writeText(key: string, value: string | null): void {
     /* idem */
   }
 }
+
+/** Prefixe des reponses gardees sur l'appareil par `useFetch` (voir son
+ * `cacheKey`). Regroupe ici plutot que dans useFetch pour que du code sans
+ * React puisse relire ces donnees : le journal y lit la prevision de la nuit
+ * pour dater ses notes, jusque dans ses tests qui tournent sous Node. */
+export const CACHE_PREFIX = "nc-cache:";
+
+export interface Cached<T> {
+  at: string;
+  data: T;
+}
+
+/** Derniere reponse gardee pour cette cle, sans requete. */
+export function readCache<T>(cacheKey: string): T | null {
+  return readJson<Cached<T>>(CACHE_PREFIX + cacheKey)?.data ?? null;
+}

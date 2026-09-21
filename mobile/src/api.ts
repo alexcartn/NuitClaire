@@ -1,8 +1,10 @@
 import type {
   AppState,
+  Feeling,
   ExposureEntry,
   GeocodeResult,
   Night,
+  NoteContext,
   Sessions,
   Settings,
   SettingsUpdate,
@@ -77,25 +79,33 @@ export const api = {
     get<TargetDetail>(`/api/targets/${encodeURIComponent(designation)}`),
 
   sessions: () => get<Sessions>("/api/sessions"),
-  addSessionItem: (designation: string) =>
-    request<Sessions>("POST", "/api/sessions/current/items", { body: { designation } }),
-  updateSessionItem: (designation: string, update: { done?: boolean; exposureMin?: number }) =>
+  // `at` : l'heure de saisie cote client. Une saisie faite hors ligne part
+  // quand le reseau revient, parfois des heures plus tard -- sans elle,
+  // l'entree porterait l'heure de la synchronisation (voir sessionQueue.ts).
+  addSessionItem: (designation: string, at?: string) =>
+    request<Sessions>("POST", "/api/sessions/current/items", { body: { designation, at } }),
+  updateSessionItem: (
+    designation: string,
+    update: { done?: boolean; exposureMin?: number; rating?: number | null },
+  ) =>
     request<Sessions>("PUT", `/api/sessions/current/items/${encodeURIComponent(designation)}`, {
       body: update,
     }),
   deleteSessionItem: (designation: string) =>
     request<Sessions>("DELETE", `/api/sessions/current/items/${encodeURIComponent(designation)}`),
-  addItemNote: (designation: string, text: string) =>
+  addItemNote: (designation: string, text: string, at?: string, context?: NoteContext | null) =>
     request<Sessions>("POST", `/api/sessions/current/items/${encodeURIComponent(designation)}/notes`, {
-      body: { text },
+      body: { text, at, context },
     }),
   deleteItemNote: (designation: string, noteId: string) =>
     request<Sessions>(
       "DELETE",
       `/api/sessions/current/items/${encodeURIComponent(designation)}/notes/${encodeURIComponent(noteId)}`,
     ),
-  addFreeNote: (text: string) =>
-    request<Sessions>("POST", "/api/sessions/current/notes", { body: { text } }),
+  addFreeNote: (text: string, at?: string, context?: NoteContext | null) =>
+    request<Sessions>("POST", "/api/sessions/current/notes", { body: { text, at, context } }),
+  updateFeeling: (patch: Partial<Feeling>) =>
+    request<Sessions>("PUT", "/api/sessions/current/feeling", { body: patch }),
   deleteFreeNote: (noteId: string) =>
     request<Sessions>("DELETE", `/api/sessions/current/notes/${encodeURIComponent(noteId)}`),
   closeSession: () => request<Sessions>("POST", "/api/sessions/current/close"),

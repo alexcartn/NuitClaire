@@ -33,6 +33,9 @@ export interface HourlyPoint {
   windGustsKmh: number | null;
   temperatureC: number | null;
   dewPointC: number | null;
+  /** 1 (excellent) a 8 (mauvais), null quand 7Timer est indisponible. */
+  seeing: number | null;
+  transparency: number | null;
 }
 
 export interface CloudTrend {
@@ -158,10 +161,24 @@ export interface GeocodeResult {
   displayName: string;
 }
 
+/** Conditions annoncees a l'heure ou la note a ete ecrite : relevees dans la
+ * prevision de la nuit deja chargee (voir nightContext.ts), donc disponibles
+ * hors ligne. Ce n'est pas une mesure, c'est ce que l'appli affichait a ce
+ * moment-la. */
+export interface NoteContext {
+  temperatureC: number | null;
+  cloudCoverPct: number | null;
+  seeing: number | null;
+  transparency: number | null;
+  score: number | null;
+  moonIllum: number | null;
+}
+
 export interface Note {
   id: string;
   text: string;
   at: string;
+  context: NoteContext | null;
 }
 
 export interface TimelineEntry {
@@ -169,6 +186,7 @@ export interface TimelineEntry {
   at: string;
   text: string;
   target: string | null;
+  context: NoteContext | null;
 }
 
 export interface SessionItem {
@@ -177,6 +195,18 @@ export interface SessionItem {
   done: boolean;
   notes: Note[];
   exposureMin: number | null;
+  /** Satisfaction sur cette cible, 1 a 5, ou null tant que rien n'est saisi. */
+  rating: number | null;
+}
+
+/** Ressenti d'une sortie : saisie pure, l'appli ne le deduit de rien.
+ * `skyQuality` est la qualite de ciel percue, volontairement distincte du
+ * score calcule -- c'est l'ecart entre les deux qui interesse. */
+export interface Feeling {
+  rating: number | null;
+  skyQuality: number | null;
+  highlight: string;
+  nextTime: string;
 }
 
 export interface CurrentSession {
@@ -185,6 +215,7 @@ export interface CurrentSession {
   items: SessionItem[];
   freeNotes: Note[];
   timeline: TimelineEntry[];
+  feeling: Feeling;
 }
 
 export interface PastSession {
@@ -194,6 +225,7 @@ export interface PastSession {
   note: string;
   closedAt: string;
   timeline: TimelineEntry[];
+  feeling: Feeling;
 }
 
 export interface Sessions {
@@ -217,6 +249,8 @@ export interface Stats {
   capturesByMonth: MonthCount[];
   successfulOutings: number;
   avgScoreSuccessful: number | null;
+  avgRating: number | null;
+  ratedOutings: number;
   exposureByTarget: TargetExposure[];
   totalExposureMin: number;
 }

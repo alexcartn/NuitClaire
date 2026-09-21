@@ -5,15 +5,36 @@ POST/DELETE /api/sessions/current/notes[/{note_id}] (notes libres),
 POST /api/sessions/current/close,
 PUT /api/sessions/past/{closed_at}, POST /api/sessions/past/{closed_at}/reopen
 -- journal de session (voir sessions.py)."""
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 
 import sessions as sessions_store
 from api.deps import current_night, current_score_pct, get_site, sessions_write_lock
-from api.schemas import AddNote, AddSessionItem, SessionsOut, UpdatePastSession, UpdateSessionItem
+from api.schemas import AddNote, AddSessionItem, SessionsOut, UpdateFeeling, UpdatePastSession, \
+    UpdateSessionItem
 from api.translate import sessions_to_out
 from astro import local_now
 
 router = APIRouter()
+
+
+def _written_at(at: str | None, site: dict) -> datetime:
+    """Heure a retenir pour une saisie : celle du client quand il la fournit,
+    sinon celle du serveur.
+
+    Une saisie faite hors ligne part quand le reseau revient, parfois des
+    heures plus tard : l'horodater a la reception collerait a une note ecrite
+    a 22h40 l'heure de la synchronisation, et le fil de la nuit se
+    retrouverait dans le desordre. Une date illisible retombe sur l'heure du
+    serveur plutot que de faire echouer la saisie -- perdre une note vaut
+    bien pire qu'une minute d'ecart."""
+    if at:
+        try:
+            return datetime.fromisoformat(at)
+        except ValueError:
+            pass
+    return local_now(site)
 
 
 @router.get("/api/sessions", response_model=SessionsOut)
@@ -26,7 +47,8 @@ def add_session_item(body: AddSessionItem) -> dict:
     site = get_site()
     with sessions_write_lock:
         data = sessions_store.load()
-        sessions_store.add_item(data, body.designation, local_now(site), current_score_pct(site))
+        sessions_store.add_item(data, body.designation, _written_at(body.at, site),
+                                 current_score_pct(site))
         sessions_store.save(data)
         return sessions_to_out(data)
 
@@ -41,6 +63,8 @@ def update_session_item(designation: str, body: UpdateSessionItem) -> dict:
             sessions_store.toggle_item(data, designation)
         if body.exposureMin is not None:
             sessions_store.set_item_exposure(data, designation, body.exposureMin)
+        if "rating" in body.model_fields_set:
+            sessions_store.set_item_rating(data, designation, body.rating)
         sessions_store.save(data)
         return sessions_to_out(data)
 
@@ -60,7 +84,8 @@ def add_session_item_note(designation: str, body: AddNote) -> dict:
     with sessions_write_lock:
         data = sessions_store.load()
         try:
-            sessions_store.add_item_note(data, designation, body.text, local_now(site))
+            sessions_store.add_item_note(data, designation, body.text, _written_at(body.at, site),
+                                          body.context.model_dump() if body.context else None)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
         sessions_store.save(data)
@@ -84,7 +109,9 @@ def add_session_free_note(body: AddNote) -> dict:
     site = get_site()
     with sessions_write_lock:
         data = sessions_store.load()
-        sessions_store.add_free_note(data, body.text, local_now(site), current_score_pct(site))
+        sessions_store.add_free_note(data, body.text, _written_at(body.at, site),
+                                      current_score_pct(site),
+                                      body.context.model_dump() if body.context else None)
         sessions_store.save(data)
         return sessions_to_out(data)
 
@@ -94,6 +121,22 @@ def delete_session_free_note(note_id: str) -> dict:
     with sessions_write_lock:
         data = sessions_store.load()
         sessions_store.remove_free_note(data, note_id)
+        sessions_store.save(data)
+        return sessions_to_out(data)
+
+
+@router.put("/api/sessions/current/feeling", response_model=SessionsOut)
+def update_feeling(body: UpdateFeeling) -> dict:
+    """Ressenti de la sortie en cours. Seuls les champs presents dans la
+    requete sont modifies (`model_fields_set`) : deux saisies successives sur
+    des champs differents ne s'effacent pas l'une l'autre."""
+    patch = {k: getattr(body, k) for k in body.model_fields_set}
+    with sessions_write_lock:
+        data = sessions_store.load()
+        try:
+            sessions_store.set_feeling(data, patch)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
         sessions_store.save(data)
         return sessions_to_out(data)
 

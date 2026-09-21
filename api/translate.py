@@ -21,7 +21,8 @@ def sessions_to_out(data: dict) -> dict:
     past = [{**entry, "timeline": sessions_store.timeline(entry)} for entry in data["past"]]
     return {
         "current": {"openedAt": cur["openedAt"], "scoreAtOpen": cur["scoreAtOpen"], "items": items,
-                    "freeNotes": cur["freeNotes"], "timeline": sessions_store.timeline(cur)},
+                    "freeNotes": cur["freeNotes"], "timeline": sessions_store.timeline(cur),
+                    "feeling": cur["feeling"]},
         "past": past,
     }
 

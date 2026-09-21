@@ -87,6 +87,11 @@ class HourlyPoint(BaseModel):
     windGustsKmh: float | None
     temperatureC: float | None
     dewPointC: float | None
+    # 1 (excellent) a 8 (mauvais), None quand 7Timer est indisponible. Exposes
+    # pour que le journal puisse conserver, avec chaque note, ce que la
+    # prevision annoncait a cette heure-la (voir l'en-tete de sessions.py).
+    seeing: float | None = None
+    transparency: float | None = None
 
 
 class CloudTrendOut(BaseModel):
@@ -178,10 +183,24 @@ class TargetDetailOut(TargetRowOut):
     exposureTotalMin: int
 
 
+class NoteContext(BaseModel):
+    """Conditions annoncees a l'heure d'ecriture d'une note. Releve par le
+    client dans la prevision de la nuit deja chargee -- donc disponible hors
+    ligne -- et conserve tel quel : ce n'est pas une mesure, c'est ce que
+    l'appli affichait a ce moment-la (voir l'en-tete de sessions.py)."""
+    temperatureC: float | None = None
+    cloudCoverPct: float | None = None
+    seeing: float | None = None
+    transparency: float | None = None
+    score: float | None = None
+    moonIllum: float | None = None
+
+
 class NoteOut(BaseModel):
     id: str
     text: str
     at: str
+    context: NoteContext | None = None
 
 
 class TimelineEntryOut(BaseModel):
@@ -189,6 +208,7 @@ class TimelineEntryOut(BaseModel):
     at: str
     text: str
     target: str | None
+    context: NoteContext | None = None
 
 
 class SessionItemOut(BaseModel):
@@ -197,6 +217,14 @@ class SessionItemOut(BaseModel):
     done: bool
     notes: list[NoteOut]
     exposureMin: int | None = None
+    rating: int | None = None
+
+
+class FeelingOut(BaseModel):
+    rating: int | None = None
+    skyQuality: int | None = None
+    highlight: str = ""
+    nextTime: str = ""
 
 
 class CurrentSessionOut(BaseModel):
@@ -205,6 +233,7 @@ class CurrentSessionOut(BaseModel):
     items: list[SessionItemOut]
     freeNotes: list[NoteOut]
     timeline: list[TimelineEntryOut]
+    feeling: FeelingOut
 
 
 class PastSessionOut(BaseModel):
@@ -214,6 +243,7 @@ class PastSessionOut(BaseModel):
     note: str
     closedAt: str
     timeline: list[TimelineEntryOut]
+    feeling: FeelingOut
 
 
 class SessionsOut(BaseModel):
@@ -223,15 +253,31 @@ class SessionsOut(BaseModel):
 
 class AddSessionItem(BaseModel):
     designation: str
+    # Heure de saisie cote client. Une saisie faite hors ligne part quand le
+    # reseau revient : sans elle, l'entree porterait l'heure de la
+    # synchronisation, pas celle du geste (voir les routes de sessions).
+    at: str | None = None
 
 
 class UpdateSessionItem(BaseModel):
     done: bool | None = None
     exposureMin: int | None = None
+    rating: int | None = Field(default=None, ge=1, le=5)
+
+
+class UpdateFeeling(BaseModel):
+    """Champs fournis seulement : un champ absent n'est pas modifie, un champ
+    a null est efface."""
+    rating: int | None = Field(default=None, ge=1, le=5)
+    skyQuality: int | None = Field(default=None, ge=1, le=5)
+    highlight: str | None = None
+    nextTime: str | None = None
 
 
 class AddNote(BaseModel):
     text: str
+    at: str | None = None
+    context: NoteContext | None = None
 
 
 class UpdatePastSession(BaseModel):
@@ -250,6 +296,8 @@ class TargetExposureOut(BaseModel):
 
 class StatsOut(BaseModel):
     totalOutings: int
+    avgRating: float | None = None
+    ratedOutings: int = 0
     outingsByMonth: list[MonthCountOut]
     capturesByMonth: list[MonthCountOut]
     successfulOutings: int

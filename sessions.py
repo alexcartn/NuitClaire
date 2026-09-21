@@ -18,6 +18,22 @@ estimee par l'appli. Ne jamais reformater une note en un format qui
 ressemblerait a des statistiques d'exposition -- ce serait remettre la
 donnee fabriquee du mockup par la petite porte.
 
+Deux champs s'ajoutent a ce que l'utilisateur tape. Le `context` d'une note
+(temperature, nuages, seeing, transparence, score horaire, Lune) n'est pas
+une mesure : c'est ce que la prevision de l'appli annoncait a l'heure ou la
+note a ete ecrite, releve par le client au moment de la saisie -- y compris
+hors ligne, ou il le lit dans la prevision de la nuit deja telechargee.
+Rien n'est donc fabrique : la valeur existait deja, elle est seulement
+conservee au lieu d'etre jetee. Elle est stockee telle quelle, jamais
+recalculee a la reception : une note ecrite a 22h40 et synchronisee a 1h du
+matin doit garder les conditions de 22h40.
+
+Le `feeling` d'une sortie (satisfaction, qualite de ciel percue, ce qu'on
+retient, ce qu'on referait autrement) et la note de satisfaction par cible
+(`rating`) sont, eux, de la saisie pure : l'appli ne les deduit de rien.
+La qualite de ciel percue est volontairement distincte du score calcule --
+c'est l'ecart entre les deux qui interesse, pas leur accord.
+
 Le score de la nuit est capture une seule fois, a l'ouverture de la session
 (premiere cible ou premiere note libre ajoutee) et reutilise tel quel a la
 cloture -- jamais re-interroge en direct a ce moment-la : c'est une
@@ -36,15 +52,25 @@ SESSIONS_PATH = Path(__file__).parent / "data" / "sessions.json"
 
 _DEFAULT_FROZEN = MappingProxyType({
     "current": MappingProxyType({"openedAt": None, "scoreAtOpen": None,
-                                  "items": MappingProxyType({}), "freeNotes": ()}),
+                                  "items": MappingProxyType({}), "freeNotes": (),
+                                  "feeling": MappingProxyType({})}),
     "past": (),
 })
+
+
+def default_feeling() -> dict:
+    """Ressenti d'une sortie, vierge. `rating` (satisfaction) et `skyQuality`
+    (qualite de ciel percue) valent 1 a 5, ou None tant que rien n'est
+    saisi ; `highlight` et `nextTime` sont les deux champs libres de fin de
+    nuit."""
+    return {"rating": None, "skyQuality": None, "highlight": "", "nextTime": ""}
 
 
 def default() -> dict:
     """Retourne une copie fraiche et independante des valeurs par defaut."""
     return {
-        "current": {"openedAt": None, "scoreAtOpen": None, "items": {}, "freeNotes": []},
+        "current": {"openedAt": None, "scoreAtOpen": None, "items": {}, "freeNotes": [],
+                    "feeling": default_feeling()},
         "past": [],
     }
 
@@ -52,8 +78,16 @@ def default() -> dict:
 DEFAULT = default()
 
 
-def _new_note(text: str, at: datetime) -> dict:
-    return {"id": uuid4().hex, "text": text, "at": at.isoformat()}
+def _new_note(text: str, at: datetime, context: dict | None = None) -> dict:
+    return {"id": uuid4().hex, "text": text, "at": at.isoformat(), "context": context}
+
+
+def _migrate_note(note: dict) -> dict:
+    """Une note ecrite avant l'introduction du contexte n'en a pas : le champ
+    existe alors avec la valeur None, jamais reconstitue apres coup -- on ne
+    sait plus quel temps il faisait, et l'inventer serait fabriquer."""
+    note.setdefault("context", None)
+    return note
 
 
 def _is_active(cur: dict) -> bool:
@@ -63,6 +97,17 @@ def _is_active(cur: dict) -> bool:
     return bool(cur["items"] or cur["freeNotes"])
 
 
+def _close_if_empty(cur: dict) -> None:
+    """Une session vidée de sa derniere entree redevient une session non
+    ouverte : ni heure d'ouverture, ni score, ni ressenti. Sans remise a zero
+    du ressenti, une note de satisfaction saisie puis annulee se retrouverait
+    collee a la sortie suivante."""
+    if not _is_active(cur):
+        cur["openedAt"] = None
+        cur["scoreAtOpen"] = None
+        cur["feeling"] = default_feeling()
+
+
 def _migrate_item(item: dict) -> dict:
     """Convertit une cible sauvegardee avant l'introduction des notes
     multiples (`note`: str unique) ou du temps d'expo (`exposureMin`) vers la
@@ -70,11 +115,13 @@ def _migrate_item(item: dict) -> dict:
     l'appli sur des donnees qu'elle a elle-meme ecrites."""
     if "notes" in item:
         item.setdefault("exposureMin", None)
+        item.setdefault("rating", None)
+        item["notes"] = [_migrate_note(n) for n in item["notes"]]
         return item
     legacy_note = item.get("note", "")
     notes = [_new_note(legacy_note, datetime.fromisoformat(item["addedAt"]))] if legacy_note else []
     return {"addedAt": item["addedAt"], "done": bool(item.get("done", False)), "notes": notes,
-            "exposureMin": None}
+            "exposureMin": None, "rating": None}
 
 
 def load(path: Path = SESSIONS_PATH) -> dict:
@@ -93,13 +140,19 @@ def load(path: Path = SESSIONS_PATH) -> dict:
             merged["current"]["items"] = {}
         if not isinstance(merged["current"].get("freeNotes"), list):
             merged["current"]["freeNotes"] = []
+        if not isinstance(merged["current"].get("feeling"), dict):
+            merged["current"]["feeling"] = default_feeling()
     merged["current"]["items"] = {k: _migrate_item(v) for k, v in merged["current"]["items"].items()}
+    merged["current"]["freeNotes"] = [_migrate_note(n) for n in merged["current"]["freeNotes"]]
+    merged["current"]["feeling"] = {**default_feeling(), **merged["current"]["feeling"]}
 
     past_override = raw.get("past")
     if isinstance(past_override, list):
         merged["past"] = past_override
         for entry in merged["past"]:
             entry.setdefault("freeNotes", [])
+            entry["freeNotes"] = [_migrate_note(n) for n in entry["freeNotes"]]
+            entry["feeling"] = {**default_feeling(), **(entry.get("feeling") or {})}
             if entry.get("items"):
                 entry["items"] = {k: _migrate_item(v) for k, v in entry["items"].items()}
     return merged
@@ -139,7 +192,7 @@ def add_item(data: dict, designation: str, now: datetime, score_now: int | None)
         cur["openedAt"] = now.isoformat()
         cur["scoreAtOpen"] = score_now
     cur["items"].setdefault(designation, {"addedAt": now.isoformat(), "done": False, "notes": [],
-                                           "exposureMin": None})
+                                           "exposureMin": None, "rating": None})
     return data
 
 
@@ -149,9 +202,7 @@ def remove_item(data: dict, designation: str) -> dict:
     cible ni note libre)."""
     cur = data["current"]
     cur["items"].pop(designation, None)
-    if not _is_active(cur):
-        cur["openedAt"] = None
-        cur["scoreAtOpen"] = None
+    _close_if_empty(cur)
     return data
 
 
@@ -190,14 +241,17 @@ def exposure_totals(data: dict) -> dict[str, int]:
     return totals
 
 
-def add_item_note(data: dict, designation: str, text: str, now: datetime) -> dict:
+def add_item_note(data: dict, designation: str, text: str, now: datetime,
+                   context: dict | None = None) -> dict:
     """Ajoute une note horodatee a une cible deja dans la session en cours --
     plusieurs notes possibles par cible (ex. une remarque a 22h, une autre
-    apres un changement de filtre a 23h30), jamais d'ecrasement."""
+    apres un changement de filtre a 23h30), jamais d'ecrasement. `context`
+    est ce que la prevision annoncait a `now` (voir l'en-tete du module),
+    conserve tel quel."""
     item = data["current"]["items"].get(designation)
     if item is None:
         raise ValueError(f"« {designation} » n'est pas dans la session en cours.")
-    item["notes"].append(_new_note(text, now))
+    item["notes"].append(_new_note(text, now, context))
     return data
 
 
@@ -209,7 +263,8 @@ def remove_item_note(data: dict, designation: str, note_id: str) -> dict:
     return data
 
 
-def add_free_note(data: dict, text: str, now: datetime, score_now: int | None) -> dict:
+def add_free_note(data: dict, text: str, now: datetime, score_now: int | None,
+                   context: dict | None = None) -> dict:
     """Ajoute une note libre (sans cible associee) a la session en cours --
     l'ouvre si c'est la toute premiere entree de la nuit, meme regle que
     `add_item` (une note libre a 21h avant la premiere cible pointee compte
@@ -218,16 +273,53 @@ def add_free_note(data: dict, text: str, now: datetime, score_now: int | None) -
     if not _is_active(cur):
         cur["openedAt"] = now.isoformat()
         cur["scoreAtOpen"] = score_now
-    cur["freeNotes"].append(_new_note(text, now))
+    cur["freeNotes"].append(_new_note(text, now, context))
     return data
 
 
 def remove_free_note(data: dict, note_id: str) -> dict:
     cur = data["current"]
     cur["freeNotes"] = [n for n in cur["freeNotes"] if n["id"] != note_id]
+    _close_if_empty(cur)
+    return data
+
+
+RATING_RANGE = (1, 5)
+
+
+def _check_rating(value: int | None, field: str) -> None:
+    lo, hi = RATING_RANGE
+    if value is not None and not (isinstance(value, int) and lo <= value <= hi):
+        raise ValueError(f"{field} doit etre compris entre {lo} et {hi}, ou absent.")
+
+
+def set_item_rating(data: dict, designation: str, rating: int | None) -> dict:
+    """Note de satisfaction d'une cible sur cette sortie (1 a 5, ou None pour
+    effacer). Saisie pure : l'appli ne deduit rien d'une image qu'elle ne voit
+    pas."""
+    _check_rating(rating, "rating")
+    item = data["current"]["items"].get(designation)
+    if item is None:
+        raise ValueError(f"« {designation} » n'est pas dans la session en cours.")
+    item["rating"] = rating
+    return data
+
+
+def set_feeling(data: dict, patch: dict) -> dict:
+    """Met a jour le ressenti de la sortie en cours, champ par champ : seules
+    les cles fournies sont remplacees, pour que deux ecrans (ou deux saisies
+    differees) ne s'ecrasent pas l'un l'autre. Refuse sur une session non
+    ouverte : un ressenti sans sortie n'a pas de sens, et il serait repris
+    par la sortie suivante."""
+    cur = data["current"]
     if not _is_active(cur):
-        cur["openedAt"] = None
-        cur["scoreAtOpen"] = None
+        raise ValueError("aucune session en cours")
+    _check_rating(patch.get("rating"), "rating")
+    _check_rating(patch.get("skyQuality"), "skyQuality")
+    unknown = set(patch) - set(default_feeling())
+    if unknown:
+        raise ValueError(f"champ(s) de ressenti inconnu(s) : {', '.join(sorted(unknown))}")
+    cur["feeling"] = {**cur["feeling"], **patch}
     return data
 
 
@@ -254,6 +346,7 @@ def close_session(data: dict, today: date, now: datetime) -> dict:
             "openedAt": cur["openedAt"],
             "items": {k: {**v, "notes": list(v["notes"])} for k, v in cur["items"].items()},
             "freeNotes": list(cur["freeNotes"]),
+            "feeling": dict(cur["feeling"]),
         })
     data["current"] = default()["current"]
     return data
@@ -278,12 +371,14 @@ def timeline(cur: dict) -> list[dict]:
     que `[...]` : une vieille entree `past` peut ne pas avoir `items`/
     `freeNotes` du tout (creee avant leur introduction, voir `load`)."""
     entries = [
-        {"id": note["id"], "at": note["at"], "text": note["text"], "target": designation}
+        {"id": note["id"], "at": note["at"], "text": note["text"], "target": designation,
+         "context": note.get("context")}
         for designation, item in cur.get("items", {}).items()
         for note in item.get("notes", [])
     ]
     entries += [
-        {"id": note["id"], "at": note["at"], "text": note["text"], "target": None}
+        {"id": note["id"], "at": note["at"], "text": note["text"], "target": None,
+         "context": note.get("context")}
         for note in cur.get("freeNotes", [])
     ]
     entries.sort(key=lambda e: e["at"])
@@ -313,5 +408,6 @@ def reopen_session(data: dict, closed_at: str) -> dict:
         "scoreAtOpen": entry["score"],
         "items": items,
         "freeNotes": list(entry.get("freeNotes") or []),
+        "feeling": {**default_feeling(), **(entry.get("feeling") or {})},
     }
     return data

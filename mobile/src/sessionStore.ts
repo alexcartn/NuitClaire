@@ -35,19 +35,23 @@ import {
 export function sendOp(op: SessionOp): Promise<Sessions> {
   switch (op.kind) {
     case "addItem":
-      return api.addSessionItem(op.designation);
+      return api.addSessionItem(op.designation, op.at);
     case "removeItem":
       return api.deleteSessionItem(op.designation);
     case "setDone":
       return api.updateSessionItem(op.designation, { done: op.done });
     case "setExposure":
       return api.updateSessionItem(op.designation, { exposureMin: op.minutes });
+    case "setItemRating":
+      return api.updateSessionItem(op.designation, { rating: op.rating });
+    case "setFeeling":
+      return api.updateFeeling(op.patch);
     case "addItemNote":
-      return api.addItemNote(op.designation, op.text);
+      return api.addItemNote(op.designation, op.text, op.at, op.context);
     case "removeItemNote":
       return api.deleteItemNote(op.designation, op.noteId);
     case "addFreeNote":
-      return api.addFreeNote(op.text);
+      return api.addFreeNote(op.text, op.at, op.context);
     case "removeFreeNote":
       return api.deleteFreeNote(op.noteId);
     case "closeSession":

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { readJson, writeJson } from "./storage";
+import { CACHE_PREFIX, readCache, readJson, writeJson, type Cached } from "./storage";
 
 interface FetchState<T> {
   data: T | null;
@@ -10,13 +10,6 @@ interface FetchState<T> {
    * affiche date, quand le reseau manque. */
   fetchedAt: string | null;
 }
-
-interface Cached<T> {
-  at: string;
-  data: T;
-}
-
-const CACHE_PREFIX = "nc-cache:";
 
 /** Petit hook fetch generique : pas de bibliotheque de cache/requetes (voir
  * le plan d'implementation mobile -- empreinte de dependances minimale pour
@@ -96,3 +89,5 @@ export function staleLabel(fetchedAt: string | null): string {
   const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   return `Hors ligne : donnees du ${date} a ${time}`;
 }
+
+export { readCache };

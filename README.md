@@ -82,6 +82,38 @@ inventees localement : elles arrivent avec la reponse.
     cd mobile
     npm test          # logique hors ligne du journal (lanceur de tests integre a Node)
 
+### Contexte et ressenti
+
+Deux ajouts qui transforment le log en carnet, sans jamais fabriquer de donnee
+(voir l'en-tete de `sessions.py`).
+
+Chaque note emporte les conditions annoncees a l'heure ou elle a ete ecrite :
+temperature, nuages, seeing, transparence, score horaire, Lune. Ce n'est pas une
+mesure, c'est ce que la prevision de l'appli affichait a ce moment-la -- jusqu'ici
+calcule pour "Ce soir" puis jete. Le releve est fait cote client
+(`mobile/src/nightContext.ts`) dans la prevision de la nuit deja gardee sur
+l'appareil : il marche donc hors ligne, et une note ecrite a 22h40 garde les
+conditions de 22h40 meme si elle part a 1h du matin. Sans prevision sous la main,
+le contexte reste vide plutot qu'approche.
+
+Cela a demande de corriger un defaut au passage : les saisies etaient horodatees a
+leur arrivee sur le serveur, pas a leur ecriture. Une note faite hors ligne portait
+donc l'heure de la synchronisation, et le fil de la nuit se retrouvait dans le
+desordre. Le client envoie desormais son heure de saisie (`at`), le serveur
+l'honore, et retombe sur la sienne si elle manque (chemin Streamlit) ou est
+illisible.
+
+Le ressenti est, lui, de la saisie pure : satisfaction et qualite de ciel percue de
+1 a 5, plus "ce que je retiens" et "a refaire autrement". La qualite de ciel percue
+est volontairement distincte du score calcule -- c'est l'ecart entre les deux qui
+interesse. S'y ajoute une satisfaction par cible. Le tout suit la sortie a la
+cloture, se relit sur les sorties passees, et `stats.py` en tire une satisfaction
+moyenne (`avgRating`), qui ne compte que les sorties notees.
+
+Cote Streamlit, `app.py` continue de fonctionner sans changement mais n'affiche ni
+contexte ni ressenti : l'ecart entre les deux frontends reste a arbitrer (voir
+l'en-tete de `settings.py` pour un precedent assume).
+
 ### Appli installable
 
 `mobile/public/manifest.webmanifest` et un service worker ecrit a la main

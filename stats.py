@@ -48,6 +48,16 @@ def avg_score_successful(past: list[dict]) -> tuple[float | None, int]:
     return avg, len(successful)
 
 
+def avg_rating(past: list[dict]) -> tuple[float | None, int]:
+    """Satisfaction moyenne des sorties notees, et leur nombre. Agregation
+    elementaire d'une saisie pure (voir sessions.set_feeling) : une sortie
+    sans note n'est pas comptee, et surtout pas comptee comme moyenne."""
+    rated = [p["feeling"]["rating"] for p in past
+             if (p.get("feeling") or {}).get("rating") is not None]
+    avg = round(sum(rated) / len(rated), 1) if rated else None
+    return avg, len(rated)
+
+
 def exposure_by_target(sessions_data: dict, progress_data: dict) -> list[dict]:
     """Minutes d'expo cumulees par cible, deux sources sommees : le temps
     saisi par session (sessions.exposure_totals) et le journal d'expo libre
@@ -69,9 +79,12 @@ def compute(sessions_data: dict, progress_data: dict) -> dict:
     (onglet/ecran Journal)."""
     past = sessions_data["past"]
     avg_score, nb_successful = avg_score_successful(past)
+    rating, nb_rated = avg_rating(past)
     exposure = exposure_by_target(sessions_data, progress_data)
     return {
         "totalOutings": len(past),
+        "avgRating": rating,
+        "ratedOutings": nb_rated,
         "outingsByMonth": outings_by_month(past),
         "capturesByMonth": captures_by_month(past),
         "successfulOutings": nb_successful,

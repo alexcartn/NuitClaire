@@ -4,6 +4,7 @@ def test_stats_empty_journal(api_client):
     assert r.json() == {
         "totalOutings": 0, "outingsByMonth": [], "capturesByMonth": [],
         "successfulOutings": 0, "avgScoreSuccessful": None,
+        "avgRating": None, "ratedOutings": 0,
         "exposureByTarget": [], "totalExposureMin": 0,
     }
 

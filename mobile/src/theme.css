@@ -212,6 +212,19 @@ a {
   color: var(--ink3);
 }
 
+/* Conditions annoncees a l'heure d'une note, sous celle-ci : presentes pour
+   qui les cherche a la relecture, assez effacees pour ne pas encombrer le
+   fil de la nuit. */
+.nc-context {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ink3);
+}
+
+[data-theme="night"] .nc-context {
+  font-size: 12px;
+}
+
 /* Bandeau "nouvelle version" : au-dessus du contenu, sous la barre
    systeme, sans recouvrir quoi que ce soit. */
 .nc-update {

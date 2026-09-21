@@ -2,7 +2,9 @@ def test_get_sessions_returns_empty_defaults(api_client):
     r = api_client.get("/api/sessions")
     assert r.status_code == 200
     assert r.json() == {
-        "current": {"openedAt": None, "scoreAtOpen": None, "items": [], "freeNotes": [], "timeline": []},
+        "current": {"openedAt": None, "scoreAtOpen": None, "items": [], "freeNotes": [],
+                    "timeline": [],
+                    "feeling": {"rating": None, "skyQuality": None, "highlight": "", "nextTime": ""}},
         "past": [],
     }
 
@@ -212,3 +214,87 @@ def test_update_item_sets_exposure_and_done_together(api_client):
 def test_update_unknown_item_exposure_returns_404(api_client):
     r = api_client.put("/api/sessions/current/items/M13", json={"exposureMin": 10})
     assert r.status_code == 404
+
+
+def test_note_keeps_the_time_it_was_written_not_the_time_it_arrived(api_client):
+    """Une saisie faite hors ligne part quand le reseau revient, parfois des
+    heures plus tard : c'est l'heure du geste qui doit etre conservee, sinon
+    le fil de la nuit se retrouve dans le desordre."""
+    api_client.post("/api/sessions/current/notes",
+                    json={"text": "buee", "at": "2026-09-21T22:40:03.120000"})
+    timeline = api_client.get("/api/sessions").json()["current"]["timeline"]
+    assert [n["at"] for n in timeline] == ["2026-09-21T22:40:03.120000"]
+
+
+def test_note_without_client_time_falls_back_to_server_time(api_client):
+    # Chemin Streamlit, qui n'envoie pas d'heure : la saisie ne doit pas
+    # echouer pour autant.
+    api_client.post("/api/sessions/current/notes", json={"text": "au chaud"})
+    assert api_client.get("/api/sessions").json()["current"]["timeline"][0]["at"]
+
+
+def test_unreadable_client_time_does_not_lose_the_note(api_client):
+    api_client.post("/api/sessions/current/notes", json={"text": "horloge cassee", "at": "n'importe quoi"})
+    timeline = api_client.get("/api/sessions").json()["current"]["timeline"]
+    assert [n["text"] for n in timeline] == ["horloge cassee"]
+
+
+def test_note_context_is_stored_as_given(api_client):
+    context = {"temperatureC": 8.2, "cloudCoverPct": 5.0, "seeing": 2.0,
+               "transparency": 3.0, "score": 0.82, "moonIllum": 77.0}
+    api_client.post("/api/sessions/current/notes", json={"text": "ca bave", "context": context})
+    entry = api_client.get("/api/sessions").json()["current"]["timeline"][0]
+    assert entry["context"] == context
+
+
+def test_note_without_context_keeps_none(api_client):
+    api_client.post("/api/sessions/current/notes", json={"text": "sans contexte"})
+    assert api_client.get("/api/sessions").json()["current"]["timeline"][0]["context"] is None
+
+
+def test_item_rating_is_set_and_cleared(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.put("/api/sessions/current/items/M13", json={"rating": 4})
+    assert api_client.get("/api/sessions").json()["current"]["items"][0]["rating"] == 4
+    api_client.put("/api/sessions/current/items/M13", json={"rating": None})
+    assert api_client.get("/api/sessions").json()["current"]["items"][0]["rating"] is None
+
+
+def test_item_rating_outside_range_is_refused(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    assert api_client.put("/api/sessions/current/items/M13", json={"rating": 9}).status_code == 422
+
+
+def test_feeling_merges_field_by_field(api_client):
+    api_client.post("/api/sessions/current/notes", json={"text": "debut"})
+    api_client.put("/api/sessions/current/feeling", json={"rating": 5})
+    api_client.put("/api/sessions/current/feeling", json={"highlight": "premiere lumiere"})
+    feeling = api_client.get("/api/sessions").json()["current"]["feeling"]
+    assert feeling == {"rating": 5, "skyQuality": None, "highlight": "premiere lumiere", "nextTime": ""}
+
+
+def test_feeling_refused_without_a_session(api_client):
+    assert api_client.put("/api/sessions/current/feeling", json={"rating": 5}).status_code == 404
+
+
+def test_feeling_follows_the_outing_through_close_and_reopen(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.put("/api/sessions/current/feeling", json={"rating": 4, "skyQuality": 2,
+                                                          "nextTime": "arriver plus tot"})
+    closed = api_client.post("/api/sessions/current/close").json()["past"][0]
+    assert closed["feeling"]["rating"] == 4
+    assert closed["feeling"]["skyQuality"] == 2
+
+    reopened = api_client.post(f"/api/sessions/past/{closed['closedAt']}/reopen").json()
+    assert reopened["current"]["feeling"]["nextTime"] == "arriver plus tot"
+
+
+def test_emptying_a_session_clears_its_feeling(api_client):
+    # Sinon une note de satisfaction saisie puis annulee se retrouverait
+    # collee a la sortie suivante.
+    r = api_client.post("/api/sessions/current/notes", json={"text": "essai"})
+    note_id = r.json()["current"]["freeNotes"][0]["id"]
+    api_client.put("/api/sessions/current/feeling", json={"rating": 5})
+    api_client.delete(f"/api/sessions/current/notes/{note_id}")
+    feeling = api_client.get("/api/sessions").json()["current"]["feeling"]
+    assert feeling == {"rating": None, "skyQuality": None, "highlight": "", "nextTime": ""}

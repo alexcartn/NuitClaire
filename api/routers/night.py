@@ -80,6 +80,11 @@ def get_night() -> dict:
                 "windGustsKmh": _nan_to_none(df.at[t, "wind_gusts_10m"]),
                 "temperatureC": _nan_to_none(df.at[t, "temperature_2m"]),
                 "dewPointC": _nan_to_none(df.at[t, "dew_point_2m"]),
+                # Deja calcules pour le score : exposes pour que le journal
+                # puisse conserver, avec chaque note, ce que la prevision
+                # annoncait a cette heure-la.
+                "seeing": _nan_to_none(df.at[t, "seeing"]) if "seeing" in df else None,
+                "transparency": _nan_to_none(df.at[t, "transparency"]) if "transparency" in df else None,
             }
             for t in df.index
         ],

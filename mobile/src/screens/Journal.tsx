@@ -8,7 +8,7 @@ import { useTheme } from "../useTheme";
 import { useWakeLock } from "../useWakeLock";
 import { StatCard } from "../components/StatCard";
 import { TabIcon } from "../components/TabIcon";
-import type { TargetRow, TimelineEntry } from "../types";
+import type { Feeling, NoteContext, TargetRow, TimelineEntry } from "../types";
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -41,6 +41,86 @@ const QUICK_NOTES = [
   "Satellite",
   "Vent",
 ] as const;
+
+/** "8,2 °C · 5 % · seeing 3" : ce que la prevision annoncait a l'heure de la
+ * note (voir nightContext.ts). N'affiche que ce qui est connu, et rien du
+ * tout quand rien ne l'est -- une ligne de tirets ne vaut pas mieux qu'une
+ * absence de ligne. */
+function ContextLine({ context }: { context: NoteContext | null }) {
+  if (!context) return null;
+  const parts = [
+    context.temperatureC != null ? `${context.temperatureC.toFixed(1).replace(".", ",")} °C` : null,
+    context.cloudCoverPct != null ? `${Math.round(context.cloudCoverPct)} % nuages` : null,
+    context.seeing != null ? `seeing ${Math.round(context.seeing)}` : null,
+    context.transparency != null ? `transp. ${Math.round(context.transparency)}` : null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return (
+    <div className="nc-context nc-mono">
+      {parts.join(" · ")}
+    </div>
+  );
+}
+
+/** Note de 1 a 5, ou rien. Cinq boutons chiffres plutot que des etoiles :
+ * les glyphes d'etoile basculent en emoji couleur sur certains telephones,
+ * ce qui ruinerait le mode vision nocturne. Reappuyer sur la valeur courante
+ * l'efface. */
+function Rating({ label, scope, value, onChange }: {
+  label: string;
+  /** Ce que la note qualifie, ajoute au nom accessible. L'ecran porte
+   * plusieurs "Satisfaction" -- une par cible, plus celle de la nuit -- que
+   * le contexte visuel distingue, mais qui seraient indiscernables a la
+   * voix. */
+  scope: string;
+  value: number | null;
+  onChange: (next: number | null) => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <span className="nc-caption" style={{ margin: 0, flex: "none" }}>{label}</span>
+      <div style={{ display: "flex", gap: 5 }}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            onClick={() => onChange(value === n ? null : n)}
+            className={`nc-chip ${value === n ? "nc-chip-active" : ""}`}
+            style={{ minWidth: 32 }}
+            aria-pressed={value === n}
+            aria-label={`${label} ${scope} : ${n} sur 5`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Ressenti d'une sortie cloturee, en lecture seule : ce qui a ete note sur
+ * le moment, pas retouchable des mois plus tard (la note-resume de la sortie,
+ * elle, reste modifiable juste en dessous). Silencieux si rien n'a ete
+ * saisi. */
+function PastFeeling({ feeling }: { feeling: Feeling }) {
+  const scores = [
+    feeling.rating != null ? `satisfaction ${feeling.rating}/5` : null,
+    feeling.skyQuality != null ? `ciel percu ${feeling.skyQuality}/5` : null,
+  ].filter(Boolean);
+  if (scores.length === 0 && !feeling.highlight && !feeling.nextTime) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      {scores.length > 0 && (
+        <div className="nc-mono" style={{ fontSize: 11, color: "var(--ink2)" }}>{scores.join(" · ")}</div>
+      )}
+      {feeling.highlight && (
+        <div className="nc-caption" style={{ margin: 0 }}>Je retiens : {feeling.highlight}</div>
+      )}
+      {feeling.nextTime && (
+        <div className="nc-caption" style={{ margin: 0 }}>A refaire autrement : {feeling.nextTime}</div>
+      )}
+    </div>
+  );
+}
 
 /** Bandeau d'etat de la synchronisation. Le journal se remplit dehors, avec
  * un reseau qui va et vient : ce qui compte est de savoir que rien n'est
@@ -92,6 +172,7 @@ function Timeline({ entries, pendingNotes, onDelete }: {
             {pendingNotes?.has(e.id) && (
               <span className="nc-mono" style={{ color: "var(--ink3)", fontSize: 11 }}> · en attente</span>
             )}
+            <ContextLine context={e.context} />
           </span>
           {onDelete && (
             <button
@@ -119,6 +200,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
   const [itemNoteDraft, setItemNoteDraft] = useState<Record<string, string>>({});
   const [exposureDraft, setExposureDraft] = useState<Record<string, string>>({});
   const [freeNoteDraft, setFreeNoteDraft] = useState("");
+  const [feelingDraft, setFeelingDraft] = useState<Partial<Record<keyof Feeling, string>>>({});
   const [targetQuery, setTargetQuery] = useState("");
   const [targetResults, setTargetResults] = useState<TargetRow[] | null>(null);
   const [searchingTarget, setSearchingTarget] = useState(false);
@@ -217,6 +299,18 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
 
   const removeItem = (designation: string) => send({ kind: "removeItem", designation });
 
+  const rateItem = (designation: string, rating: number | null) =>
+    send({ kind: "setItemRating", designation, rating });
+
+  const setFeeling = (patch: Partial<Feeling>) => send({ kind: "setFeeling", patch });
+
+  /** Champ libre du ressenti : enregistre a la sortie du champ, pas a chaque
+   * frappe -- inutile d'empiler une operation par lettre dans la file. */
+  const saveFeelingText = (field: "highlight" | "nextTime", value: string) => {
+    if (value === current.feeling[field]) return;
+    setFeeling({ [field]: value });
+  };
+
   const close = () => send({ kind: "closeSession" });
 
   const savePastNote = async (closedAt: string, note: string) => {
@@ -279,6 +373,11 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
               sub="sorties reussies"
             />
             <StatCard label="Expo totale" value={fmtExposure(stats.totalExposureMin)} />
+            <StatCard
+              label="Satisfaction"
+              value={stats.avgRating != null ? `${stats.avgRating}/5` : "n/d"}
+              sub={`${stats.ratedOutings} sortie(s) notee(s)`}
+            />
             <StatCard
               label="Ce mois"
               value={stats.capturesByMonth.find((m) => m.month === new Date().toISOString().slice(0, 7))?.count ?? 0}
@@ -455,6 +554,13 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                       </span>
                     )}
                   </div>
+
+                  <Rating
+                    label="Satisfaction"
+                    scope={item.designation}
+                    value={item.rating}
+                    onChange={(rating) => rateItem(item.designation, rating)}
+                  />
                 </div>
               ))}
             </div>
@@ -463,6 +569,49 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div className="nc-eyebrow">Journal de la nuit</div>
             <Timeline entries={current.timeline} pendingNotes={pendingNotes} onDelete={deleteTimelineEntry} />
+          </div>
+
+          <div style={{ height: 1, background: "var(--line)" }} />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            <div className="nc-eyebrow">Ressenti de la nuit</div>
+            <Rating
+              label="Satisfaction"
+              scope="de la nuit"
+              value={current.feeling.rating}
+              onChange={(rating) => setFeeling({ rating })}
+            />
+            {/* Volontairement distincte du score calcule : c'est l'ecart
+                entre les deux qui interesse, pas leur accord. */}
+            <Rating
+              label="Ciel percu"
+              scope="cette nuit"
+              value={current.feeling.skyQuality}
+              onChange={(skyQuality) => setFeeling({ skyQuality })}
+            />
+            {/* Intitule visible en plus du placeholder : celui-ci disparait
+                des que le champ est rempli, et on ne saurait plus lequel des
+                deux on relit. */}
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="nc-caption" style={{ margin: 0 }}>Ce que je retiens</span>
+              <input
+                value={feelingDraft.highlight ?? current.feeling.highlight}
+                onChange={(e) => setFeelingDraft((d) => ({ ...d, highlight: e.target.value }))}
+                onBlur={(e) => saveFeelingText("highlight", e.target.value)}
+                placeholder="Ce que je retiens"
+                className="nc-input"
+              />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="nc-caption" style={{ margin: 0 }}>A refaire autrement</span>
+              <input
+                value={feelingDraft.nextTime ?? current.feeling.nextTime}
+                onChange={(e) => setFeelingDraft((d) => ({ ...d, nextTime: e.target.value }))}
+                onBlur={(e) => saveFeelingText("nextTime", e.target.value)}
+                placeholder="A refaire autrement"
+                className="nc-input"
+              />
+            </label>
           </div>
 
           <button onClick={close} className="nc-btn nc-btn-primary">
@@ -488,6 +637,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                 </div>
               </div>
               <div style={{ fontSize: 12, color: "var(--ink2)" }}>{p.targets.join(", ") || "aucune cible"}</div>
+              <PastFeeling feeling={p.feeling} />
               <input
                 value={pastNoteDraft[p.closedAt] ?? p.note}
                 onChange={(e) => setPastNoteDraft((d) => ({ ...d, [p.closedAt]: e.target.value }))}

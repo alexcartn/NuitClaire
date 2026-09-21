@@ -17,20 +17,30 @@ import { test } from "node:test";
 
 import {
   applyOp,
+  emptyFeeling,
   enqueue,
   localIsoNow,
   newOp,
   parseTargetPrefix,
   pendingNoteIds,
 } from "./sessionQueue.ts";
+import { contextAt } from "./nightContext.ts";
 import type { SessionOp, SessionOpBody } from "./sessionQueue.ts";
 import type { Sessions } from "./types.ts";
 
 function emptySessions(): Sessions {
   return {
-    current: { openedAt: null, scoreAtOpen: null, items: [], freeNotes: [], timeline: [] },
+    current: {
+      openedAt: null, scoreAtOpen: null, items: [], freeNotes: [], timeline: [],
+      feeling: emptyFeeling(),
+    },
     past: [],
   };
+}
+
+/** Note telle que la renvoie le serveur, contexte compris. */
+function note(id: string, text: string, at: string) {
+  return { id, text, at, context: null };
 }
 
 /** Operation horodatee explicitement, pour tester le tri du fil. */
@@ -199,8 +209,9 @@ test("dans la meme seconde, une saisie passe apres une note deja enregistree", (
       openedAt: "2026-09-21T21:05:30.123456",
       scoreAtOpen: 72,
       items: [],
-      freeNotes: [{ id: "s1", text: "deja enregistree", at: "2026-09-21T21:05:30.123456" }],
+      freeNotes: [note("s1", "deja enregistree", "2026-09-21T21:05:30.123456")],
       timeline: [],
+      feeling: emptyFeeling(),
     },
     past: [],
   };
@@ -219,10 +230,11 @@ test("une note en attente se range au bon endroit parmi les notes du serveur", (
       scoreAtOpen: 72,
       items: [],
       freeNotes: [
-        { id: "s1", text: "avant", at: "2026-09-21T21:00:00" },
-        { id: "s2", text: "apres", at: "2026-09-21T23:00:00" },
+        note("s1", "avant", "2026-09-21T21:00:00"),
+        note("s2", "apres", "2026-09-21T23:00:00"),
       ],
       timeline: [],
+      feeling: emptyFeeling(),
     },
     past: [],
   };
@@ -251,9 +263,13 @@ test("rejouer la file sur une base serveur ne perd pas les saisies en attente", 
     current: {
       openedAt: "2026-09-21T21:00:00",
       scoreAtOpen: 72,
-      items: [{ designation: "M31", addedAt: "2026-09-21T21:00:00", done: false, notes: [], exposureMin: null }],
+      items: [{
+        designation: "M31", addedAt: "2026-09-21T21:00:00", done: false, notes: [],
+        exposureMin: null, rating: null,
+      }],
       freeNotes: [],
       timeline: [],
+      feeling: emptyFeeling(),
     },
     past: [],
   };
@@ -295,4 +311,92 @@ test("une note sans designation en tete reste une note libre", () => {
   // isole, l'utilisateur voulait peut-etre juste noter le nom.
   assert.equal(parseTargetPrefix("M31"), null);
   assert.equal(parseTargetPrefix("  M31  "), null);
+});
+
+test("une note porte les conditions annoncees a l'heure ou elle est ecrite", () => {
+  // Releve dans la prevision deja chargee, donc disponible hors ligne. Le
+  // point retenu est le plus proche de l'heure de saisie, pas le premier.
+  const night = {
+    moonIllum: 77,
+    hourly: [
+      { time: "2026-09-21T21:00:00", score: 0.9, cloudCoverPct: 2, windGustsKmh: 8,
+        temperatureC: 10.4, dewPointC: 4, seeing: 2, transparency: 3 },
+      { time: "2026-09-21T22:00:00", score: 0.82, cloudCoverPct: 5, windGustsKmh: 11,
+        temperatureC: 8.2, dewPointC: 4.1, seeing: 3, transparency: 3 },
+    ],
+  } as unknown as Parameters<typeof contextAt>[0];
+
+  assert.deepEqual(contextAt(night, "2026-09-21T22:14:00.000000"), {
+    temperatureC: 8.2,
+    cloudCoverPct: 5,
+    seeing: 3,
+    transparency: 3,
+    score: 0.82,
+    moonIllum: 77,
+  });
+});
+
+test("sans prevision sous la main, le contexte reste vide", () => {
+  // Inventer une temperature plausible serait exactement la donnee fabriquee
+  // que sessions.py proscrit.
+  assert.equal(contextAt(null, "2026-09-21T22:00:00"), null);
+  assert.equal(contextAt({ moonIllum: 50, hourly: [] } as never, "2026-09-21T22:00:00"), null);
+});
+
+test("une note ecrite hors de la plage prevue n'herite pas d'un contexte lointain", () => {
+  const night = {
+    moonIllum: 50,
+    hourly: [{ time: "2026-09-21T21:00:00", score: 0.9, cloudCoverPct: 2, windGustsKmh: 8,
+               temperatureC: 10, dewPointC: 4, seeing: 2, transparency: 2 }],
+  } as unknown as Parameters<typeof contextAt>[0];
+
+  assert.equal(contextAt(night, "2026-09-22T06:00:00"), null);
+});
+
+test("la note de satisfaction se pose sur la cible visee", () => {
+  const data = replay([
+    op({ kind: "addItem", designation: "M31" }, "2026-09-21T21:00:00"),
+    op({ kind: "addItem", designation: "M42" }, "2026-09-21T21:01:00"),
+    op({ kind: "setItemRating", designation: "M42", rating: 4 }, "2026-09-21T22:00:00"),
+  ]);
+
+  const [m31, m42] = data.current.items;
+  assert.equal(m31.rating, null);
+  assert.equal(m42.rating, 4);
+});
+
+test("le ressenti se complete champ par champ", () => {
+  const data = replay([
+    op({ kind: "addFreeNote", noteId: "n1", text: "debut", context: null }, "2026-09-21T21:00:00"),
+    op({ kind: "setFeeling", patch: { rating: 5 } }, "2026-09-21T23:00:00"),
+    op({ kind: "setFeeling", patch: { highlight: "premiere lumiere" } }, "2026-09-21T23:01:00"),
+  ]);
+
+  assert.deepEqual(data.current.feeling, {
+    rating: 5, skyQuality: null, highlight: "premiere lumiere", nextTime: "",
+  });
+});
+
+test("vider la session efface aussi son ressenti", () => {
+  // Sinon une note de satisfaction saisie puis annulee se retrouverait
+  // collee a la sortie suivante (meme regle que sessions._close_if_empty).
+  const data = replay([
+    op({ kind: "addFreeNote", noteId: "n1", text: "essai", context: null }, "2026-09-21T21:00:00"),
+    op({ kind: "setFeeling", patch: { rating: 5 } }, "2026-09-21T21:01:00"),
+    op({ kind: "removeFreeNote", noteId: "n1" }, "2026-09-21T21:02:00"),
+  ]);
+
+  assert.deepEqual(data.current.feeling, emptyFeeling());
+});
+
+test("la cloture emporte le ressenti dans l'historique", () => {
+  const data = replay([
+    op({ kind: "addItem", designation: "M31" }, "2026-09-21T21:00:00"),
+    op({ kind: "setFeeling", patch: { rating: 4, skyQuality: 2 } }, "2026-09-21T23:00:00"),
+    op({ kind: "closeSession" }, "2026-09-21T23:59:00"),
+  ]);
+
+  assert.equal(data.past[0].feeling.rating, 4);
+  assert.equal(data.past[0].feeling.skyQuality, 2);
+  assert.deepEqual(data.current.feeling, emptyFeeling());
 });

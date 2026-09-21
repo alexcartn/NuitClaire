@@ -30,7 +30,16 @@
 // tests de Node (voir sessionQueue.test.ts), dont la resolution ESM ne
 // devine pas les extensions, contrairement a Vite.
 import { readJson, writeJson } from "./storage.ts";
-import type { CurrentSession, Note, Sessions, SessionItem, TimelineEntry } from "./types";
+import { captureContext } from "./nightContext.ts";
+import type {
+  CurrentSession,
+  Feeling,
+  Note,
+  NoteContext,
+  Sessions,
+  SessionItem,
+  TimelineEntry,
+} from "./types";
 
 const QUEUE_KEY = "nc-sessions-queue";
 const CACHE_KEY = "nc-sessions-cache";
@@ -41,9 +50,11 @@ export type SessionOpBody =
   | { kind: "removeItem"; designation: string }
   | { kind: "setDone"; designation: string; done: boolean }
   | { kind: "setExposure"; designation: string; minutes: number }
-  | { kind: "addItemNote"; designation: string; noteId: string; text: string }
+  | { kind: "setItemRating"; designation: string; rating: number | null }
+  | { kind: "setFeeling"; patch: Partial<Feeling> }
+  | { kind: "addItemNote"; designation: string; noteId: string; text: string; context?: NoteContext | null }
   | { kind: "removeItemNote"; designation: string; noteId: string }
-  | { kind: "addFreeNote"; noteId: string; text: string }
+  | { kind: "addFreeNote"; noteId: string; text: string; context?: NoteContext | null }
   | { kind: "removeFreeNote"; noteId: string }
   | { kind: "closeSession" };
 
@@ -93,9 +104,19 @@ export function localIsoNow(now: Date = new Date()): string {
   return `${date}T${time}.${String(now.getMilliseconds()).padStart(3, "0")}000`;
 }
 
-/** Complete un geste avec son identite et son heure de saisie. */
+/** Complete un geste avec son identite, son heure de saisie et -- pour une
+ * note -- les conditions annoncees a cette heure-la.
+ *
+ * Le contexte est releve ici plutot que par l'appelant pour qu'il porte
+ * exactement l'horodatage de l'operation, et pour qu'aucun point de saisie
+ * ne puisse l'oublier. */
 export function newOp(body: SessionOpBody): SessionOp {
-  return { ...body, id: localId(), at: localIsoNow() };
+  const at = localIsoNow();
+  const op = { ...body, id: localId(), at };
+  if ((op.kind === "addItemNote" || op.kind === "addFreeNote") && op.context === undefined) {
+    return { ...op, context: captureContext(at) };
+  }
+  return op;
 }
 
 // --- Detection d'une cible en tete de note ----------------------------
@@ -143,12 +164,20 @@ export function parseTargetPrefix(input: string): TargetPrefix | null {
 function rebuildTimeline(cur: CurrentSession): TimelineEntry[] {
   const entries: TimelineEntry[] = [
     ...cur.items.flatMap((item) =>
-      item.notes.map((n) => ({ id: n.id, at: n.at, text: n.text, target: item.designation })),
+      item.notes.map((n) => ({
+        id: n.id, at: n.at, text: n.text, target: item.designation, context: n.context,
+      })),
     ),
-    ...cur.freeNotes.map((n) => ({ id: n.id, at: n.at, text: n.text, target: null })),
+    ...cur.freeNotes.map((n) => ({
+      id: n.id, at: n.at, text: n.text, target: null, context: n.context,
+    })),
   ];
   entries.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   return entries;
+}
+
+export function emptyFeeling(): Feeling {
+  return { rating: null, skyQuality: null, highlight: "", nextTime: "" };
 }
 
 function isActive(cur: CurrentSession): boolean {
@@ -161,7 +190,9 @@ function isActive(cur: CurrentSession): boolean {
  * calcule par l'API, le client ne l'invente pas ; il arrive avec la
  * reponse. */
 function reconcileOpen(cur: CurrentSession, at: string): CurrentSession {
-  if (!isActive(cur)) return { ...cur, openedAt: null, scoreAtOpen: null };
+  // Vidée de sa derniere entree, la session redevient non ouverte : ni
+  // heure, ni score, ni ressenti (meme regle que sessions._close_if_empty).
+  if (!isActive(cur)) return { ...cur, openedAt: null, scoreAtOpen: null, feeling: emptyFeeling() };
   if (cur.openedAt === null) return { ...cur, openedAt: at };
   return cur;
 }
@@ -190,6 +221,7 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
         done: false,
         notes: [],
         exposureMin: null,
+        rating: null,
       };
       // Triees par designation, comme les renvoie l'API (voir
       // api/translate.sessions_to_out) : en les ajoutant simplement a la
@@ -214,8 +246,18 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
         mapItem(cur, op.designation, (i) => ({ ...i, exposureMin: op.minutes })),
         op.at,
       );
+    case "setItemRating":
+      return withCurrent(
+        data,
+        mapItem(cur, op.designation, (i) => ({ ...i, rating: op.rating })),
+        op.at,
+      );
+    case "setFeeling":
+      // Champ par champ, comme le serveur : deux saisies successives sur des
+      // champs differents ne s'effacent pas l'une l'autre.
+      return withCurrent(data, { ...cur, feeling: { ...cur.feeling, ...op.patch } }, op.at);
     case "addItemNote": {
-      const note: Note = { id: op.noteId, text: op.text, at: op.at };
+      const note: Note = { id: op.noteId, text: op.text, at: op.at, context: op.context ?? null };
       return withCurrent(
         data,
         mapItem(cur, op.designation, (i) => ({ ...i, notes: [...i.notes, note] })),
@@ -231,7 +273,12 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
     case "addFreeNote":
       return withCurrent(
         data,
-        { ...cur, freeNotes: [...cur.freeNotes, { id: op.noteId, text: op.text, at: op.at }] },
+        {
+          ...cur,
+          freeNotes: [...cur.freeNotes, {
+            id: op.noteId, text: op.text, at: op.at, context: op.context ?? null,
+          }],
+        },
         op.at,
       );
     case "removeFreeNote":
@@ -257,10 +304,14 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
         note: texts.join("; "),
         closedAt: op.at,
         timeline: cur.timeline,
+        feeling: cur.feeling,
       };
       return {
         past: [entry, ...data.past],
-        current: { openedAt: null, scoreAtOpen: null, items: [], freeNotes: [], timeline: [] },
+        current: {
+          openedAt: null, scoreAtOpen: null, items: [], freeNotes: [], timeline: [],
+          feeling: emptyFeeling(),
+        },
       };
     }
   }
