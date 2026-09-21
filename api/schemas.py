@@ -13,9 +13,15 @@ class SiteOut(BaseModel):
     tz: str
 
 
+class ViewWindowOut(BaseModel):
+    startHour: float
+    endHour: float
+
+
 class SettingsOut(BaseModel):
     site: SiteOut
     windowMode: str
+    viewWindow: ViewWindowOut
     alerts: dict[str, bool]
 
 
@@ -25,9 +31,15 @@ class SiteUpdate(BaseModel):
     lon: float
 
 
+class ViewWindowUpdate(BaseModel):
+    startHour: float = Field(ge=0, le=24)
+    endHour: float = Field(ge=0, le=24)
+
+
 class SettingsUpdate(BaseModel):
     site: SiteUpdate | None = None
     windowMode: str | None = None
+    viewWindow: ViewWindowUpdate | None = None
     alerts: dict[str, bool] | None = None
 
 
@@ -64,6 +76,7 @@ class StateOut(BaseModel):
     site: SiteOut
     horizon: dict[str, bool]
     windowMode: str
+    viewWindow: ViewWindowOut
     messierCaptured: list[str]
 
 

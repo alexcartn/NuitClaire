@@ -20,7 +20,7 @@ import progress as progress_store
 import settings as settings_store
 from astro import night_hours, sky_frame, twilight_times
 from catalog import load_targets, load_messier
-from config import SITE, NB_NIGHTS
+from config import SITE, NB_NIGHTS, VIEW_WINDOW
 from rows import common_row_fields
 from scoring import night_summary, score_frame, score_label_fr, target_windows, view_window_df
 from weather import fetch_all
@@ -76,6 +76,10 @@ def get_window_mode() -> str:
     return settings_store.load()["window_mode"]
 
 
+def get_view_window() -> dict:
+    return settings_store.load()["view_window"]
+
+
 def get_progress() -> dict:
     return progress_store.load()
 
@@ -118,13 +122,18 @@ def current_night(site: dict):
     return sel, nights[sel], twilights[sel]
 
 
-def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalog: str) -> list[dict]:
+def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalog: str,
+                   view_window: dict | None = None) -> list[dict]:
     """Equivalent de `app.feasible_rows` : meme forme de ligne (via
-    `rows.common_row_fields`), meme asymetrie Messier/targets face au mode de
-    fenetre (le mode Habituelle/Nuit complete ne s'applique qu'au catalogue
-    "targets" -- la faisabilite Messier reste sur la nuit complete, comme
-    dans app.py)."""
-    key = (_site_key(site), day, tuple(sorted(horizon.items())), window_mode, catalog)
+    `rows.common_row_fields`). Le mode Habituelle/Nuit complete s'applique
+    desormais aux deux catalogues ("targets" ET "messier") -- avant, le suivi
+    Messier ignorait volontairement le mode de fenetre ; changement demande
+    pour que la faisabilite affichee soit coherente partout dans l'appli
+    (liste de cibles, catalogue Messier, graphe d'altitude de la fiche
+    detail -- voir `scoring.in_observation_window`)."""
+    view_window = view_window if view_window is not None else VIEW_WINDOW
+    key = (_site_key(site), day, tuple(sorted(horizon.items())), window_mode,
+           view_window["start_hour"], view_window["end_hour"], catalog)
     with _rows_lock:
         cached = _rows_cache.get(key)
         if cached is not None:
@@ -134,7 +143,7 @@ def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalo
         if df is None:
             result: list[dict] = []
         else:
-            view_df = view_window_df(df, window_mode) if catalog == "targets" else df
+            view_df = view_window_df(df, window_mode, view_window)
             targets = load_targets() if catalog == "targets" else load_messier()
             result = []
             for tgt in targets:
@@ -163,7 +172,7 @@ def current_score_pct(site: dict) -> int | None:
     sel, df, _ = current_night(site)
     if sel is None:
         return None
-    view_df = view_window_df(df, get_window_mode())
+    view_df = view_window_df(df, get_window_mode(), get_view_window())
     s = night_summary(view_df)
     pct, _ = score_label_fr(s["score"])
     return pct

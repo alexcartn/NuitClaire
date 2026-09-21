@@ -6,8 +6,16 @@ import { COMPASS_SECTORS } from "../types";
 
 const WINDOW_MODES: { key: "complete" | "habituelle"; label: string }[] = [
   { key: "complete", label: "Nuit complete" },
-  { key: "habituelle", label: "Habituelle (20:00–22:30)" },
+  { key: "habituelle", label: "Habituelle" },
 ];
+
+/** '20.5' -> "20:30" (les horaires sont stockes en heures decimales, voir
+ * settings.view_window). */
+function fmtHour(h: number): string {
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
 
 const ALERT_LABEL: Record<string, string> = {
   score: "Me prevenir a 18h quand la nuit depasse 70",
@@ -76,6 +84,20 @@ export function Reglages() {
 
   const pickWindowMode = async (mode: "complete" | "habituelle") => {
     await api.updateSettings({ windowMode: mode });
+    reloadSettings();
+  };
+
+  const [windowDraft, setWindowDraft] = useState<{ start: string; end: string } | null>(null);
+  const [windowError, setWindowError] = useState<string | null>(null);
+
+  const saveViewWindow = async (startHour: number, endHour: number) => {
+    setWindowError(null);
+    if (!(startHour < endHour)) {
+      setWindowError("L'heure de debut doit etre avant l'heure de fin.");
+      return;
+    }
+    await api.updateSettings({ viewWindow: { startHour, endHour } });
+    setWindowDraft(null);
     reloadSettings();
   };
 
@@ -162,10 +184,64 @@ export function Reglages() {
                 borderColor: data.windowMode === w.key ? "var(--accent)" : "var(--line)",
               }}
             >
-              <span>{w.label}</span>
+              <span>
+                {w.label}
+                {w.key === "habituelle" && (
+                  <span className="nc-mono" style={{ color: "var(--ink3)", marginLeft: 6, fontSize: 12 }}>
+                    ({fmtHour(data.viewWindow.startHour)}–{fmtHour(data.viewWindow.endHour)})
+                  </span>
+                )}
+              </span>
               {data.windowMode === w.key && <span className="nc-mono">●</span>}
             </button>
           ))}
+
+          {data.windowMode === "habituelle" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="time"
+                  value={windowDraft?.start ?? fmtHour(data.viewWindow.startHour)}
+                  onChange={(e) => setWindowDraft({
+                    start: e.target.value,
+                    end: windowDraft?.end ?? fmtHour(data.viewWindow.endHour),
+                  })}
+                  className="nc-mono"
+                  style={{
+                    flex: 1, background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
+                    padding: "7px 9px", fontSize: 13, color: "var(--ink)",
+                  }}
+                />
+                <span className="nc-caption" style={{ margin: 0 }}>a</span>
+                <input
+                  type="time"
+                  value={windowDraft?.end ?? fmtHour(data.viewWindow.endHour)}
+                  onChange={(e) => setWindowDraft({
+                    start: windowDraft?.start ?? fmtHour(data.viewWindow.startHour),
+                    end: e.target.value,
+                  })}
+                  className="nc-mono"
+                  style={{
+                    flex: 1, background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
+                    padding: "7px 9px", fontSize: 13, color: "var(--ink)",
+                  }}
+                />
+              </div>
+              {windowError && <p className="nc-caption" style={{ color: "var(--bad)", margin: 0 }}>{windowError}</p>}
+              {windowDraft && (
+                <button
+                  onClick={() => {
+                    const [sh, sm] = windowDraft.start.split(":").map(Number);
+                    const [eh, em] = windowDraft.end.split(":").map(Number);
+                    saveViewWindow(sh + sm / 60, eh + em / 60);
+                  }}
+                  className="nc-btn nc-btn-primary"
+                >
+                  Enregistrer les horaires
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

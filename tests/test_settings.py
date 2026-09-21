@@ -17,6 +17,25 @@ def test_save_then_load_roundtrip(tmp_path):
     assert load(path) == data
 
 
+def test_default_view_window_matches_config():
+    from config import VIEW_WINDOW
+    assert DEFAULT["view_window"] == {"start_hour": VIEW_WINDOW["start_hour"], "end_hour": VIEW_WINDOW["end_hour"]}
+
+
+def test_load_merges_partial_view_window_without_losing_sibling_key(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"view_window": {"start_hour": 21.0}}), encoding="utf-8")
+    data = load(path)
+    assert data["view_window"]["start_hour"] == 21.0
+    assert data["view_window"]["end_hour"] == DEFAULT["view_window"]["end_hour"]
+
+
+def test_load_falls_back_to_default_view_window_when_malformed(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"view_window": ["not", "a", "dict"]}), encoding="utf-8")
+    assert load(path)["view_window"] == DEFAULT["view_window"]
+
+
 def test_load_merges_missing_keys_with_defaults(tmp_path):
     path = tmp_path / "settings.json"
     path.write_text(json.dumps({"window_mode": "habituelle"}), encoding="utf-8")

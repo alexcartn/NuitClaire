@@ -2,8 +2,8 @@ import pandas as pd
 
 from scoring import (score_label_fr, best_window, target_windows, target_altitude_series,
                      recommended_exposure_minutes, wind_quality, target_feasibility_reasons,
-                     hourly_score, cloud_trend, dew_risk, discovery_sort_key, temperature_range,
-                     view_window_df)
+                     hourly_score, cloud_trend, dew_risk, discovery_sort_key, in_observation_window,
+                     temperature_range, view_window_df)
 
 
 def test_score_label_fr_buckets():
@@ -320,6 +320,31 @@ def test_view_window_df_habituelle_mode_falls_back_to_full_frame_when_empty():
     idx = pd.date_range("2026-09-15 00:00", periods=3, freq="1h")  # 00h-02h, hors fenetre
     df = pd.DataFrame({"x": range(3)}, index=idx)
     assert view_window_df(df, "habituelle") is df
+
+
+def test_view_window_df_uses_custom_view_window_over_config_default():
+    idx = pd.date_range("2026-09-15 18:00", periods=10, freq="1h")  # 18h..03h
+    df = pd.DataFrame({"x": range(10)}, index=idx)
+    filtered = view_window_df(df, "habituelle", {"start_hour": 22.0, "end_hour": 23.5})
+    assert list(filtered.index.hour) == [22, 23]
+
+
+def test_in_observation_window_all_true_in_complete_mode():
+    idx = pd.date_range("2026-09-15 00:00", periods=5, freq="1h")
+    mask = in_observation_window(idx, "complete")
+    assert mask.tolist() == [True] * 5
+
+
+def test_in_observation_window_gates_by_custom_hours_in_habituelle_mode():
+    idx = pd.date_range("2026-09-15 19:00", periods=5, freq="1h")  # 19,20,21,22,23
+    mask = in_observation_window(idx, "habituelle", {"start_hour": 20.0, "end_hour": 22.0})
+    assert mask.tolist() == [False, True, True, True, False]
+
+
+def test_in_observation_window_falls_back_to_config_default_when_no_view_window():
+    idx = pd.date_range("2026-09-15 19:00", periods=5, freq="1h")  # 19,20,21,22,23
+    mask = in_observation_window(idx, "habituelle")  # config.VIEW_WINDOW = 20h-22.5h
+    assert mask.tolist() == [False, True, True, True, False]
 
 
 def test_target_windows_uses_site_timezone_not_frozen_module_tz(monkeypatch):

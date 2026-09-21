@@ -58,14 +58,36 @@ def hourly_score(row: pd.Series) -> float:
         + WEIGHTS["dew"] * dew + WEIGHTS["seeing_transp"] * st, 3)
 
 
-def view_window_df(df: pd.DataFrame, view_mode_key: str) -> pd.DataFrame:
-    """Filtre `df` sur la fenetre d'observation habituelle (`config.VIEW_WINDOW`),
-    sauf si elle est vide ou que le mode 'nuit complete' est actif."""
+def in_observation_window(index: pd.DatetimeIndex, view_mode_key: str,
+                           view_window: dict | None = None) -> pd.Series:
+    """Masque booleen (indexe comme `index`) : True si l'horodatage tombe
+    dans la fenetre d'observation -- toujours True en mode 'nuit complete'
+    (`view_mode_key != "habituelle"`). `view_window` (dict `start_hour`/
+    `end_hour`, voir `settings.py`) remplace `config.VIEW_WINDOW` quand
+    fourni -- horaires personnalisables depuis les reglages plutot que
+    fige pour tout le monde. Ne gere pas les fenetres a cheval sur minuit
+    (start_hour doit etre < end_hour) : suffisant pour une plage en soiree,
+    pas pour "22h-2h".
+
+    Renvoie un masque plutot que de filtrer directement : reutilise par le
+    graphe d'altitude (bande "pointable"), qui a besoin de garder tous les
+    points affiches pour le contexte visuel plutot que de les retirer --
+    contrairement a `view_window_df`, qui filtre pour de bon."""
+    if view_mode_key != "habituelle":
+        return pd.Series(True, index=index)
+    vw = view_window if view_window is not None else VIEW_WINDOW
+    start_h, end_h = vw["start_hour"], vw["end_hour"]
+    return pd.Series(index.map(lambda t: start_h <= t.hour + t.minute / 60 <= end_h), index=index)
+
+
+def view_window_df(df: pd.DataFrame, view_mode_key: str, view_window: dict | None = None) -> pd.DataFrame:
+    """Filtre `df` sur la fenetre d'observation (voir `in_observation_window`),
+    sauf si elle est vide ou que le mode 'nuit complete' est actif -- repli
+    rapide qui renvoie `df` tel quel (meme objet, pas de copie) en mode
+    complet, plutot que de filtrer sur un masque tout-vrai."""
     if view_mode_key != "habituelle":
         return df
-    start_h, end_h = VIEW_WINDOW["start_hour"], VIEW_WINDOW["end_hour"]
-    mask = df.index.map(lambda t: start_h <= t.hour + t.minute / 60 <= end_h)
-    filtered = df[mask]
+    filtered = df[in_observation_window(df.index, view_mode_key, view_window)]
     return filtered if not filtered.empty else df
 
 

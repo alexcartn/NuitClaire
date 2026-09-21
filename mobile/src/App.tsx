@@ -40,6 +40,8 @@ export default function App() {
             designation={selected}
             captured={captured}
             horizon={state?.horizon}
+            windowMode={state?.windowMode}
+            viewWindow={state?.viewWindow}
             onBack={() => setScreen(backTo)}
             onCaptureChange={reloadState}
           />

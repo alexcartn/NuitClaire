@@ -25,6 +25,18 @@ def test_list_messier_only_feasible_filters_out_infeasible(api_client):
     assert any(r["feasibleTonight"] is False for r in all_rows)
 
 
+def test_list_messier_respects_window_mode(api_client):
+    # Avant, Messier ignorait volontairement window_mode (toujours "nuit
+    # complete") -- une fenetre tres etroite (30 min) doit desormais reduire
+    # le nombre d'objets faisables par rapport a la nuit complete.
+    complete_count = len(api_client.get("/api/messier", params={"onlyFeasible": "true"}).json())
+    api_client.put("/api/settings", json={
+        "windowMode": "habituelle", "viewWindow": {"startHour": 20.0, "endHour": 20.5},
+    })
+    narrow_count = len(api_client.get("/api/messier", params={"onlyFeasible": "true"}).json())
+    assert narrow_count < complete_count
+
+
 def test_search_finds_known_designation(api_client):
     r = api_client.get("/api/search", params={"q": "M31"})
     assert r.status_code == 200

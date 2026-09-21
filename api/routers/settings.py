@@ -12,16 +12,23 @@ router = APIRouter()
 _VALID_WINDOW_MODES = ("complete", "habituelle")
 
 
+def _view_window_out(s: dict) -> dict:
+    return {"startHour": s["view_window"]["start_hour"], "endHour": s["view_window"]["end_hour"]}
+
+
 @router.get("/api/settings", response_model=SettingsOut)
 def get_settings() -> dict:
     s = settings_store.load()
-    return {"site": site_to_out(site_from_settings(s)), "windowMode": s["window_mode"], "alerts": s["alerts"]}
+    return {"site": site_to_out(site_from_settings(s)), "windowMode": s["window_mode"],
+            "viewWindow": _view_window_out(s), "alerts": s["alerts"]}
 
 
 @router.put("/api/settings", response_model=SettingsOut)
 def update_settings(body: SettingsUpdate) -> dict:
     if body.windowMode is not None and body.windowMode not in _VALID_WINDOW_MODES:
         raise HTTPException(422, f"windowMode doit etre l'un de {_VALID_WINDOW_MODES}")
+    if body.viewWindow is not None and body.viewWindow.startHour >= body.viewWindow.endHour:
+        raise HTTPException(422, "L'heure de debut doit etre avant l'heure de fin.")
 
     with settings_write_lock:
         s = settings_store.load()
@@ -33,11 +40,14 @@ def update_settings(body: SettingsUpdate) -> dict:
             s["site"] = {**current, "name": body.site.name, "lat": body.site.lat, "lon": body.site.lon}
         if body.windowMode is not None:
             s["window_mode"] = body.windowMode
+        if body.viewWindow is not None:
+            s["view_window"] = {"start_hour": body.viewWindow.startHour, "end_hour": body.viewWindow.endHour}
         if body.alerts is not None:
             s["alerts"] = {**s["alerts"], **body.alerts}
         settings_store.save(s)
 
-    return {"site": site_to_out(site_from_settings(s)), "windowMode": s["window_mode"], "alerts": s["alerts"]}
+    return {"site": site_to_out(site_from_settings(s)), "windowMode": s["window_mode"],
+            "viewWindow": _view_window_out(s), "alerts": s["alerts"]}
 
 
 @router.post("/api/geocode", response_model=GeocodeResult)

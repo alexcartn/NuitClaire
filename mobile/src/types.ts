@@ -6,9 +6,15 @@ export interface Site {
   tz: string;
 }
 
+export interface ViewWindow {
+  startHour: number;
+  endHour: number;
+}
+
 export interface Settings {
   site: Site;
   windowMode: "complete" | "habituelle";
+  viewWindow: ViewWindow;
   alerts: Record<string, boolean>;
 }
 
@@ -16,6 +22,7 @@ export interface AppState {
   site: Site;
   horizon: Record<string, boolean>;
   windowMode: string;
+  viewWindow: ViewWindow;
   messierCaptured: string[];
 }
 
@@ -141,6 +148,7 @@ export type Screen = "soir" | "cibles" | "detail" | "messier" | "recherche" | "r
 export interface SettingsUpdate {
   site?: { name: string; lat: number; lon: number };
   windowMode?: "complete" | "habituelle";
+  viewWindow?: ViewWindow;
   alerts?: Record<string, boolean>;
 }
 

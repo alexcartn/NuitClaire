@@ -9,14 +9,15 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from config import SITE, NB_NIGHTS, SEESTAR
+from config import SITE, NB_NIGHTS, SEESTAR, VIEW_WINDOW
 from weather import fetch_all
 from astro import (night_hours, sky_frame, twilight_times, COMPASS_SECTORS,
                     format_ra, format_dec, moon_status, local_now)
 from scoring import (score_frame, night_summary, target_windows, score_label_fr,
                       target_altitude_series, recommended_exposure_minutes, wind_quality,
                       target_feasibility_reasons, cloud_trend, CLOUD_TREND_WINDOW_HOURS,
-                      dew_risk, discovery_sort_key, temperature_range, view_window_df)
+                      dew_risk, discovery_sort_key, in_observation_window, temperature_range,
+                      view_window_df)
 from catalog import load_targets, load_messier, find_target, search_prefix
 from geocode import geocode, GeocodeError
 from wiki import target_summary, wiki_title_candidates
@@ -161,7 +162,25 @@ with st.sidebar:
                 progress_store.save(prog)
 
     st.header("Fenetre d'observation")
-    mode = st.radio("Plage horaire", ["Nuit complete", "Habituelle (20:00–22:30)"], index=0)
+    mode = st.radio("Plage horaire", ["Nuit complete", "Habituelle"], index=0)
+    # Horaires personnalisables (par defaut ceux de config.VIEW_WINDOW) --
+    # ephemere en session_state, meme choix que le site (voir commentaire de
+    # settings.py) : Streamlit n'a pas les reglages persistes du mobile.
+    view_window = {"start_hour": VIEW_WINDOW["start_hour"], "end_hour": VIEW_WINDOW["end_hour"]}
+    if mode == "Habituelle":
+        col_start, col_end = st.columns(2)
+        with col_start:
+            vw_start = st.number_input("Debut (h)", min_value=0.0, max_value=23.5,
+                                        value=float(VIEW_WINDOW["start_hour"]), step=0.5)
+        with col_end:
+            vw_end = st.number_input("Fin (h)", min_value=0.5, max_value=24.0,
+                                      value=float(VIEW_WINDOW["end_hour"]), step=0.5)
+        if vw_start < vw_end:
+            view_window = {"start_hour": vw_start, "end_hour": vw_end}
+        else:
+            st.warning("L'heure de debut doit preceder l'heure de fin -- horaires par defaut utilises.")
+        _soft_caption(f"Cibles/Messier/graphe d'altitude ne comptent comme pointable que "
+                      f"{vw_start:.1f}h–{vw_end:.1f}h.")
 
 
 @st.cache_data(ttl=1800)
@@ -196,8 +215,8 @@ MESSIER_COLS = 4
 
 
 def _target_grid(rows: list[dict], night_df: pd.DataFrame, site: dict, horizon: dict,
-                  key_prefix: str, cols: int, card: Callable[[dict], str],
-                  extra: Callable[[dict], None] | None = None) -> None:
+                  view_mode_key: str, view_window: dict, key_prefix: str, cols: int,
+                  card: Callable[[dict], str], extra: Callable[[dict], None] | None = None) -> None:
     """Grille de cartes en colonnes Streamlit, chacune suivie d'un bouton
     'Detail' ouvrant la modale de hauteur/fiche technique de la cible.
     `card(row)` rend le HTML de la carte ; `extra(row)`, si fourni, rend un
@@ -210,7 +229,7 @@ def _target_grid(rows: list[dict], night_df: pd.DataFrame, site: dict, horizon: 
                 st.markdown(card(row), unsafe_allow_html=True)
                 uid = row.get("Cible") or row["id"]
                 if st.button("Detail", key=f"{key_prefix}_detail_{uid}", use_container_width=True):
-                    _target_detail_dialog(row, night_df, site, horizon)
+                    _target_detail_dialog(row, night_df, site, horizon, view_mode_key, view_window)
                 if extra is not None:
                     extra(row)
 
@@ -379,8 +398,12 @@ def _render_wind_chart(df: pd.DataFrame) -> None:
 
 @st.cache_data(ttl=1800)
 def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key: str,
-                   catalog: str) -> list[dict]:
-    """Cibles faisables pour une nuit donnee (cache par site/nuit/horizon/mode/catalogue).
+                   catalog: str, view_window_key: tuple) -> list[dict]:
+    """Cibles faisables pour une nuit donnee (cache par site/nuit/horizon/mode/
+    horaires/catalogue). Le mode de fenetre s'applique aux deux catalogues
+    ("targets" ET "messier", voir view_mode_key hoiste avant les onglets) --
+    coherent avec le graphe d'altitude de la fiche detail plutot qu'une
+    exception pour Messier.
 
     Ne recalcule que si l'un de ces parametres change -- independant des autres
     interactions widget (ex. cocher une capture Messier) qui declenchent un
@@ -391,7 +414,8 @@ def feasible_rows(site_key: tuple, day: date, horizon_key: tuple, view_mode_key:
     df = nights.get(day)
     if df is None:
         return []
-    view_df = view_window_df(df, view_mode_key) if catalog == "targets" else df
+    view_window = {"start_hour": view_window_key[0], "end_hour": view_window_key[1]}
+    view_df = view_window_df(df, view_mode_key, view_window)
     horizon = dict(horizon_key)
     targets = load_targets() if catalog == "targets" else load_messier()
 
@@ -433,17 +457,21 @@ _COMPASS_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100",
                    "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 
 
-def _clear_horizon_runs(series: pd.DataFrame, horizon: dict) -> pd.DataFrame:
+def _clear_horizon_runs(series: pd.DataFrame, horizon: dict, view_mode_key: str,
+                         view_window: dict) -> pd.DataFrame:
     """Plages horaires contigues ou la cible est a la fois dans l'altitude
-    exploitable du Seestar et dans un secteur d'horizon degage -- purement
-    geometrique (site + position), independant de la meteo/Lune (`series` n'a
-    pas ces colonnes ici, voir `_target_detail_dialog`). Meme technique de
-    regroupement en plages que `scoring.best_window_span`, dupliquee ici
-    plutot que partagee : l'un opere sur un score meteo, l'autre sur un
-    masque alt/secteur, deux notions distinctes malgre la forme commune."""
+    exploitable du Seestar, dans un secteur d'horizon degage, ET dans la
+    fenetre d'observation configuree (si le mode "habituelle" est actif) --
+    purement geometrique + horaire (site + position + reglage utilisateur),
+    independant de la meteo/Lune (`series` n'a pas ces colonnes ici, voir
+    `_target_detail_dialog`). Meme technique de regroupement en plages que
+    `scoring.best_window_span`, dupliquee ici plutot que partagee : l'un
+    opere sur un score meteo, l'autre sur un masque alt/secteur/horaire,
+    deux notions distinctes malgre la forme commune."""
     open_sectors = {s for s, is_open in horizon.items() if is_open}
+    window_ok = in_observation_window(series.index, view_mode_key, view_window)
     ok = ((series["alt"] >= SEESTAR["min_alt_deg"]) & (series["alt"] <= SEESTAR["max_alt_deg"])
-          & series["sector"].isin(open_sectors))
+          & series["sector"].isin(open_sectors) & window_ok)
     runs = []
     for is_ok, group in groupby(zip(series.index, ok), key=lambda x: x[1]):
         if is_ok:
@@ -452,7 +480,8 @@ def _clear_horizon_runs(series: pd.DataFrame, horizon: dict) -> pd.DataFrame:
     return pd.DataFrame(runs, columns=["start", "end"])
 
 
-def _altitude_chart(series: pd.DataFrame, horizon: dict, height: int = 240) -> alt.Chart:
+def _altitude_chart(series: pd.DataFrame, horizon: dict, view_mode_key: str, view_window: dict,
+                     height: int = 240) -> alt.Chart:
     """Graphe hauteur (altitude) vs heure d'une cible entre 19h et 6h (voir
     `rows.day_frame`), avec la plage utilisable du Seestar S50 (SEESTAR min/max
     alt) en reperes pointilles. Domaine Y non-negatif : sur cette fenetre la
@@ -462,8 +491,9 @@ def _altitude_chart(series: pd.DataFrame, horizon: dict, height: int = 240) -> a
     est colore par secteur cardinal (legende auto), l'azimut exact restant
     disponible au survol -- garde un seul graphe/axe plutot que d'ajouter un
     second axe ou un graphe separe. Bande verte en fond : plages ou l'horizon
-    degage choisi (barre laterale) rend la cible reellement pointable, cf.
-    `_clear_horizon_runs`."""
+    degage choisi (barre laterale) ET la fenetre d'observation configuree
+    rendent la cible reellement pointable, cf. `_clear_horizon_runs` -- toute
+    la nuit reste affichee pour le contexte, seule la bande se restreint."""
     long_df = series.reset_index()
     x = alt.X("time:T", title="Heure", axis=alt.Axis(format=TIME_AXIS_FORMAT))
     y = alt.Y("alt:Q", title="Altitude (deg)", scale=alt.Scale(domain=[0, 90]))
@@ -471,7 +501,7 @@ def _altitude_chart(series: pd.DataFrame, horizon: dict, height: int = 240) -> a
                alt.Tooltip("alt:Q", title="Altitude", format=".0f"),
                alt.Tooltip("az:Q", title="Azimut", format=".0f"),
                alt.Tooltip("sector:N", title="Direction")]
-    runs_df = _clear_horizon_runs(series, horizon)
+    runs_df = _clear_horizon_runs(series, horizon, view_mode_key, view_window)
     bands = (
         alt.Chart(runs_df)
         .mark_rect(color="#2ecc71", opacity=0.18)
@@ -500,7 +530,8 @@ def _cached_wiki_summary(candidates: tuple[str, ...]) -> dict | None:
 
 
 @st.dialog("Detail de la cible", width="large")
-def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict, horizon: dict) -> None:
+def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict, horizon: dict,
+                           view_mode_key: str, view_window: dict) -> None:
     """Modale ouverte par le bouton 'Detail' d'une carte (onglet 'Ce soir' ou
     'Catalogue Messier') : image + graphe de hauteur (19h-6h, voir
     `rows.day_frame`) cote a cote, puis fiche technique de la cible."""
@@ -529,9 +560,11 @@ def _target_detail_dialog(row: dict, night_df: pd.DataFrame, site: dict, horizon
         with img_col:
             st.image(row["Image"], use_container_width=True)
         with chart_col:
-            st.altair_chart(_altitude_chart(series, horizon), use_container_width=True)
+            st.altair_chart(_altitude_chart(series, horizon, view_mode_key, view_window),
+                             use_container_width=True)
     else:
-        st.altair_chart(_altitude_chart(series, horizon), use_container_width=True)
+        st.altair_chart(_altitude_chart(series, horizon, view_mode_key, view_window),
+                         use_container_width=True)
 
     peak_t = series["alt"].idxmax()
     peak = series.loc[peak_t]
@@ -620,6 +653,13 @@ if not nights:
     st.error("Aucune donnee de nuit disponible pour les prochains jours.")
     st.stop()
 
+# Hoiste avant les onglets (pas seulement dans tab_ce_soir) : le mode de
+# fenetre s'applique desormais partout -- cibles, Messier et graphe
+# d'altitude de la fiche detail (voir scoring.in_observation_window) --
+# plutot que d'etre recalcule ou ignore selon l'onglet.
+view_mode_key = "habituelle" if mode.startswith("Habituelle") else "complete"
+view_window_key = (view_window["start_hour"], view_window["end_hour"])
+
 tab_ce_soir, tab_messier, tab_journal = st.tabs(["Ce soir", "Catalogue Messier", "Journal"])
 
 with tab_ce_soir:
@@ -631,8 +671,7 @@ with tab_ce_soir:
     df = nights[sel]
     tw = twilights[sel]
 
-    view_mode_key = "habituelle" if mode.startswith("Habituelle") else "complete"
-    view_df = view_window_df(df, view_mode_key)
+    view_df = view_window_df(df, view_mode_key, view_window)
 
     # Unique source du score affiche sur la page (view_df) : c'est ce qui
     # garantit que le score du bandeau et celui de la carte ne divergent plus.
@@ -666,7 +705,7 @@ with tab_ce_soir:
                 label = f"{tgt['name']} — {tgt.get('common_name') or tgt.get('type_fr', '')}"
                 if st.button(label, key=f"search_suggest_{tgt['name']}", use_container_width=True):
                     _target_detail_dialog(row_from_search(tgt, df, prog["horizon"], site), df, site,
-                                           prog["horizon"])
+                                           prog["horizon"], view_mode_key, view_window)
         else:
             st.warning(f"Aucun objet trouve pour « {query} ». Essayez une designation "
                        "comme M31, NGC7380 ou IC434.")
@@ -744,7 +783,7 @@ with tab_ce_soir:
     # vise pour un usage juste avant de sortir (cf. .impeccable.md).
     st.subheader("Cibles faisables ce soir")
     horizon_key = tuple(sorted(prog["horizon"].items()))
-    rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "targets")
+    rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "targets", view_window_key)
     if rows:
         captured = set(prog["messier_captured"])
         rows = sorted(rows, key=lambda r: discovery_sort_key(r, captured))
@@ -763,12 +802,12 @@ with tab_ce_soir:
             rows = [r for r in rows if r.get("Mag") is None or mag_lo <= r["Mag"] <= mag_hi]
 
         shown, rest = rows[:GALLERY_PAGE_SIZE], rows[GALLERY_PAGE_SIZE:]
-        _target_grid(shown, df, site, prog["horizon"], "soir", GALLERY_COLS,
+        _target_grid(shown, df, site, prog["horizon"], view_mode_key, view_window, "soir", GALLERY_COLS,
                      card=lambda r: card_html(**_target_card(r)))
         if rest:
             with st.expander(f"Voir {len(rest)} cible(s) de plus"):
-                _target_grid(rest, df, site, prog["horizon"], "soir_plus", GALLERY_COLS,
-                              card=lambda r: card_html(**_target_card(r)))
+                _target_grid(rest, df, site, prog["horizon"], view_mode_key, view_window, "soir_plus",
+                              GALLERY_COLS, card=lambda r: card_html(**_target_card(r)))
     else:
         st.info("Aucune cible exploitable cette nuit (meteo, Lune ou horizon degage).")
 
@@ -779,12 +818,12 @@ with tab_messier:
     st.progress(len(captured) / messier_total, text=f"{len(captured)}/{messier_total} captures")
 
     # Meme nuit que l'onglet "Ce soir" (`sel`, la nuit du jour meme) -- pas de
-    # selecteur multi-jours ici non plus.
+    # selecteur multi-jours ici non plus. Respecte desormais le meme mode de
+    # fenetre que "Ce soir" (view_mode_key hoiste avant les onglets) : avant,
+    # Messier ignorait volontairement la fenetre d'observation -- changement
+    # demande pour que la faisabilite soit coherente partout dans l'appli.
     horizon_key = tuple(sorted(prog["horizon"].items()))
-    # view_mode_key fixe ("na") : la faisabilite Messier ignore la fenetre
-    # d'observation habituelle (df de nuit complet), donc un changement de
-    # mode dans la barre laterale ne doit pas invalider ce cache.
-    rows = feasible_rows(site_key, sel, horizon_key, "na", "messier")
+    rows = feasible_rows(site_key, sel, horizon_key, view_mode_key, "messier", view_window_key)
     for row in rows:
         row["Capture"] = row["id"] in captured
     rows.sort(key=lambda r: int(r["id"]))
@@ -814,7 +853,7 @@ with tab_messier:
             st.rerun()
 
     if rows:
-        _target_grid(rows, df, site, prog["horizon"], "messier", MESSIER_COLS,
+        _target_grid(rows, df, site, prog["horizon"], view_mode_key, view_window, "messier", MESSIER_COLS,
                       card=_messier_card_html, extra=_messier_extra)
     else:
         st.info("Aucun objet Messier faisable ce soir (meteo, Lune ou horizon degage).")

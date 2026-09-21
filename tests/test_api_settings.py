@@ -3,9 +3,32 @@ def test_get_settings_returns_defaults(api_client):
     assert r.status_code == 200
     data = r.json()
     assert data["windowMode"] == "complete"
+    assert data["viewWindow"] == {"startHour": 20.0, "endHour": 22.5}
     assert data["alerts"] == {"score": True, "dew": False}
     assert data["site"]["name"] == "Marson"
     assert data["site"]["tz"] == "Europe/Paris"
+
+
+def test_put_settings_updates_view_window(api_client):
+    r = api_client.put("/api/settings", json={"viewWindow": {"startHour": 21.0, "endHour": 23.0}})
+    assert r.status_code == 200
+    assert r.json()["viewWindow"] == {"startHour": 21.0, "endHour": 23.0}
+    assert api_client.get("/api/settings").json()["viewWindow"] == {"startHour": 21.0, "endHour": 23.0}
+
+
+def test_put_settings_rejects_view_window_start_after_end(api_client):
+    r = api_client.put("/api/settings", json={"viewWindow": {"startHour": 23.0, "endHour": 21.0}})
+    assert r.status_code == 422
+
+
+def test_put_settings_rejects_view_window_start_equal_end(api_client):
+    r = api_client.put("/api/settings", json={"viewWindow": {"startHour": 20.0, "endHour": 20.0}})
+    assert r.status_code == 422
+
+
+def test_put_settings_rejects_view_window_out_of_bounds(api_client):
+    r = api_client.put("/api/settings", json={"viewWindow": {"startHour": -1.0, "endHour": 22.0}})
+    assert r.status_code == 422
 
 
 def test_put_settings_updates_window_mode_and_alerts(api_client):

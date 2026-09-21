@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { AltitudeChart } from "../components/AltitudeChart";
+import type { ViewWindow } from "../types";
 
 function fmtExposureDate(iso: string): string {
   const d = new Date(iso);
@@ -12,12 +13,16 @@ export function Detail({
   designation,
   captured,
   horizon,
+  windowMode,
+  viewWindow,
   onBack,
   onCaptureChange,
 }: {
   designation: string;
   captured: Set<string>;
   horizon?: Record<string, boolean>;
+  windowMode?: string;
+  viewWindow?: ViewWindow;
   onBack: () => void;
   onCaptureChange: () => void;
 }) {
@@ -100,7 +105,7 @@ export function Detail({
                 fenetre pointable
               </div>
             </div>
-            <AltitudeChart series={data.altitudeSeries} horizon={horizon} />
+            <AltitudeChart series={data.altitudeSeries} horizon={horizon} windowMode={windowMode} viewWindow={viewWindow} />
             <p style={{ margin: 0, fontSize: 11, color: "var(--ink2)" }}>
               Direction a l'altitude max : {data.peakSector} (azimut {Math.round(data.peakAz)}°) vers{" "}
               {new Date(data.peakTime).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.

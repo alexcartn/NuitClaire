@@ -29,7 +29,7 @@ def list_targets(types: list[str] | None = Query(default=None)) -> list[dict]:
     sel, df, _ = current_night(site)
     if sel is None:
         return []
-    rows = feasible_rows(site, sel, horizon, window_mode, "targets")
+    rows = feasible_rows(site, sel, horizon, window_mode, "targets", s["view_window"])
     if types:
         rows = [r for r in rows if r["Type"] in types]
     return [row_to_target_out(r) for r in rows]
@@ -37,13 +37,15 @@ def list_targets(types: list[str] | None = Query(default=None)) -> list[dict]:
 
 @router.get("/api/messier", response_model=list[TargetRowOut])
 def list_messier(onlyFeasible: bool = False) -> list[dict]:
-    site, horizon = get_site(), get_horizon()
+    s = settings_store.load()
+    site, horizon = site_from_settings(s), get_horizon()
     sel, df, _ = current_night(site)
     if sel is None:
         return []
-    # Messier ignore le mode de fenetre (voir `api.deps.feasible_rows`) --
-    # window_mode n'a donc aucune influence ici, comme dans app.py.
-    rows = feasible_rows(site, sel, horizon, "complete", "messier")
+    # Respecte desormais le mode de fenetre comme le catalogue "targets"
+    # (voir `api.deps.feasible_rows`) : coherent avec la liste de cibles et
+    # le graphe d'altitude de la fiche detail plutot qu'une exception.
+    rows = feasible_rows(site, sel, horizon, s["window_mode"], "messier", s["view_window"])
     if onlyFeasible:
         rows = [r for r in rows if r["Faisable ce soir"] == "Oui"]
     return [row_to_target_out(r) for r in rows]

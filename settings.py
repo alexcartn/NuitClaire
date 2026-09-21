@@ -18,12 +18,19 @@ from pathlib import Path
 from types import MappingProxyType
 
 import db
+from config import VIEW_WINDOW
 
 SETTINGS_PATH = Path(__file__).parent / "data" / "settings.json"
 
 _DEFAULT_FROZEN = MappingProxyType({
     "site": None,
     "window_mode": "complete",  # "complete" | "habituelle" -- memes valeurs que app.py
+    # Horaires de la fenetre "habituelle" -- seed depuis config.VIEW_WINDOW,
+    # mais editables par l'utilisateur (voir PUT /api/settings) : ne pas
+    # relire VIEW_WINDOW directement ailleurs que pour ce seed, c'est ce
+    # dict-ci qui fait foi une fois un reglage sauvegarde.
+    "view_window": MappingProxyType({"start_hour": VIEW_WINDOW["start_hour"],
+                                      "end_hour": VIEW_WINDOW["end_hour"]}),
     "alerts": MappingProxyType({"score": True, "dew": False}),
 })
 
@@ -33,6 +40,7 @@ def default() -> dict:
     return {
         "site": None,
         "window_mode": _DEFAULT_FROZEN["window_mode"],
+        "view_window": dict(_DEFAULT_FROZEN["view_window"]),
         "alerts": dict(_DEFAULT_FROZEN["alerts"]),
     }
 
@@ -59,6 +67,11 @@ def load(path: Path = SETTINGS_PATH) -> dict:
     if not isinstance(alerts_override, dict):
         alerts_override = {}
     merged["alerts"] = {**_DEFAULT_FROZEN["alerts"], **alerts_override}
+
+    view_window_override = raw.get("view_window")
+    if not isinstance(view_window_override, dict):
+        view_window_override = {}
+    merged["view_window"] = {**_DEFAULT_FROZEN["view_window"], **view_window_override}
     return merged
 
 

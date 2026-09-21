@@ -49,6 +49,17 @@ cote Streamlit. Recherche par prefixe, pas par nom courant (couverture OpenNGC t
 partielle) ; la designation exacte (`catalog.find_target`, `GET /api/search`) reste
 utilisee pour l'ajout direct au journal de session.
 
+### Fenetre d'observation personnalisable
+
+Les horaires de la fenetre "Habituelle" (par defaut 20h-22h30, `config.VIEW_WINDOW`) sont
+editables dans Reglages (mobile, persiste dans `settings.json`/Supabase, `view_window`)
+ou dans la barre laterale (Streamlit, ephemere en session -- meme choix deliberement
+divergent que le site, voir l'en-tete de `settings.py`). Le mode de fenetre s'applique
+desormais de facon coherente partout dans l'appli : cibles faisables, Catalogue Messier
+(avant, il l'ignorait volontairement -- changement demande) et la bande "pointable" du
+graphe d'altitude de la fiche detail (`scoring.in_observation_window`, partage par les
+deux frontends). En mode "Nuit complete" (par defaut), rien de tout ca ne change.
+
 ### Performance mobile
 
 Deux optimisations en place : la fonction API Vercel est epinglee sur la region `cdg1`

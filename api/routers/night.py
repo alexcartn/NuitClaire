@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException
 
-from api.deps import current_night, get_site, get_window_mode
+from api.deps import current_night, get_site, get_view_window, get_window_mode
 from api.schemas import NightOut
 from astro import local_now, moon_status
 from scoring import cloud_trend, dew_risk, night_summary, score_label_fr, temperature_range, \
@@ -41,7 +41,7 @@ def get_night() -> dict:
         raise HTTPException(503, "Aucune donnee de nuit disponible pour les prochains jours.")
 
     window_mode = get_window_mode()
-    view_df = view_window_df(df, window_mode)
+    view_df = view_window_df(df, window_mode, get_view_window())
     s = night_summary(view_df)
     pct, label = score_label_fr(s["score"])
 
