@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { StaleNotice } from "../components/StaleNotice";
 import { RangeSlider } from "../components/RangeSlider";
 import { TargetRowCard } from "../components/TargetRow";
 
@@ -18,7 +19,13 @@ export function Cibles({
   const [showAll, setShowAll] = useState(false);
 
   const fetchTargets = useCallback(() => api.targets(types.length ? types : undefined), [types]);
-  const { data: rows, loading, error } = useFetch(fetchTargets, [types]);
+  const { data: rows, loading, error, fetchedAt } = useFetch(
+    fetchTargets,
+    [types],
+    // Meme cle que "Ce soir" quand aucun filtre n'est pose : c'est la meme
+    // requete, inutile d'en stocker deux copies.
+    types.length ? `targets:${[...types].sort().join(",")}` : "targets",
+  );
 
   const allTypes = useMemo(() => {
     const seen = new Set<string>();
@@ -90,7 +97,7 @@ export function Cibles({
       )}
 
       {loading && <p className="nc-caption">Chargement...</p>}
-      {error && <p className="nc-caption">Erreur de chargement des cibles.</p>}
+      {error && (rows ? <StaleNotice when={fetchedAt} /> : <p className="nc-caption">Erreur de chargement des cibles.</p>)}
 
       {shown.map((row) => (
         <TargetRowCard

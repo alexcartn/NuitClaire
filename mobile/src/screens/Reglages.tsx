@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { useTheme } from "../useTheme";
+import { isIOS, promptInstall, usePwa } from "../pwa";
 import { COMPASS_SECTORS } from "../types";
 
 const WINDOW_MODES: { key: "complete" | "habituelle"; label: string }[] = [
@@ -24,6 +25,7 @@ const ALERT_LABEL: Record<string, string> = {
 
 export function Reglages() {
   const { theme, isSystem, setTheme } = useTheme();
+  const { canPromptInstall, installed } = usePwa();
 
   const fetchSettings = useCallback(() => api.settings(), []);
   const { data, reload: reloadSettings } = useFetch(fetchSettings, []);
@@ -271,6 +273,31 @@ export function Reglages() {
               </span>
             </button>
           ))}
+        </div>
+      )}
+
+      {!installed && (
+        <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="nc-eyebrow">Installer l'appli</div>
+          <p className="nc-caption" style={{ margin: 0 }}>
+            Posee sur l'ecran d'accueil, NuitClaire s'ouvre en plein ecran et demarre meme
+            sans reseau : utile en pleine campagne, ou le journal continue de se remplir
+            hors ligne.
+          </p>
+          {canPromptInstall ? (
+            <button onClick={() => void promptInstall()} className="nc-btn nc-btn-primary">
+              Ajouter a l'ecran d'accueil
+            </button>
+          ) : (
+            // iOS n'expose pas d'API d'installation, et Chrome ne rejoue pas
+            // sa proposition une fois ecartee : dans les deux cas il ne
+            // reste que la marche a suivre manuelle.
+            <p className="nc-caption" style={{ margin: 0 }}>
+              {isIOS()
+                ? "Sur iPhone et iPad : bouton Partager, puis « Sur l'ecran d'accueil »."
+                : "Depuis le menu du navigateur : « Installer l'application » ou « Ajouter a l'ecran d'accueil »."}
+            </p>
+          )}
         </div>
       )}
 

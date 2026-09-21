@@ -1,13 +1,27 @@
 {
+  "id": "/",
   "name": "NuitClaire",
   "short_name": "NuitClaire",
   "description": "Planificateur de nuits et carnet d'observation Seestar S50",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["utilities", "education"],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#0a090c",
   "theme_color": "#0a090c",
+  "shortcuts": [
+    {
+      "name": "Journal de session",
+      "short_name": "Journal",
+      "description": "Ouvrir directement le carnet de la nuit en cours",
+      "url": "/?ecran=journal",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

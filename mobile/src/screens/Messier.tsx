@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { StaleNotice } from "../components/StaleNotice";
 import { RangeSlider } from "../components/RangeSlider";
 
 const MESSIER_TOTAL = 110;
@@ -21,7 +22,11 @@ export function Messier({
   const [showAll, setShowAll] = useState(false);
 
   const fetchMessier = useCallback(() => api.messier(onlyFeasible), [onlyFeasible]);
-  const { data: rows, loading } = useFetch(fetchMessier, [onlyFeasible]);
+  const { data: rows, loading, error, fetchedAt } = useFetch(
+    fetchMessier,
+    [onlyFeasible],
+    `messier:${onlyFeasible}`,
+  );
 
   const allTypes = useMemo(() => {
     const seen = new Set<string>();
@@ -107,7 +112,8 @@ export function Messier({
         </div>
       )}
 
-      {loading && <p className="nc-caption">Chargement...</p>}
+      {loading && !rows && <p className="nc-caption">Chargement...</p>}
+      {error && (rows ? <StaleNotice when={fetchedAt} /> : <p className="nc-caption">Erreur de chargement du catalogue.</p>)}
       {rows && filtered.length === 0 && (
         <p className="nc-caption">Aucun objet ne correspond a ces filtres.</p>
       )}

@@ -212,6 +212,21 @@ a {
   color: var(--ink3);
 }
 
+/* Bandeau "nouvelle version" : au-dessus du contenu, sous la barre
+   systeme, sans recouvrir quoi que ce soit. */
+.nc-update {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-top, 0px));
+  background: var(--surf2);
+  border-bottom: 1px solid var(--line);
+  font: 400 12px/1.3 "Helvetica Neue", Helvetica, sans-serif;
+  color: var(--ink2);
+}
+
 .nc-tabbar {
   flex: none;
   border-top: 1px solid var(--line);

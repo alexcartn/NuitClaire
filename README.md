@@ -79,14 +79,37 @@ coute un aller-retour au lieu de deux. Les valeurs que le client ne peut pas con
 (score de la nuit, identifiants et horodatages de notes cotes serveur) ne sont pas
 inventees localement : elles arrivent avec la reponse.
 
-L'appli est aussi installable (`mobile/public/manifest.webmanifest`) et s'ouvre sans
-reseau grace a un service worker ecrit a la main (`mobile/public/sw.js`, liste de
-prechargement injectee au build par le plugin `swPrecache` de `vite.config.ts`). Les
-appels a l'API et les ressources d'autres domaines ne sont jamais mis en cache. Les
-icones sont generees par `python scripts/build_icons.py`.
-
     cd mobile
     npm test          # logique hors ligne du journal (lanceur de tests integre a Node)
+
+### Appli installable
+
+`mobile/public/manifest.webmanifest` et un service worker ecrit a la main
+(`mobile/public/sw.js`, liste de prechargement injectee au build par le plugin
+`swPrecache` de `vite.config.ts`) font de NuitClaire une appli posee sur l'ecran
+d'accueil, qui demarre sans reseau. Les icones viennent de
+`python scripts/build_icons.py`. Ce qui a suivi pour que ce soit vraiment une appli et
+pas une page web deguisee :
+
+- proposition d'installation dans Reglages (`src/pwa.ts`) : la boite du navigateur en un
+  appui sur Chromium, et sur iOS -- qui n'expose aucune API -- la marche a suivre en
+  clair, les deux masquees une fois l'appli installee ;
+- mise a jour proposee, jamais imposee : le nouveau service worker reste en attente
+  (`SKIP_WAITING` sur demande) et un bandeau propose de recharger. Une prise de controle
+  automatique remplacerait le code sous les pieds de la page et ferait perdre la note en
+  cours de frappe ;
+- demarrage a froid hors ligne : `useFetch` garde la derniere reponse reussie sur
+  l'appareil (`cacheKey`) et la reaffiche avant meme la requete, avec un avertissement
+  date des que le reseau manque (`staleLabel`, `StaleNotice`). Une prevision horaire et
+  des fenetres de visibilite sont datees par nature : montrer celles d'hier sans le dire
+  ferait pointer une cible qui n'est plus la ;
+- raccourci "Journal" (appui long sur l'icone) ouvrant directement le carnet, via
+  `/?ecran=journal`.
+
+Les appels a l'API et les ressources d'autres domaines ne sont jamais mis en cache par le
+service worker : la fraicheur des donnees est geree dans l'appli, ou l'on sait quoi en
+dire. Connu comme non fait : pas de captures d'ecran dans le manifeste (elles enrichissent
+la boite d'installation Android).
 
 ### Saisie sur le terrain
 
@@ -128,9 +151,9 @@ prochain deploiement -- la selection de region peut etre limitee selon le plan V
 l'onglet "Catalogue Messier" pagine desormais comme "Cibles" (24 objets, "Voir N de plus")
 et charge ses vignettes via `<img loading="lazy">` au lieu d'un fond CSS charge d'un bloc,
 pour ne pas declencher jusqu'a 110 requetes d'images externes simultanees a l'ouverture.
-Connu comme non fait : pas de cache client entre ecrans hors journal (les autres ecrans
-refetchent a chaque navigation), ni de mitigation du cold start serverless Vercel apres
-une periode d'inactivite -- le journal, lui, ne l'attend plus (voir "Journal hors ligne").
+Connu comme non fait : pas de mitigation du cold start serverless Vercel apres une
+periode d'inactivite. Chaque navigation refetche, mais plus a vide : la derniere reponse
+connue s'affiche pendant ce temps (voir "Appli installable").
 
 La fiche detail d'une cible (Cibles/Catalogue Messier) permet aussi d'ajouter du temps
 d'expo directement, sans passer par le journal de session -- pratique pour rattraper des

@@ -29,7 +29,16 @@ const OFFLINE_URL = "/index.html";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
-  self.skipWaiting();
+  // Pas de skipWaiting ici : une nouvelle version qui prend la main toute
+  // seule remplace le code sous les pieds de la page ouverte. L'appli
+  // propose de recharger et n'active la nouvelle version qu'a ce
+  // moment-la (voir src/pwa.ts), pour ne pas couper une note en cours de
+  // frappe. Sur la toute premiere installation il n'y a pas d'ancienne
+  // version : le worker s'active directement, sans rien attendre.
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

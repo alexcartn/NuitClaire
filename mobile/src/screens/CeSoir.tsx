@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { StaleNotice } from "../components/StaleNotice";
 import { ScoreCard } from "../components/ScoreCard";
 import { StatCard } from "../components/StatCard";
 import { SectorChips } from "../components/SectorChips";
@@ -38,19 +39,23 @@ export function CeSoir({
   const fetchTargets = useCallback(() => api.targets(), []);
   const fetchMessier = useCallback(() => api.messier(true), []);
 
-  const night = useFetch(fetchNight, []);
-  const state = useFetch(fetchState, []);
-  const targets = useFetch(fetchTargets, []);
-  const messier = useFetch(fetchMessier, []);
+  // Cles de cache : la derniere reponse reussie est reaffichee au demarrage,
+  // avant meme la requete, pour que l'appli installee montre quelque chose
+  // sans reseau (voir useFetch).
+  const night = useFetch(fetchNight, [], "night");
+  const state = useFetch(fetchState, [], "state");
+  const targets = useFetch(fetchTargets, [], "targets");
+  const messier = useFetch(fetchMessier, [], "messier:true");
+  const stale = (night.error || state.error) && night.data && state.data;
 
-  if (night.loading || state.loading) {
+  if ((night.loading && !night.data) || (state.loading && !state.data)) {
     return (
       <div className="nc-screen">
         <p className="nc-caption">Chargement meteo + ephemerides...</p>
       </div>
     );
   }
-  if (night.error || !night.data || state.error || !state.data) {
+  if (!night.data || !state.data) {
     return (
       <div className="nc-screen">
         <p className="nc-caption">Impossible de recuperer les donnees. Reessayez dans quelques instants.</p>
@@ -66,6 +71,7 @@ export function CeSoir({
 
   return (
     <div className="nc-screen">
+      {stale && <StaleNotice when={night.fetchedAt} />}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div>
           <div className="nc-eyebrow">Ce soir</div>

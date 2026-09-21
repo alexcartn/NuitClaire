@@ -26,6 +26,10 @@
  * Rien n'est fabrique au sens de l'en-tete de `sessions.py` : la file ne
  * cree aucune donnee, elle differe seulement l'envoi de ce que
  * l'utilisateur a saisi. */
+// Extension explicite : ce module est importe tel quel par le lanceur de
+// tests de Node (voir sessionQueue.test.ts), dont la resolution ESM ne
+// devine pas les extensions, contrairement a Vite.
+import { readJson, writeJson } from "./storage.ts";
 import type { CurrentSession, Note, Sessions, SessionItem, TimelineEntry } from "./types";
 
 const QUEUE_KEY = "nc-sessions-queue";
@@ -293,25 +297,9 @@ export function pendingNoteIds(queue: SessionOp[]): Set<string> {
 
 // --- Persistance locale ------------------------------------------------
 
-/** localStorage peut lever (mode prive, quota, stockage bloque) : le
- * journal doit continuer a fonctionner en memoire dans ce cas, avec pour
- * seule consequence la perte de la file si l'onglet est ferme. */
-function readJson<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw === null ? null : (JSON.parse(raw) as T);
-  } catch {
-    return null;
-  }
-}
-
-function writeJson(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* ignore */
-  }
-}
+// Ecritures tolerantes a un localStorage indisponible (voir storage.ts) :
+// le journal continue en memoire, avec pour seule consequence la perte de
+// la file si l'onglet est ferme.
 
 export function loadQueue(): SessionOp[] {
   const q = readJson<SessionOp[]>(QUEUE_KEY);
