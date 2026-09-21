@@ -1,6 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { applyServer, mutate, refresh, useSessions } from "../useSessions";
+import { localNoteId, newOp } from "../sessionQueue";
+import type { SessionOpBody } from "../sessionQueue";
 import { StatCard } from "../components/StatCard";
 import type { TargetRow, TimelineEntry } from "../types";
 
@@ -27,10 +30,40 @@ const inputStyle = {
   padding: "7px 9px", fontSize: 12, color: "var(--ink)", flex: 1,
 } as const;
 
+/** Bandeau d'etat de la synchronisation. Le journal se remplit dehors, avec
+ * un reseau qui va et vient : ce qui compte est de savoir que rien n'est
+ * perdu, pas d'etre bloque. Silencieux quand tout est envoye. */
+function SyncBanner({ pendingCount, syncError, loadError }: {
+  pendingCount: number; syncError: string | null; loadError: string | null;
+}) {
+  if (pendingCount === 0 && !syncError && !loadError) return null;
+  const message = pendingCount > 0
+    ? `${pendingCount} saisie(s) en attente d'envoi : conservees sur l'appareil, envoyees des le retour du reseau.`
+    : loadError
+      ? `Journal affiche depuis la copie locale (${loadError}).`
+      : syncError;
+  return (
+    <div
+      className="nc-caption"
+      style={{
+        margin: 0, background: "var(--surf2)", border: "1px solid var(--line)",
+        borderRadius: 9, padding: "8px 10px", color: "var(--ink2)",
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
 /** Fil chronologique d'une nuit : notes par cible et notes libres deja
- * fusionnees/triees par le backend (voir sessions.timeline) -- on se
- * contente de les rendre comme un carnet, sans reconstituer le tri ici. */
-function Timeline({ entries, onDelete }: { entries: TimelineEntry[]; onDelete?: (entry: TimelineEntry) => void }) {
+ * fusionnees/triees (par le backend, ou localement tant qu'une saisie n'est
+ * pas partie -- voir sessionQueue.applyOp) ; on se contente de les rendre
+ * comme un carnet, sans reconstituer le tri ici. */
+function Timeline({ entries, pendingNotes, onDelete }: {
+  entries: TimelineEntry[];
+  pendingNotes?: Set<string>;
+  onDelete?: (entry: TimelineEntry) => void;
+}) {
   if (entries.length === 0) {
     return <p className="nc-caption" style={{ margin: 0 }}>Aucune note pour l'instant.</p>;
   }
@@ -44,6 +77,9 @@ function Timeline({ entries, onDelete }: { entries: TimelineEntry[]; onDelete?: 
             {e.target ? <span style={{ color: "var(--ink)", fontWeight: 500 }}>{e.target}</span> : "Note libre"}
             {" — "}
             {e.text}
+            {pendingNotes?.has(e.id) && (
+              <span className="nc-mono" style={{ color: "var(--ink3)", fontSize: 11 }}> · en attente</span>
+            )}
           </span>
           {onDelete && (
             <button
@@ -61,11 +97,9 @@ function Timeline({ entries, onDelete }: { entries: TimelineEntry[]; onDelete?: 
 }
 
 export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) => void }) {
-  const fetchSessions = useCallback(() => api.sessions(), []);
-  const { data, loading, reload } = useFetch(fetchSessions, []);
+  const { data, loading, loadError, pendingCount, pendingNotes, syncError, syncCount } = useSessions();
   const fetchStats = useCallback(() => api.stats(), []);
   const { data: stats, reload: reloadStats } = useFetch(fetchStats, []);
-  const [closing, setClosing] = useState(false);
   const [reopening, setReopening] = useState<string | null>(null);
   const [reopenError, setReopenError] = useState<string | null>(null);
   const [pastNoteDraft, setPastNoteDraft] = useState<Record<string, string>>({});
@@ -77,16 +111,24 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
   const [targetResults, setTargetResults] = useState<TargetRow[] | null>(null);
   const [searchingTarget, setSearchingTarget] = useState(false);
 
+  // Les statistiques derivent du journal cote serveur : les recharger quand
+  // une saisie vient d'y etre enregistree, pas a chaque frappe locale.
+  useEffect(() => {
+    if (syncCount > 0) reloadStats();
+  }, [syncCount, reloadStats]);
+
   if (loading || !data) {
     return (
       <div className="nc-screen">
-        <p className="nc-caption">Chargement...</p>
+        <p className="nc-caption">{loadError ?? "Chargement..."}</p>
       </div>
     );
   }
 
   const { current, past } = data;
   const sessionActive = current.items.length > 0 || current.freeNotes.length > 0;
+
+  const send = (body: SessionOpBody) => mutate(newOp(body));
 
   const searchTargets = async () => {
     if (!targetQuery.trim()) return;
@@ -98,78 +140,61 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
     }
   };
 
-  const addTarget = async (designation: string) => {
-    await api.addSessionItem(designation);
+  const addTarget = (designation: string) => {
+    send({ kind: "addItem", designation });
     setTargetResults(null);
     setTargetQuery("");
-    reload();
   };
 
-  const submitFreeNote = async () => {
+  const submitFreeNote = () => {
     const text = freeNoteDraft.trim();
     if (!text) return;
-    await api.addFreeNote(text);
+    send({ kind: "addFreeNote", noteId: localNoteId(), text });
     setFreeNoteDraft("");
-    reload();
   };
 
-  const toggleDone = async (designation: string, done: boolean) => {
-    await api.updateSessionItem(designation, { done: !done });
-    reload();
-  };
+  const toggleDone = (designation: string, done: boolean) =>
+    send({ kind: "setDone", designation, done: !done });
 
-  const saveExposure = async (designation: string, raw: string) => {
+  const saveExposure = (designation: string, raw: string) => {
     const trimmed = raw.trim();
     if (trimmed === "") return;
     const minutes = Math.round(Number(trimmed));
     if (!Number.isFinite(minutes) || minutes < 0) return;
-    await api.updateSessionItem(designation, { exposureMin: minutes });
-    reload();
-    reloadStats();
+    send({ kind: "setExposure", designation, minutes });
   };
 
-  const submitItemNote = async (designation: string) => {
+  const submitItemNote = (designation: string) => {
     const text = (itemNoteDraft[designation] ?? "").trim();
     if (!text) return;
-    await api.addItemNote(designation, text);
+    send({ kind: "addItemNote", designation, noteId: localNoteId(), text });
     setItemNoteDraft((d) => ({ ...d, [designation]: "" }));
-    reload();
   };
 
-  const deleteTimelineEntry = async (entry: TimelineEntry) => {
-    if (entry.target) await api.deleteItemNote(entry.target, entry.id);
-    else await api.deleteFreeNote(entry.id);
-    reload();
+  const deleteTimelineEntry = (entry: TimelineEntry) => {
+    if (entry.target) send({ kind: "removeItemNote", designation: entry.target, noteId: entry.id });
+    else send({ kind: "removeFreeNote", noteId: entry.id });
   };
 
-  const removeItem = async (designation: string) => {
-    await api.deleteSessionItem(designation);
-    reload();
-  };
+  const removeItem = (designation: string) => send({ kind: "removeItem", designation });
 
-  const close = async () => {
-    setClosing(true);
-    try {
-      await api.closeSession();
-      reload();
-      reloadStats();
-    } finally {
-      setClosing(false);
-    }
-  };
+  const close = () => send({ kind: "closeSession" });
 
   const savePastNote = async (closedAt: string, note: string) => {
-    await api.updatePastSessionNote(closedAt, note);
-    reload();
+    // Retouche d'une sortie deja cloturee : pas une saisie de terrain, elle
+    // peut rester un aller-retour direct (et le serveur valide `closedAt`).
+    try {
+      applyServer(await api.updatePastSessionNote(closedAt, note));
+    } catch {
+      refresh();
+    }
   };
 
   const reopen = async (closedAt: string) => {
     setReopening(closedAt);
     setReopenError(null);
     try {
-      await api.reopenSession(closedAt);
-      reload();
-      reloadStats();
+      applyServer(await api.reopenSession(closedAt));
     } catch (e) {
       setReopenError(e instanceof Error ? e.message : "Impossible de rouvrir cette sortie.");
     } finally {
@@ -183,6 +208,8 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
         <div className="nc-eyebrow">Journal de session</div>
         <div className="nc-title">{past.length} sortie(s) enregistree(s)</div>
       </div>
+
+      <SyncBanner pendingCount={pendingCount} syncError={syncError} loadError={loadError} />
 
       {stats && stats.totalOutings > 0 && (
         <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
@@ -362,11 +389,11 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div className="nc-eyebrow">Journal de la nuit</div>
-            <Timeline entries={current.timeline} onDelete={deleteTimelineEntry} />
+            <Timeline entries={current.timeline} pendingNotes={pendingNotes} onDelete={deleteTimelineEntry} />
           </div>
 
-          <button onClick={close} disabled={closing} className="nc-btn nc-btn-primary">
-            {closing ? "..." : "Cloturer la session"}
+          <button onClick={close} className="nc-btn nc-btn-primary">
+            Cloturer la session
           </button>
         </div>
       ) : (
@@ -412,12 +439,18 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
               )}
               <button
                 onClick={() => reopen(p.closedAt)}
-                disabled={sessionActive || reopening === p.closedAt}
+                disabled={sessionActive || pendingCount > 0 || reopening === p.closedAt}
                 className="nc-caption"
-                title={sessionActive ? "Cloturez la session en cours avant de rouvrir une sortie passee" : "Rouvrir cette sortie"}
+                title={
+                  sessionActive
+                    ? "Cloturez la session en cours avant de rouvrir une sortie passee"
+                    : pendingCount > 0
+                      ? "Saisies en attente d'envoi : rouvrez cette sortie une fois la synchronisation terminee"
+                      : "Rouvrir cette sortie"
+                }
                 style={{
                   alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer",
-                  color: sessionActive ? "var(--ink3)" : "var(--accent)", padding: 0,
+                  color: sessionActive || pendingCount > 0 ? "var(--ink3)" : "var(--accent)", padding: 0,
                 }}
               >
                 {reopening === p.closedAt ? "..." : "Rouvrir cette sortie"}

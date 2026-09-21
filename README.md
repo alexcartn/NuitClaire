@@ -28,8 +28,9 @@ Les 7 ecrans de la maquette sont implementes : "Ce soir", "Cibles", "Detail cibl
 alertes -- toutes editables) et "Journal" (session en cours + historique). Connu comme
 incomplet : les alertes sont enregistrees mais rien ne les envoie reellement (pas
 d'infrastructure de notification) ; "Ma position" prend les coordonnees GPS sans geocodage
-inverse (pas de nom d'adresse) ; pas de PWA installable (pas de manifest/service worker) ;
-pas de suite de tests JS (verification faite via Playwright manuel).
+inverse (pas de nom d'adresse) ; cote tests JS, seule la logique hors ligne du journal est
+couverte (`mobile/src/sessionQueue.test.ts`), le reste des ecrans est verifie a la main
+via Playwright.
 
 "Cibles" et "Catalogue Messier" ont un filtre magnitude (curseur a deux poignees, mini et
 maxi independants -- `RangeSlider` cote mobile, `st.slider` en mode plage cote Streamlit)
@@ -60,6 +61,33 @@ desormais de facon coherente partout dans l'appli : cibles faisables, Catalogue 
 graphe d'altitude de la fiche detail (`scoring.in_observation_window`, partage par les
 deux frontends). En mode "Nuit complete" (par defaut), rien de tout ca ne change.
 
+### Journal hors ligne
+
+Le journal se remplit a chaud, dehors, ou le reseau est souvent faible ou absent. Une
+saisie n'attend donc plus l'aller-retour serveur : elle s'affiche immediatement et part
+en fond (`mobile/src/sessionQueue.ts` pour la file et l'application locale,
+`sessionStore.ts` pour l'envoi et l'etat partage entre ecrans). Une saisie qui ne passe
+pas reste dans une file persistee sur l'appareil, est signalee "en attente" a l'ecran, et
+repart automatiquement au retour du reseau (reessais avec temporisation croissante, plus
+un essai immediat sur les evenements `online` et retour au premier plan). Un refus du
+serveur (4xx) abandonne l'operation au lieu de bloquer les suivantes.
+
+L'etat affiche est toujours le dernier etat serveur connu plus les operations en attente
+rejouees par-dessus : pas d'annulation a rattraper, et la reponse du serveur (qui contient
+le journal complet) devient la nouvelle base sans requete supplementaire -- chaque saisie
+coute un aller-retour au lieu de deux. Les valeurs que le client ne peut pas connaitre
+(score de la nuit, identifiants et horodatages de notes cotes serveur) ne sont pas
+inventees localement : elles arrivent avec la reponse.
+
+L'appli est aussi installable (`mobile/public/manifest.webmanifest`) et s'ouvre sans
+reseau grace a un service worker ecrit a la main (`mobile/public/sw.js`, liste de
+prechargement injectee au build par le plugin `swPrecache` de `vite.config.ts`). Les
+appels a l'API et les ressources d'autres domaines ne sont jamais mis en cache. Les
+icones sont generees par `python scripts/build_icons.py`.
+
+    cd mobile
+    npm test          # logique hors ligne du journal (lanceur de tests integre a Node)
+
 ### Performance mobile
 
 Deux optimisations en place : la fonction API Vercel est epinglee sur la region `cdg1`
@@ -68,8 +96,9 @@ prochain deploiement -- la selection de region peut etre limitee selon le plan V
 l'onglet "Catalogue Messier" pagine desormais comme "Cibles" (24 objets, "Voir N de plus")
 et charge ses vignettes via `<img loading="lazy">` au lieu d'un fond CSS charge d'un bloc,
 pour ne pas declencher jusqu'a 110 requetes d'images externes simultanees a l'ouverture.
-Connu comme non fait : pas de cache client entre ecrans (chaque navigation refetch tout),
-ni de mitigation du cold start serverless Vercel apres une periode d'inactivite.
+Connu comme non fait : pas de cache client entre ecrans hors journal (les autres ecrans
+refetchent a chaque navigation), ni de mitigation du cold start serverless Vercel apres
+une periode d'inactivite -- le journal, lui, ne l'attend plus (voir "Journal hors ligne").
 
 La fiche detail d'une cible (Cibles/Catalogue Messier) permet aussi d'ajouter du temps
 d'expo directement, sans passer par le journal de session -- pratique pour rattraper des
@@ -149,6 +178,7 @@ Vercel separes sur le meme repo GitHub :
 - catalog.py             : chargement des catalogues (CSV generes)
 - rows.py               : forme commune d'une ligne cible, partagee par app.py et api/
 - scripts/build_catalog.py : generation ponctuelle des CSV depuis OpenNGC
+- scripts/build_icons.py   : generation ponctuelle des icones PWA de l'appli mobile
 - scoring.py            : score horaire, fenetres de visibilite, score francais
 - app.py                : dashboard Streamlit (onglets "Ce soir" / "Catalogue Messier")
 - api/                  : API FastAPI pour l'appli mobile (voir plus haut)

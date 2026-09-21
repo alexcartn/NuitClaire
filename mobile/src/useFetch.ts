@@ -11,7 +11,14 @@ interface FetchState<T> {
  * une petite appli personnelle). `fn` doit etre stable (useCallback) sinon
  * elle re-declenche une requete a chaque rendu. `reload()` relance `fn()`
  * sans attendre un changement de `deps` -- utilise apres une mutation
- * (ex. cocher une capture Messier) pour refleter l'etat serveur a jour. */
+ * (ex. cocher une capture Messier) pour refleter l'etat serveur a jour.
+ *
+ * En cas d'erreur, `data` conserve la derniere valeur chargee au lieu de
+ * repasser a null : un `reload()` qui echoue (reseau faible sur le terrain,
+ * cold start de la fonction serverless) ne doit pas vider un ecran deja
+ * rempli -- l'appelant affiche `error` a cote des donnees devenues
+ * potentiellement perimees, ce qui est plus utile qu'un ecran blanc au
+ * milieu d'une session d'observation. */
 export function useFetch<T>(fn: () => Promise<T>, deps: unknown[]): FetchState<T> & { reload: () => void } {
   const [state, setState] = useState<FetchState<T>>({ data: null, loading: true, error: null });
   const gen = useRef(0);
@@ -27,7 +34,7 @@ export function useFetch<T>(fn: () => Promise<T>, deps: unknown[]): FetchState<T
         if (myGen === gen.current) setState({ data, loading: false, error: null });
       })
       .catch((err: Error) => {
-        if (myGen === gen.current) setState({ data: null, loading: false, error: err.message });
+        if (myGen === gen.current) setState((s) => ({ ...s, loading: false, error: err.message }));
       });
   }, []);
 

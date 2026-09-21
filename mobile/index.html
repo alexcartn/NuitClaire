@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>NuitClaire</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- iOS ignore le manifeste : ces deux meta font l'equivalent (ouverture
+         en plein ecran depuis l'ecran d'accueil, barre d'etat sombre). -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0a090c" />
     <script>
       // Applique le theme avant le premier rendu React, pour eviter un
       // flash du mauvais theme au chargement.
@@ -13,6 +21,9 @@
           var theme = saved === "light" || saved === "dark" ? saved
             : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
           document.documentElement.setAttribute("data-theme", theme);
+          // La couleur de la barre systeme (appli installee) suit le theme.
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", theme === "light" ? "#f6f4f8" : "#0a090c");
         } catch (e) {}
       })();
     </script>

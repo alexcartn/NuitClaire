@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { mutate } from "../useSessions";
+import { newOp } from "../sessionQueue";
 import { AltitudeChart } from "../components/AltitudeChart";
 import type { ViewWindow } from "../types";
 
@@ -62,8 +64,11 @@ export function Detail({
     }
   };
 
-  const addToJournal = async () => {
-    await api.addSessionItem(designation);
+  const addToJournal = () => {
+    // Passe par la file du journal (voir sessionQueue.ts) plutot que par un
+    // appel direct : ce geste se fait aussi dehors, reseau incertain, et il
+    // doit etre pris en compte immediatement meme hors ligne.
+    mutate(newOp({ kind: "addItem", designation }));
     setAddedToJournal(true);
   };
 

@@ -14,6 +14,21 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
+/** Erreur HTTP portant son code : la file d'attente du journal (voir
+ * sessionQueue.ts) doit distinguer un refus du serveur (4xx, definitif --
+ * rejouer l'operation echouera toujours) d'une panne reseau ou serveur
+ * (fetch qui rejette, 5xx -- a reessayer plus tard). Sans le code, les deux
+ * se ressemblent et une operation invalide bloquerait la file pour toujours. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -33,7 +48,7 @@ async function request<T>(
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `${path} -> ${res.status}`);
+    throw new ApiError(detail?.detail ?? `${path} -> ${res.status}`, res.status);
   }
   return res.json() as Promise<T>;
 }
