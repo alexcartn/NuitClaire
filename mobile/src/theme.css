@@ -180,8 +180,8 @@ a {
 }
 
 .nc-tab-icon {
-  font-size: 15px;
-  line-height: 1;
+  display: flex;
+  line-height: 0;
   color: var(--ink3);
 }
 

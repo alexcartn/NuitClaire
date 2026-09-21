@@ -88,6 +88,14 @@ icones sont generees par `python scripts/build_icons.py`.
     cd mobile
     npm test          # logique hors ligne du journal (lanceur de tests integre a Node)
 
+### Icones
+
+Les icones de la barre d'onglets sont dessinees en SVG (`mobile/src/components/TabIcon.tsx`)
+et non plus posees en glyphes Unicode : rendus par la police du systeme, ceux-ci variaient
+en taille, en epaisseur et en alignement d'un telephone a l'autre. Toujours pas de
+bibliotheque d'icones -- cinq dessins de quelques lignes, sur la meme grille et le meme
+trait que le croissant de l'icone de l'appli, generee par `python scripts/build_icons.py`.
+
 ### Performance mobile
 
 Deux optimisations en place : la fonction API Vercel est epinglee sur la region `cdg1`
