@@ -94,6 +94,46 @@ export function newOp(body: SessionOpBody): SessionOp {
   return { ...body, id: localId(), at: localIsoNow() };
 }
 
+// --- Detection d'une cible en tete de note ----------------------------
+
+/** Une note qui commence par une designation ("M31 tres contraste ce soir")
+ * parle de cette cible : elle lui est rattachee plutot que posee en note
+ * libre. Taper deux caracteres de plus evite d'ouvrir la fiche de la cible
+ * pour y saisir la note, ce qui compte a 23h avec les doigts gelés.
+ *
+ * Volontairement limite aux trois prefixes que portent les catalogues
+ * embarques (M, NGC, IC) et a une note non vide : "M31" seul reste une note
+ * libre, pour ne pas creer une cible sur un mot isole. */
+const TARGET_PREFIX = /^(M|NGC|IC)\s*0*(\d{1,4}[A-Za-z]?)\s+(\S.*)$/i;
+
+/** Met une designation a la forme du catalogue : Messier sans zeros de tete
+ * ("M31"), NGC et IC completes a quatre chiffres ("NGC0520", "IC0434").
+ *
+ * Fait ici plutot que cote serveur parce que la saisie doit marcher hors
+ * ligne, sans catalogue sous la main. Sans ca, une note prefixee "ic434"
+ * creerait une cible "IC434" a cote de la "IC0434" du catalogue : deux
+ * entrees pour le meme objet, et un temps d'expo cumule coupe en deux. */
+export function canonicalDesignation(prefix: string, digits: string): string {
+  const cat = prefix.toUpperCase();
+  const letter = digits.slice(-1).match(/[A-Za-z]/) ? digits.slice(-1).toUpperCase() : "";
+  const num = letter ? digits.slice(0, -1) : digits;
+  const padded = cat === "M" ? num : num.padStart(4, "0");
+  return `${cat}${padded}${letter}`;
+}
+
+export interface TargetPrefix {
+  designation: string;
+  text: string;
+}
+
+/** Decoupe "ngc 7380 belle nebuleuse" en cible + note, ou null si la note
+ * ne commence pas par une designation. */
+export function parseTargetPrefix(input: string): TargetPrefix | null {
+  const m = TARGET_PREFIX.exec(input.trim());
+  if (!m) return null;
+  return { designation: canonicalDesignation(m[1], m[2]), text: m[3].trim() };
+}
+
 // --- Application locale (optimiste) -----------------------------------
 
 function rebuildTimeline(cur: CurrentSession): TimelineEntry[] {
@@ -147,7 +187,14 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
         notes: [],
         exposureMin: null,
       };
-      return withCurrent(data, { ...cur, items: [...cur.items, item] }, op.at);
+      // Triees par designation, comme les renvoie l'API (voir
+      // api/translate.sessions_to_out) : en les ajoutant simplement a la
+      // suite, une cible s'afficherait en bas de liste puis sauterait a sa
+      // place a la synchronisation.
+      const items = [...cur.items, item].sort((a, b) =>
+        a.designation < b.designation ? -1 : a.designation > b.designation ? 1 : 0,
+      );
+      return withCurrent(data, { ...cur, items }, op.at);
     }
     case "removeItem":
       return withCurrent(

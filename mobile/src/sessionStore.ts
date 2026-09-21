@@ -19,6 +19,7 @@ import {
   enqueue,
   loadCache,
   loadQueue,
+  localId,
   pendingNoteIds,
   saveCache,
   saveQueue,
@@ -60,6 +61,27 @@ export function sendOp(op: SessionOp): Promise<Sessions> {
  * et se rejoue. */
 export function isPermanentFailure(err: unknown): boolean {
   return err instanceof ApiError && err.status >= 400 && err.status < 500;
+}
+
+/** Repli quand le serveur refuse definitivement une note rattachee a une
+ * cible : la meme note, reposee en note libre avec la cible en tete.
+ *
+ * Un refus arrive quand la cible n'est pas (ou plus) dans la session -- par
+ * exemple une designation detectee en tete de note (voir
+ * `parseTargetPrefix`) que le catalogue ne connait pas. Abandonner
+ * l'operation effacerait un texte que l'utilisateur a ecrit, dehors, la
+ * nuit : c'est exactement ce que ce journal ne doit jamais faire. L'attache
+ * a la cible est perdue, le texte non. On garde `noteId` et `at` d'origine
+ * pour que l'entree deja affichee ne bouge pas dans le fil.  */
+function rescueNote(op: SessionOp): SessionOp | null {
+  if (op.kind !== "addItemNote") return null;
+  return {
+    kind: "addFreeNote",
+    noteId: op.noteId,
+    text: `${op.designation} : ${op.text}`,
+    id: localId(),
+    at: op.at,
+  };
 }
 
 const RETRY_BASE_MS = 2000;
@@ -168,8 +190,11 @@ function flush(): void {
       syncError = err.message;
       if (isPermanentFailure(err)) {
         // Refus definitif du serveur : abandonner cette operation, sinon
-        // elle bloque toutes les suivantes indefiniment.
-        setQueue(queue.filter((o) => o.id !== op.id));
+        // elle bloque toutes les suivantes indefiniment -- mais jamais le
+        // texte qu'elle portait (voir rescueNote).
+        const rescued = rescueNote(op);
+        const rest = queue.filter((o) => o.id !== op.id);
+        setQueue(rescued ? [...rest, rescued] : rest);
         attempts = 0;
         return;
       }

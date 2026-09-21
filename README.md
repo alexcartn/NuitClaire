@@ -88,6 +88,30 @@ icones sont generees par `python scripts/build_icons.py`.
     cd mobile
     npm test          # logique hors ligne du journal (lanceur de tests integre a Node)
 
+### Saisie sur le terrain
+
+Quatre choses pour que le journal se remplisse vraiment pendant l'observation, dans le noir
+et souvent avec des gants :
+
+- Vision nocturne : un theme a part entiere (`[data-theme="night"]` dans `theme.css`), rouge
+  sur noir et tailles augmentees, pour ne pas reperdre son adaptation a l'obscurite a chaque
+  note. Accessible d'un appui depuis le Journal, ou dans Reglages. Contrepartie assumee : le
+  code couleur bon/moyen/mauvais devient un code de luminosite, tout etant rouge.
+- Evenements frequents en un appui (buee, nuage, mise au point, avion, satellite, vent) :
+  la meme note libre horodatee qu'une saisie au clavier, juste pre-ecrite.
+- Une note qui commence par une designation est rattachee a cette cible, ajoutee a la
+  session si besoin : « M31 tres contraste » plutot que passer par la fiche detail. La
+  detection (`sessionQueue.parseTargetPrefix`) est annoncee a l'ecran avant l'envoi, et met
+  la designation a la forme du catalogue (`ic434` -> `IC0434`) -- sans quoi une meme cible
+  se dedoublerait, et son temps d'expo cumule avec elle. Limitee aux prefixes M/NGC/IC des
+  catalogues embarques, et a une note non vide : `M31` seul reste une note libre.
+- L'ecran reste allume pendant une sortie en cours (`useWakeLock`), pas sur tout l'ecran
+  Journal : inutile de vider la batterie pour relire une sortie passee.
+
+Une note refusee definitivement par le serveur (cible absente de la session) n'est jamais
+perdue : elle est reposee en note libre avec la cible en tete (`sessionStore.rescueNote`).
+L'attache a la cible saute, le texte non.
+
 ### Icones
 
 Les icones de la barre d'onglets sont dessinees en SVG (`mobile/src/components/TabIcon.tsx`)

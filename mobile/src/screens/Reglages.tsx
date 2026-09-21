@@ -276,16 +276,22 @@ export function Reglages() {
 
       <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div className="nc-eyebrow">Theme</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {(["system", "light", "dark"] as const).map((t) => {
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {(["system", "light", "dark", "night"] as const).map((t) => {
             const active = t === "system" ? isSystem : !isSystem && theme === t;
+            const label = { system: "Systeme", light: "Clair", dark: "Sombre", night: "Vision nocturne" }[t];
             return (
               <button key={t} onClick={() => setTheme(t)} className={`nc-chip ${active ? "nc-chip-active" : ""}`}>
-                {t === "system" ? "Systeme" : t === "light" ? "Clair" : "Sombre"}
+                {label}
               </button>
             );
           })}
         </div>
+        <p className="nc-caption" style={{ margin: 0 }}>
+          Vision nocturne : rouge sur noir et tailles augmentees, pour ne pas reperdre son
+          adaptation a l'obscurite en consultant l'appli dehors. Aussi accessible d'un appui
+          depuis le Journal.
+        </p>
       </div>
     </div>
   );

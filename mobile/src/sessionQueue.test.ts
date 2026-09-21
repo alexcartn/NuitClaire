@@ -15,7 +15,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { applyOp, enqueue, localIsoNow, newOp, pendingNoteIds } from "./sessionQueue.ts";
+import {
+  applyOp,
+  enqueue,
+  localIsoNow,
+  newOp,
+  parseTargetPrefix,
+  pendingNoteIds,
+} from "./sessionQueue.ts";
 import type { SessionOp, SessionOpBody } from "./sessionQueue.ts";
 import type { Sessions } from "./types.ts";
 
@@ -72,6 +79,18 @@ test("le fil est trie par horodatage, pas par ordre de saisie", () => {
   ]);
 
   assert.deepEqual(data.current.timeline.map((e) => e.text), ["precoce", "tardive"]);
+});
+
+test("les cibles sont triees par designation, comme cote serveur", () => {
+  // Sinon la cible ajoutee s'affiche en bas de liste puis saute a sa place
+  // des que la reponse du serveur arrive.
+  const data = replay([
+    op({ kind: "addItem", designation: "M31" }, "2026-09-21T21:00:00"),
+    op({ kind: "addItem", designation: "IC0434" }, "2026-09-21T21:05:00"),
+    op({ kind: "addItem", designation: "M42" }, "2026-09-21T21:10:00"),
+  ]);
+
+  assert.deepEqual(data.current.items.map((i) => i.designation), ["IC0434", "M31", "M42"]);
 });
 
 test("ajouter deux fois la meme cible ne la duplique pas", () => {
@@ -246,4 +265,34 @@ test("rejouer la file sur une base serveur ne perd pas les saisies en attente", 
 
   assert.equal(shown.current.scoreAtOpen, 72);
   assert.deepEqual(shown.current.timeline.map((e) => e.text), ["en attente"]);
+});
+
+test("une note prefixee d'une designation est rattachee a la cible", () => {
+  assert.deepEqual(parseTargetPrefix("M31 tres contraste ce soir"), {
+    designation: "M31",
+    text: "tres contraste ce soir",
+  });
+  assert.deepEqual(parseTargetPrefix("ngc 7380 belle nebuleuse"), {
+    designation: "NGC7380",
+    text: "belle nebuleuse",
+  });
+});
+
+test("la designation detectee prend la forme du catalogue", () => {
+  // Le catalogue zero-padde NGC et IC a quatre chiffres, pas Messier. Sans
+  // ca, "ic434" creerait une cible a cote de la "IC0434" du catalogue :
+  // deux entrees pour le meme objet, et un temps d'expo coupe en deux.
+  assert.equal(parseTargetPrefix("ic434 flamme nette")?.designation, "IC0434");
+  assert.equal(parseTargetPrefix("IC0434 flamme nette")?.designation, "IC0434");
+  assert.equal(parseTargetPrefix("m031 bien haute")?.designation, "M31");
+  assert.equal(parseTargetPrefix("ic4837a faible")?.designation, "IC4837A");
+});
+
+test("une note sans designation en tete reste une note libre", () => {
+  assert.equal(parseTargetPrefix("buee sur la lentille"), null);
+  assert.equal(parseTargetPrefix("vent de nord-ouest, 15 km/h"), null);
+  // Une designation seule ne suffit pas : pas de cible creee sur un mot
+  // isole, l'utilisateur voulait peut-etre juste noter le nom.
+  assert.equal(parseTargetPrefix("M31"), null);
+  assert.equal(parseTargetPrefix("  M31  "), null);
 });

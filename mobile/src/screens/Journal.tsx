@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { applyServer, mutate, refresh, useSessions } from "../useSessions";
-import { localNoteId, newOp } from "../sessionQueue";
+import { localNoteId, newOp, parseTargetPrefix } from "../sessionQueue";
 import type { SessionOpBody } from "../sessionQueue";
+import { useTheme } from "../useTheme";
+import { useWakeLock } from "../useWakeLock";
 import { StatCard } from "../components/StatCard";
+import { TabIcon } from "../components/TabIcon";
 import type { TargetRow, TimelineEntry } from "../types";
 
 function fmtTime(iso: string): string {
@@ -25,10 +28,19 @@ function fmtExposure(totalMin: number): string {
   return h > 0 ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
 }
 
-const inputStyle = {
-  background: "var(--surf)", border: "1px solid var(--line)", borderRadius: 8,
-  padding: "7px 9px", fontSize: 12, color: "var(--ink)", flex: 1,
-} as const;
+/** Evenements frequents d'une nuit, poses en un appui plutot que tapes.
+ * C'est la meme note libre horodatee qu'une saisie au clavier -- juste le
+ * texte le plus courant, pre-ecrit : dehors, a 23h, on ne tape pas une
+ * phrase, on appuie. Rien n'est mesure ni deduit par l'appli (voir
+ * l'en-tete de sessions.py), c'est bien l'utilisateur qui constate. */
+const QUICK_NOTES = [
+  "Buée",
+  "Nuage",
+  "Mise au point",
+  "Avion",
+  "Satellite",
+  "Vent",
+] as const;
 
 /** Bandeau d'etat de la synchronisation. Le journal se remplit dehors, avec
  * un reseau qui va et vient : ce qui compte est de savoir que rien n'est
@@ -71,7 +83,7 @@ function Timeline({ entries, pendingNotes, onDelete }: {
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {entries.map((e) => (
         <div key={e.id} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span style={{ flex: 1, fontSize: 12, color: "var(--ink2)" }}>
+          <span className="nc-log-entry">
             <span className="nc-mono">{fmtTime(e.at)}</span>
             {" · "}
             {e.target ? <span style={{ color: "var(--ink)", fontWeight: 500 }}>{e.target}</span> : "Note libre"}
@@ -110,12 +122,20 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
   const [targetQuery, setTargetQuery] = useState("");
   const [targetResults, setTargetResults] = useState<TargetRow[] | null>(null);
   const [searchingTarget, setSearchingTarget] = useState(false);
+  const { isNight, toggleNight } = useTheme();
 
   // Les statistiques derivent du journal cote serveur : les recharger quand
   // une saisie vient d'y etre enregistree, pas a chaque frappe locale.
   useEffect(() => {
     if (syncCount > 0) reloadStats();
   }, [syncCount, reloadStats]);
+
+  // Ecran maintenu allume pendant une sortie seulement (voir useWakeLock).
+  // Appele avant tout retour anticipe : un hook ne se saute pas.
+  const hasSession = Boolean(
+    data && (data.current.items.length > 0 || data.current.freeNotes.length > 0),
+  );
+  useWakeLock(hasSession);
 
   if (loading || !data) {
     return (
@@ -126,7 +146,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
   }
 
   const { current, past } = data;
-  const sessionActive = current.items.length > 0 || current.freeNotes.length > 0;
+  const sessionActive = hasSession;
 
   const send = (body: SessionOpBody) => mutate(newOp(body));
 
@@ -146,10 +166,29 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
     setTargetQuery("");
   };
 
+  /** Ce que deviendra la note libre en cours de frappe : rattachee a une
+   * cible si elle commence par une designation, libre sinon. Calcule a
+   * chaque frappe pour l'afficher avant l'envoi -- une detection qui se
+   * declenche en silence serait une mauvaise surprise sur une note qui
+   * commence par hasard par "M31". */
+  const prefix = parseTargetPrefix(freeNoteDraft);
+  const prefixIsNew =
+    prefix !== null && !current.items.some((i) => i.designation === prefix.designation);
+
+  const addQuickNote = (text: string) => send({ kind: "addFreeNote", noteId: localNoteId(), text });
+
   const submitFreeNote = () => {
     const text = freeNoteDraft.trim();
     if (!text) return;
-    send({ kind: "addFreeNote", noteId: localNoteId(), text });
+    if (prefix) {
+      // La cible d'abord : le serveur refuse une note sur une cible absente
+      // de la session. Les deux operations partent dans cet ordre (voir
+      // sessionQueue.ts), y compris hors ligne.
+      if (prefixIsNew) send({ kind: "addItem", designation: prefix.designation });
+      send({ kind: "addItemNote", designation: prefix.designation, noteId: localNoteId(), text: prefix.text });
+    } else {
+      send({ kind: "addFreeNote", noteId: localNoteId(), text });
+    }
     setFreeNoteDraft("");
   };
 
@@ -204,9 +243,27 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
 
   return (
     <div className="nc-screen">
-      <div>
-        <div className="nc-eyebrow">Journal de session</div>
-        <div className="nc-title">{past.length} sortie(s) enregistree(s)</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div>
+          <div className="nc-eyebrow">Journal de session</div>
+          <div className="nc-title">{past.length} sortie(s) enregistree(s)</div>
+        </div>
+        {/* Bascule vision nocturne a portee de pouce : c'est sur cet ecran
+            qu'on en a besoin, au moment ou on sort. Le nom accessible
+            reprend le texte visible ("Nuit") avant de le completer -- une
+            aide vocale doit pouvoir designer le bouton par ce qui est
+            ecrit dessus. */}
+        <button
+          onClick={toggleNight}
+          className={`nc-chip ${isNight ? "nc-chip-active" : ""}`}
+          style={{ flex: "none", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}
+          aria-pressed={isNight}
+          aria-label="Nuit : vision nocturne"
+          title={isNight ? "Revenir au theme precedent" : "Vision nocturne : rouge sur noir, tailles augmentees"}
+        >
+          <TabIcon name="moon" />
+          Nuit
+        </button>
       </div>
 
       <SyncBanner pendingCount={pendingCount} syncError={syncError} loadError={loadError} />
@@ -249,8 +306,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
             value={targetQuery}
             onChange={(e) => setTargetQuery(e.target.value)}
             placeholder="Ajouter une cible : M31, NGC7380..."
-            className="nc-mono"
-            style={inputStyle}
+            className="nc-input nc-mono"
           />
           <button type="submit" className="nc-btn" style={{ flex: "none" }} disabled={searchingTarget}>
             {searchingTarget ? "..." : "Chercher"}
@@ -267,7 +323,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                 <span className="nc-caption" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.commonName || r.type}
                 </span>
-                <button onClick={() => addTarget(r.designation)} className="nc-btn" style={{ flex: "none", padding: "5px 10px", fontSize: 12 }}>
+                <button onClick={() => addTarget(r.designation)} className="nc-btn nc-btn-sm" style={{ flex: "none" }}>
                   Ajouter
                 </button>
               </div>
@@ -277,17 +333,33 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
 
         <div style={{ height: 1, background: "var(--line)" }} />
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            value={freeNoteDraft}
-            onChange={(e) => setFreeNoteDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submitFreeNote()}
-            placeholder="Note libre, sans cible (ex : conditions, materiel...)"
-            style={inputStyle}
-          />
-          <button onClick={submitFreeNote} disabled={!freeNoteDraft.trim()} className="nc-btn" style={{ flex: "none" }}>
-            Ajouter
-          </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={freeNoteDraft}
+              onChange={(e) => setFreeNoteDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitFreeNote()}
+              placeholder="Note : « M31 tres contraste », ou conditions, materiel..."
+              className="nc-input"
+            />
+            <button onClick={submitFreeNote} disabled={!freeNoteDraft.trim()} className="nc-btn" style={{ flex: "none" }}>
+              Ajouter
+            </button>
+          </div>
+          {prefix && (
+            <p className="nc-caption" style={{ margin: 0 }}>
+              Sera rattachee a <span className="nc-mono" style={{ color: "var(--accent)" }}>{prefix.designation}</span>
+              {prefixIsNew ? ", ajoutee a la session." : "."}
+            </p>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {QUICK_NOTES.map((label) => (
+            <button key={label} onClick={() => addQuickNote(label)} className="nc-chip">
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -352,13 +424,13 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                       onChange={(e) => setItemNoteDraft((d) => ({ ...d, [item.designation]: e.target.value }))}
                       onKeyDown={(e) => e.key === "Enter" && submitItemNote(item.designation)}
                       placeholder="Ajouter une note..."
-                      style={inputStyle}
+                      className="nc-input"
                     />
                     <button
                       onClick={() => submitItemNote(item.designation)}
                       disabled={!(itemNoteDraft[item.designation] ?? "").trim()}
-                      className="nc-btn"
-                      style={{ flex: "none", padding: "5px 10px", fontSize: 12 }}
+                      className="nc-btn nc-btn-sm"
+                      style={{ flex: "none" }}
                     >
                       +
                     </button>
@@ -374,7 +446,8 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                       onChange={(e) => setExposureDraft((d) => ({ ...d, [item.designation]: e.target.value }))}
                       onBlur={(e) => saveExposure(item.designation, e.target.value)}
                       placeholder="0"
-                      style={{ ...inputStyle, flex: "none", width: 64 }}
+                      className="nc-input"
+                      style={{ flex: "none", width: 72 }}
                     />
                     {item.exposureMin != null && (
                       <span className="nc-mono" style={{ fontSize: 11, color: "var(--ink3)" }}>

@@ -18,12 +18,13 @@
       (function () {
         try {
           var saved = localStorage.getItem("nc-theme");
-          var theme = saved === "light" || saved === "dark" ? saved
+          var known = { light: "#f6f4f8", dark: "#0a090c", night: "#000000" };
+          var theme = known[saved] ? saved
             : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
           document.documentElement.setAttribute("data-theme", theme);
           // La couleur de la barre systeme (appli installee) suit le theme.
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute("content", theme === "light" ? "#f6f4f8" : "#0a090c");
+          if (meta) meta.setAttribute("content", known[theme]);
         } catch (e) {}
       })();
     </script>
