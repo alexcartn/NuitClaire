@@ -5,6 +5,7 @@ import { applyServer, mutate, refresh, useSessions } from "../useSessions";
 import { closeOp, localNoteId, newOp, parseTargetPrefix } from "../sessionQueue";
 import type { SessionOpBody } from "../sessionQueue";
 import { useTheme } from "../useTheme";
+import { downloadText, journalToMarkdown, outingToMarkdown } from "../journalRead";
 import { useWakeLock } from "../useWakeLock";
 import { StatCard } from "../components/StatCard";
 import { TabIcon } from "../components/TabIcon";
@@ -694,7 +695,17 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
 
       {past.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 4 }}>
-          <div className="nc-eyebrow">Sorties precedentes</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div className="nc-eyebrow">Sorties precedentes</div>
+            {/* Export local : un Blob et un lien ephemere, rien ne part sur
+                le reseau (voir journalRead.downloadText). */}
+            <button
+              onClick={() => downloadText("carnet-nuitclaire.md", journalToMarkdown(data))}
+              className="nc-chip"
+            >
+              Exporter le carnet
+            </button>
+          </div>
           {reopenError && <p className="nc-caption" style={{ color: "var(--danger, #e2434f)" }}>{reopenError}</p>}
           {past.map((p) => (
             <div key={p.closedAt} className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -704,7 +715,28 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   {p.score != null ? `score ${p.score}` : "score n/d"}
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: "var(--ink2)" }}>{p.targets.join(", ") || "aucune cible"}</div>
+              {/* Cibles cliquables : en relisant une nuit, on veut pouvoir
+                  ouvrir la fiche d'une cible pour voir tout ce que le journal
+                  en dit. */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {p.targets.length === 0 && (
+                  <span style={{ fontSize: 12, color: "var(--ink2)" }}>aucune cible</span>
+                )}
+                {p.targets.map((designation) => (
+                  <button
+                    key={designation}
+                    onClick={() => onOpenTarget(designation)}
+                    className="nc-mono"
+                    style={{
+                      background: "none", border: "none", padding: 0, cursor: "pointer",
+                      fontSize: 12, color: "var(--ink2)", textDecoration: "underline",
+                      textDecorationColor: "var(--line)",
+                    }}
+                  >
+                    {designation}
+                  </button>
+                ))}
+              </div>
               <PastConditions conditions={p.conditions} />
               <PastFeeling
                 feeling={p.feeling}
@@ -732,6 +764,13 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   {openPast === p.closedAt && <Timeline entries={p.timeline} />}
                 </>
               )}
+              <button
+                onClick={() => downloadText(`nuit-${p.date}.md`, outingToMarkdown(p))}
+                className="nc-caption"
+                style={{ alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer", color: "var(--ink2)", padding: 0 }}
+              >
+                Exporter cette nuit
+              </button>
               <button
                 onClick={() => reopen(p.closedAt)}
                 disabled={sessionActive || pendingCount > 0 || reopening === p.closedAt}

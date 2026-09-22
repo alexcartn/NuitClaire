@@ -298,3 +298,17 @@ def test_emptying_a_session_clears_its_feeling(api_client):
     api_client.delete(f"/api/sessions/current/notes/{note_id}")
     feeling = api_client.get("/api/sessions").json()["current"]["feeling"]
     assert feeling == {"rating": None, "skyQuality": None, "highlight": "", "nextTime": ""}
+
+
+def test_past_outing_exposes_its_targets_in_detail(api_client):
+    # `targets` ne donne que les noms : relire une nuit ou retrouver
+    # l'historique d'une cible demande le detail.
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.put("/api/sessions/current/items/M13", json={"exposureMin": 30, "rating": 4})
+    api_client.post("/api/sessions/current/items/M13/notes", json={"text": "bien haute"})
+    outing = api_client.post("/api/sessions/current/close").json()["past"][0]
+
+    assert [i["designation"] for i in outing["items"]] == ["M13"]
+    assert outing["items"][0]["exposureMin"] == 30
+    assert outing["items"][0]["rating"] == 4
+    assert [n["text"] for n in outing["items"][0]["notes"]] == ["bien haute"]

@@ -1,10 +1,24 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
-import { mutate } from "../useSessions";
+import { mutate, useSessions } from "../useSessions";
+import { targetHistory } from "../journalRead";
 import { newOp } from "../sessionQueue";
 import { AltitudeChart } from "../components/AltitudeChart";
 import type { ViewWindow } from "../types";
+
+/** '90' -> "1 h 30" ; en-dessous de l'heure, "45 min". */
+function fmtMinutes(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h > 0 ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
+}
+
+function fmtNightDate(isoDate: string): string {
+  return new Date(isoDate + "T00:00").toLocaleDateString("fr-FR", {
+    day: "numeric", month: "long", year: "numeric",
+  });
+}
 
 function fmtExposureDate(iso: string): string {
   const d = new Date(iso);
@@ -31,6 +45,10 @@ export function Detail({
   const fetchDetail = useCallback(() => api.targetDetail(designation), [designation]);
   const { data, loading, error, reload } = useFetch(fetchDetail, [designation]);
   const [addedToJournal, setAddedToJournal] = useState(false);
+  // Le journal est deja sur l'appareil : l'historique de la cible s'en
+  // deduit, sans requete (voir journalRead.targetHistory).
+  const sessions = useSessions();
+  const history = targetHistory(sessions.data, designation);
   const [capturing, setCapturing] = useState(false);
   const [exposureDraft, setExposureDraft] = useState("");
   const [addingExposure, setAddingExposure] = useState(false);
@@ -226,6 +244,35 @@ export function Detail({
               <a href={data.wiki.url} target="_blank" rel="noreferrer" className="nc-caption">
                 Source : Wikipedia
               </a>
+            </div>
+          )}
+
+          {history.nightCount > 0 && (
+            <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="nc-eyebrow">Dans ton journal</div>
+              <div className="nc-caption" style={{ margin: 0 }}>
+                {history.nightCount} nuit(s)
+                {history.totalExposureMin > 0 && ` · ${fmtMinutes(history.totalExposureMin)} de pose`}
+                {history.avgRating != null && ` · satisfaction ${history.avgRating}/5`}
+              </div>
+              {history.nights.map((n, i) => (
+                <div
+                  key={n.closedAt ?? `courante-${i}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 3 }}
+                >
+                  <div style={{ fontSize: 12, color: "var(--ink)" }}>
+                    {n.date ? fmtNightDate(n.date) : "Session en cours"}
+                    {n.exposureMin ? ` · ${fmtMinutes(n.exposureMin)}` : ""}
+                    {n.rating != null ? ` · ${n.rating}/5` : ""}
+                    {n.done ? " · capturee" : ""}
+                  </div>
+                  {n.notes.map((note) => (
+                    <div key={note.at} className="nc-caption" style={{ margin: 0 }}>
+                      {note.text}
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           )}
 

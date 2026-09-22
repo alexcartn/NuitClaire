@@ -255,6 +255,11 @@ class PastSessionOut(BaseModel):
     targets: list[str]
     note: str
     closedAt: str
+    # Cibles de la sortie, dans leur detail (coches, temps de pose, note de
+    # satisfaction, notes horodatees) : `targets` n'en donne que les noms, ce
+    # qui ne suffit pas pour relire une nuit ni pour retrouver l'historique
+    # d'une cible. Vide sur les sorties anterieures a leur conservation.
+    items: list[SessionItemOut] = []
     timeline: list[TimelineEntryOut]
     feeling: FeelingOut
     conditions: NightConditions | None = None

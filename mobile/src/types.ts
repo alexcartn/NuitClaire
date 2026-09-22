@@ -237,6 +237,9 @@ export interface PastSession {
   targets: string[];
   note: string;
   closedAt: string;
+  /** Cibles de la sortie, dans leur detail. Vide sur les sorties anterieures
+   * a leur conservation. */
+  items: SessionItem[];
   timeline: TimelineEntry[];
   feeling: Feeling;
   conditions: NightConditions | null;

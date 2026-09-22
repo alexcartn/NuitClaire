@@ -124,6 +124,28 @@ Cote Streamlit, `app.py` continue de fonctionner sans changement mais n'affiche 
 contexte ni ressenti : l'ecart entre les deux frontends reste a arbitrer (voir
 l'en-tete de `settings.py` pour un precedent assume).
 
+### Relecture : fiche par cible et export
+
+Deux vues derivees du journal deja present sur l'appareil
+(`mobile/src/journalRead.ts`) : aucune requete, rien de stocke en plus, et
+donc disponibles hors ligne comme le reste.
+
+La fiche d'une cible affiche ce que le journal en dit deja : les nuits ou elle a
+ete pointee, le temps de pose cumule, la satisfaction moyenne et les notes de
+chaque nuit. C'est la question qu'on se pose en rouvrant une fiche ("je l'ai deja
+faite ? qu'est-ce que j'en avais dit ?"), a laquelle les statistiques ne
+repondaient qu'a moitie. Les cibles d'une sortie passee sont cliquables pour y
+aller directement.
+
+L'export produit du Markdown, une nuit ou le carnet entier : en-tete, conditions,
+cibles et temps de pose, fil horodate avec le contexte de chaque note, ressenti.
+Telechargement local via un Blob, sans reseau. Les rubriques vides ne sont pas
+ecrites : une nuit sans ressenti n'a pas de section ressenti.
+
+Cela a demande d'exposer le detail des cibles d'une sortie passee dans
+`PastSessionOut` : `targets` n'en donnait que les noms, ce qui ne suffit ni pour
+relire une nuit ni pour reconstituer l'historique d'une cible.
+
 ### Appli installable
 
 `mobile/public/manifest.webmanifest` et un service worker ecrit a la main

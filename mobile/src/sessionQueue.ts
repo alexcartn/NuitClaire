@@ -315,6 +315,7 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
         date: (cur.openedAt ?? op.at).slice(0, 10),
         score: cur.scoreAtOpen,
         targets: cur.items.map((i) => i.designation).sort(),
+        items: cur.items,
         note: texts.join("; "),
         closedAt: op.at,
         timeline: cur.timeline,

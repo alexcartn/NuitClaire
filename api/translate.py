@@ -9,16 +9,23 @@ def site_to_out(site: dict) -> dict:
             "elevationM": site["elevation_m"], "tz": site["tz"]}
 
 
+def _items_to_out(items: dict) -> list[dict]:
+    """Cibles d'une session, triees par designation : forme de liste pour
+    l'API, la ou le stockage les indexe par designation."""
+    return [{"designation": designation, **item} for designation, item in sorted(items.items())]
+
+
 def sessions_to_out(data: dict) -> dict:
     cur = data["current"]
-    items = [
-        {"designation": designation, **item}
-        for designation, item in sorted(cur["items"].items())
-    ]
+    items = _items_to_out(cur["items"])
     # `timeline` (notes par cible + notes libres fusionnees et triees, voir
     # sessions.timeline) est calculee ici plutot que stockee : c'est une vue
     # derivee de `items`/`freeNotes`, jamais une source de verite a part.
-    past = [{**entry, "timeline": sessions_store.timeline(entry)} for entry in data["past"]]
+    past = [
+        {**entry, "items": _items_to_out(entry.get("items") or {}),
+         "timeline": sessions_store.timeline(entry)}
+        for entry in data["past"]
+    ]
     return {
         "current": {"openedAt": cur["openedAt"], "scoreAtOpen": cur["scoreAtOpen"], "items": items,
                     "freeNotes": cur["freeNotes"], "timeline": sessions_store.timeline(cur),
