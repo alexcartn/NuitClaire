@@ -10,6 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
 import sessions as sessions_store
+from catalog import find_target
 from api.deps import current_night, current_score_pct, get_site, sessions_write_lock
 from api.schemas import AddNote, AddSessionItem, CloseSession, SessionsOut, UpdateFeeling, \
     UpdatePastSession, UpdateSessionItem
@@ -44,10 +45,23 @@ def get_sessions() -> dict:
 
 @router.post("/api/sessions/current/items", response_model=SessionsOut)
 def add_session_item(body: AddSessionItem) -> dict:
+    """Ajoute une cible a la session en cours, apres l'avoir resolue dans le
+    catalogue.
+
+    La resolution sert deux choses. Elle refuse ce que le catalogue ne connait
+    pas : depuis que le journal detecte une designation en tete de note
+    (« M31 tres contraste »), une faute de frappe creerait sinon une cible
+    fantome, qui polluerait durablement l'historique et les statistiques. Et
+    elle enregistre la forme du catalogue (`m31` -> `M31`, `ic434` ->
+    `IC0434`), sans quoi une meme cible se dedoublerait et son temps de pose
+    cumule avec elle."""
     site = get_site()
+    found = find_target(body.designation)
+    if not found:
+        raise HTTPException(404, f"Aucun objet trouve pour « {body.designation} ».")
     with sessions_write_lock:
         data = sessions_store.load()
-        sessions_store.add_item(data, body.designation, _written_at(body.at, site),
+        sessions_store.add_item(data, found["name"], _written_at(body.at, site),
                                  current_score_pct(site))
         sessions_store.save(data)
         return sessions_to_out(data)

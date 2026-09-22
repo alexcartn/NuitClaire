@@ -312,3 +312,20 @@ def test_past_outing_exposes_its_targets_in_detail(api_client):
     assert outing["items"][0]["exposureMin"] == 30
     assert outing["items"][0]["rating"] == 4
     assert [n["text"] for n in outing["items"][0]["notes"]] == ["bien haute"]
+
+
+def test_adding_an_unknown_designation_is_refused(api_client):
+    # Depuis que le journal detecte une designation en tete de note, une
+    # faute de frappe creerait une cible fantome.
+    r = api_client.post("/api/sessions/current/items", json={"designation": "M999"})
+    assert r.status_code == 404
+    assert api_client.get("/api/sessions").json()["current"]["items"] == []
+
+
+def test_a_target_is_stored_in_its_catalogue_form(api_client):
+    # Sinon « ic434 » et « IC0434 » designeraient deux cibles differentes,
+    # avec un temps de pose cumule coupe en deux.
+    api_client.post("/api/sessions/current/items", json={"designation": "ic434"})
+    api_client.post("/api/sessions/current/items", json={"designation": "m 31"})
+    items = api_client.get("/api/sessions").json()["current"]["items"]
+    assert [i["designation"] for i in items] == ["IC0434", "M31"]

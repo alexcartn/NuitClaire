@@ -124,6 +124,13 @@ Cote Streamlit, `app.py` continue de fonctionner sans changement mais n'affiche 
 contexte ni ressenti : l'ecart entre les deux frontends reste a arbitrer (voir
 l'en-tete de `settings.py` pour un precedent assume).
 
+Une cible ajoutee au journal est desormais resolue dans le catalogue : refusee s'il
+ne la connait pas, et enregistree sous sa forme canonique (`ic434` -> `IC0434`).
+Depuis que le journal detecte une designation en tete de note, une faute de frappe
+creerait sinon une cible fantome, qui polluerait durablement historique et
+statistiques. Le texte, lui, n'est jamais perdu : la note refusee est reposee en
+note libre avec la designation en tete (`sessionStore.rescueNote`).
+
 ### Relecture : fiche par cible et export
 
 Deux vues derivees du journal deja present sur l'appareil
