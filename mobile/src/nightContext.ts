@@ -23,7 +23,7 @@
 // Extension explicite : ce module est dans le graphe d'import des tests
 // Node, dont la resolution ESM ne devine pas les extensions.
 import { readCache } from "./storage.ts";
-import type { Night, NoteContext } from "./types";
+import type { Night, NightConditions, NoteContext } from "./types";
 
 /** Au-dela de cet ecart, on considere que la prevision ne dit rien de cette
  * heure-la : la courbe est horaire, une note tombe donc au pire a trente
@@ -72,4 +72,67 @@ export function contextAt(night: Night | null, at: string): NoteContext | null {
  * l'appareil a deja en cache. */
 export function captureContext(at: string): NoteContext | null {
   return contextAt(readCache<Night>("night"), at);
+}
+
+/** Moyenne des valeurs connues, ou null si aucune ne l'est. */
+function mean(values: (number | null)[]): number | null {
+  const known = values.filter((v): v is number => v != null);
+  if (known.length === 0) return null;
+  return Math.round((known.reduce((a, b) => a + b, 0) / known.length) * 10) / 10;
+}
+
+function extremum(values: (number | null)[], pick: (a: number, b: number) => number): number | null {
+  const known = values.filter((v): v is number => v != null);
+  // Lambda binaire explicite : passer `Math.min` directement a `reduce` lui
+  // ferait aussi recevoir l'index et le tableau, et rendrait NaN.
+  return known.length === 0 ? null : Math.round(known.reduce((a, b) => pick(a, b)) * 10) / 10;
+}
+
+/** Resume des conditions annoncees sur la duree d'une sortie, pour figer a la
+ * cloture la vue d'ensemble que le contexte des notes ne donne qu'heure par
+ * heure : « il a fait entre 6 et 9 °C, lune a 77 %, seeing moyen 2 ».
+ *
+ * Borne a la sortie elle-meme, pas a la nuit entiere : ce qui s'est passe
+ * apres le rangement du materiel ne raconte pas cette sortie-la. */
+export function conditionsBetween(
+  night: Night | null,
+  from: string,
+  to: string,
+): NightConditions | null {
+  if (!night) return null;
+  const start = new Date(from).getTime();
+  const end = new Date(to).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+
+  const span = night.hourly.filter((p) => {
+    const t = new Date(p.time).getTime();
+    return t >= start && t <= end;
+  });
+  // Une sortie plus courte qu'un pas horaire peut ne contenir aucun point :
+  // on retombe alors sur l'heure la plus proche de son debut, plutot que de
+  // ne rien garder.
+  const points = span.length > 0 ? span : night.hourly.filter((p) =>
+    Math.abs(new Date(p.time).getTime() - start) <= 60 * 60 * 1000);
+  if (points.length === 0) return null;
+
+  const dewSpreads = points.map((p) =>
+    p.temperatureC != null && p.dewPointC != null ? p.temperatureC - p.dewPointC : null);
+
+  return {
+    tempMinC: extremum(points.map((p) => p.temperatureC), Math.min),
+    tempMaxC: extremum(points.map((p) => p.temperatureC), Math.max),
+    cloudAvgPct: mean(points.map((p) => p.cloudCoverPct)),
+    seeingAvg: mean(points.map((p) => p.seeing)),
+    transparencyAvg: mean(points.map((p) => p.transparency)),
+    // Le plus petit ecart temperature/point de rosee : c'est le moment le
+    // plus expose a la buee qui compte, pas la moyenne de la nuit.
+    dewSpreadC: extremum(dewSpreads, Math.min),
+    moonIllum: night.moonIllum,
+  };
+}
+
+/** Conditions a figer pour une sortie ouverte a `from` et cloturee a `to`,
+ * lues dans la prevision que l'appareil a deja en cache. */
+export function captureConditions(from: string, to: string): NightConditions | null {
+  return conditionsBetween(readCache<Night>("night"), from, to);
 }

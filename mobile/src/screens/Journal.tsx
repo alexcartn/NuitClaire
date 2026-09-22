@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { applyServer, mutate, refresh, useSessions } from "../useSessions";
-import { localNoteId, newOp, parseTargetPrefix } from "../sessionQueue";
+import { closeOp, localNoteId, newOp, parseTargetPrefix } from "../sessionQueue";
 import type { SessionOpBody } from "../sessionQueue";
 import { useTheme } from "../useTheme";
 import { useWakeLock } from "../useWakeLock";
 import { StatCard } from "../components/StatCard";
 import { TabIcon } from "../components/TabIcon";
-import type { Feeling, NoteContext, TargetRow, TimelineEntry } from "../types";
+import type { Feeling, NightConditions, NoteContext, TargetRow, TimelineEntry } from "../types";
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -97,18 +97,44 @@ function Rating({ label, scope, value, onChange }: {
   );
 }
 
-/** Ressenti d'une sortie cloturee, en lecture seule : ce qui a ete note sur
- * le moment, pas retouchable des mois plus tard (la note-resume de la sortie,
- * elle, reste modifiable juste en dessous). Silencieux si rien n'a ete
- * saisi. */
-function PastFeeling({ feeling }: { feeling: Feeling }) {
+/** Conditions figees a la cloture : la vue d'ensemble de la nuit, quand le
+ * contexte des notes en donne le detail heure par heure. Absente des sorties
+ * anterieures a son introduction, et silencieuse dans ce cas. */
+function PastConditions({ conditions }: { conditions: NightConditions | null }) {
+  if (!conditions) return null;
+  // Une decimale partout, sinon « 11 a 11,2 °C » melange deux precisions
+  // dans la meme phrase.
+  const n = (v: number, unit = "") => `${v.toFixed(1).replace(".", ",")}${unit}`;
+  const parts = [
+    conditions.tempMinC != null && conditions.tempMaxC != null
+      ? `${n(conditions.tempMinC)} a ${n(conditions.tempMaxC, " °C")}`
+      : null,
+    conditions.cloudAvgPct != null ? `${Math.round(conditions.cloudAvgPct)} % nuages` : null,
+    conditions.seeingAvg != null ? `seeing ${n(conditions.seeingAvg)}` : null,
+    conditions.moonIllum != null ? `lune ${Math.round(conditions.moonIllum)} %` : null,
+    conditions.dewSpreadC != null ? `ecart rosee ${n(conditions.dewSpreadC, "°")}` : null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return <div className="nc-context nc-mono">{parts.join(" · ")}</div>;
+}
+
+/** Ressenti d'une sortie cloturee, modifiable. On rentre rarement remplir
+ * « ce que je retiens » avant d'avoir range le materiel : sans cela, la case
+ * resterait vide pour toujours. Les deux champs libres n'apparaissent en
+ * saisie qu'une fois la carte depliee, pour ne pas alourdir la liste. */
+function PastFeeling({ feeling, onChange }: {
+  feeling: Feeling;
+  onChange: (patch: Partial<Feeling>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Partial<Record<keyof Feeling, string>>>({});
   const scores = [
     feeling.rating != null ? `satisfaction ${feeling.rating}/5` : null,
     feeling.skyQuality != null ? `ciel percu ${feeling.skyQuality}/5` : null,
   ].filter(Boolean);
-  if (scores.length === 0 && !feeling.highlight && !feeling.nextTime) return null;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
       {scores.length > 0 && (
         <div className="nc-mono" style={{ fontSize: 11, color: "var(--ink2)" }}>{scores.join(" · ")}</div>
       )}
@@ -117,6 +143,45 @@ function PastFeeling({ feeling }: { feeling: Feeling }) {
       )}
       {feeling.nextTime && (
         <div className="nc-caption" style={{ margin: 0 }}>A refaire autrement : {feeling.nextTime}</div>
+      )}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="nc-caption"
+        style={{ alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer", color: "var(--ink2)", padding: 0 }}
+      >
+        {open ? "Masquer le ressenti" : scores.length || feeling.highlight || feeling.nextTime
+          ? "Modifier le ressenti"
+          : "Ajouter un ressenti"}
+      </button>
+      {open && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 2 }}>
+          <Rating
+            label="Satisfaction"
+            scope="de cette sortie"
+            value={feeling.rating}
+            onChange={(rating) => onChange({ rating })}
+          />
+          <Rating
+            label="Ciel percu"
+            scope="cette nuit-la"
+            value={feeling.skyQuality}
+            onChange={(skyQuality) => onChange({ skyQuality })}
+          />
+          <input
+            value={draft.highlight ?? feeling.highlight}
+            onChange={(e) => setDraft((d) => ({ ...d, highlight: e.target.value }))}
+            onBlur={(e) => e.target.value !== feeling.highlight && onChange({ highlight: e.target.value })}
+            placeholder="Ce que je retiens"
+            className="nc-input"
+          />
+          <input
+            value={draft.nextTime ?? feeling.nextTime}
+            onChange={(e) => setDraft((d) => ({ ...d, nextTime: e.target.value }))}
+            onBlur={(e) => e.target.value !== feeling.nextTime && onChange({ nextTime: e.target.value })}
+            placeholder="A refaire autrement"
+            className="nc-input"
+          />
+        </div>
       )}
     </div>
   );
@@ -311,13 +376,16 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
     setFeeling({ [field]: value });
   };
 
-  const close = () => send({ kind: "closeSession" });
+  // Fige au passage le resume des conditions sur la duree de la sortie (voir
+  // nightContext.conditionsBetween) : le detail par note existe deja, la vue
+  // d'ensemble serait sinon perdue.
+  const close = () => mutate(closeOp(current.openedAt));
 
-  const savePastNote = async (closedAt: string, note: string) => {
+  const savePastSession = async (closedAt: string, patch: { note?: string } & Partial<Feeling>) => {
     // Retouche d'une sortie deja cloturee : pas une saisie de terrain, elle
     // peut rester un aller-retour direct (et le serveur valide `closedAt`).
     try {
-      applyServer(await api.updatePastSessionNote(closedAt, note));
+      applyServer(await api.updatePastSession(closedAt, patch));
     } catch {
       refresh();
     }
@@ -637,11 +705,15 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                 </div>
               </div>
               <div style={{ fontSize: 12, color: "var(--ink2)" }}>{p.targets.join(", ") || "aucune cible"}</div>
-              <PastFeeling feeling={p.feeling} />
+              <PastConditions conditions={p.conditions} />
+              <PastFeeling
+                feeling={p.feeling}
+                onChange={(patch) => savePastSession(p.closedAt, patch)}
+              />
               <input
                 value={pastNoteDraft[p.closedAt] ?? p.note}
                 onChange={(e) => setPastNoteDraft((d) => ({ ...d, [p.closedAt]: e.target.value }))}
-                onBlur={(e) => savePastNote(p.closedAt, e.target.value)}
+                onBlur={(e) => savePastSession(p.closedAt, { note: e.target.value })}
                 placeholder="Note de la sortie (facultatif)"
                 style={{
                   background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,

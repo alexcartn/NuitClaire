@@ -209,6 +209,19 @@ export interface Feeling {
   nextTime: string;
 }
 
+/** Resume des conditions annoncees sur la duree d'une sortie, fige a la
+ * cloture (voir nightContext.conditionsBetween). Le `context` des notes en
+ * donne le detail heure par heure ; ceci en donne la vue d'ensemble. */
+export interface NightConditions {
+  tempMinC: number | null;
+  tempMaxC: number | null;
+  cloudAvgPct: number | null;
+  seeingAvg: number | null;
+  transparencyAvg: number | null;
+  dewSpreadC: number | null;
+  moonIllum: number | null;
+}
+
 export interface CurrentSession {
   openedAt: string | null;
   scoreAtOpen: number | null;
@@ -226,6 +239,7 @@ export interface PastSession {
   closedAt: string;
   timeline: TimelineEntry[];
   feeling: Feeling;
+  conditions: NightConditions | null;
 }
 
 export interface Sessions {

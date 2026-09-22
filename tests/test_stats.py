@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import progress
 from sessions import add_item, close_session, default, set_item_exposure
@@ -9,7 +9,9 @@ NOW = datetime(2026, 9, 16, 22, 0)
 
 
 def _closed_session(designation: str, score: int, done: bool, closed_at: datetime, exposure: int | None = None):
-    data = add_item(default(), designation, NOW, score_now=score)
+    # Ouverte deux heures avant sa cloture : c'est l'ouverture qui date la
+    # sortie (voir sessions.close_session), comme pour une vraie nuit.
+    data = add_item(default(), designation, closed_at - timedelta(hours=2), score_now=score)
     if exposure is not None:
         set_item_exposure(data, designation, exposure)
     if done:

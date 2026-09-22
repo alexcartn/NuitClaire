@@ -103,12 +103,22 @@ desordre. Le client envoie desormais son heure de saisie (`at`), le serveur
 l'honore, et retombe sur la sienne si elle manque (chemin Streamlit) ou est
 illisible.
 
+A la cloture, un resume fige la vue d'ensemble que le detail par note ne donne pas :
+temperatures mini/maxi, nuages et seeing moyens, plus petit ecart au point de rosee,
+Lune (`conditionsBetween`). Borne a la duree de la sortie, pas a la nuit entiere : ce
+qui s'est passe apres le rangement du materiel ne la raconte pas.
+
+Une sortie est desormais datee par son ouverture et non par sa cloture : une nuit se
+nomme par le soir ou elle commence, et on la cloture souvent apres minuit -- la dater
+du jour de cloture la decalait d'un jour.
+
 Le ressenti est, lui, de la saisie pure : satisfaction et qualite de ciel percue de
 1 a 5, plus "ce que je retiens" et "a refaire autrement". La qualite de ciel percue
 est volontairement distincte du score calcule -- c'est l'ecart entre les deux qui
 interesse. S'y ajoute une satisfaction par cible. Le tout suit la sortie a la
-cloture, se relit sur les sorties passees, et `stats.py` en tire une satisfaction
-moyenne (`avgRating`), qui ne compte que les sorties notees.
+cloture, reste modifiable ensuite (`set_past_feeling` : on rentre rarement remplir
+"ce que je retiens" avant d'avoir range le materiel), et `stats.py` en tire une
+satisfaction moyenne (`avgRating`), qui ne compte que les sorties notees.
 
 Cote Streamlit, `app.py` continue de fonctionner sans changement mais n'affiche ni
 contexte ni ressenti : l'ecart entre les deux frontends reste a arbitrer (voir

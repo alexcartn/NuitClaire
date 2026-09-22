@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from sessions import add_free_note, add_item, add_item_note, close_session, default, \
     exposure_totals, load, remove_free_note, remove_item, remove_item_note, reopen_session, \
-    save, set_item_exposure, set_past_note, timeline, toggle_item, DEFAULT
+    save, set_item_exposure, set_past_feeling, set_past_note, timeline, toggle_item, DEFAULT
 
 NOW = datetime(2026, 9, 16, 22, 4)
 TODAY = date(2026, 9, 16)
@@ -234,11 +234,54 @@ def test_close_session_noop_when_current_is_empty():
 
 
 def test_close_session_inserts_most_recent_first():
-    data = add_item(default(), "M13", NOW, score_now=80)
-    close_session(data, date(2026, 9, 13), datetime(2026, 9, 13, 23, 0))
+    data = add_item(default(), "M13", datetime(2026, 9, 13, 21, 0), score_now=80)
+    close_session(data, TODAY, datetime(2026, 9, 13, 23, 0))
     add_item(data, "M27", NOW, score_now=60)
     close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
     assert [p["date"] for p in data["past"]] == ["2026-09-16", "2026-09-13"]
+
+
+def test_outing_is_dated_by_the_evening_it_began_not_the_closing_day():
+    """Une nuit se nomme par le soir ou elle commence, et on la cloture
+    souvent apres minuit : la dater du jour de cloture la decalerait d'un
+    jour."""
+    data = add_item(default(), "M13", datetime(2026, 9, 16, 22, 4), score_now=80)
+    close_session(data, date(2026, 9, 17), datetime(2026, 9, 17, 2, 30))
+    assert data["past"][0]["date"] == "2026-09-16"
+
+
+def test_outing_date_falls_back_when_the_session_has_no_opening_time():
+    # Entree ancienne, ecrite avant l'introduction de `openedAt`.
+    data = add_item(default(), "M13", NOW, score_now=80)
+    data["current"]["openedAt"] = None
+    close_session(data, date(2026, 9, 17), datetime(2026, 9, 17, 2, 30))
+    assert data["past"][0]["date"] == "2026-09-17"
+
+
+def test_close_session_keeps_the_conditions_it_is_given():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    conditions = {"tempMinC": 6.1, "tempMaxC": 9.4, "moonIllum": 77.0}
+    close_session(data, TODAY, datetime(2026, 9, 17, 5, 30), conditions)
+    assert data["past"][0]["conditions"] == conditions
+
+
+def test_close_session_without_conditions_keeps_none():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
+    assert data["past"][0]["conditions"] is None
+
+
+def test_set_past_feeling_completes_an_outing_after_the_fact():
+    data = add_item(default(), "M13", NOW, score_now=80)
+    close_session(data, TODAY, datetime(2026, 9, 17, 5, 30))
+    closed_at = data["past"][0]["closedAt"]
+
+    set_past_feeling(data, closed_at, {"rating": 4})
+    set_past_feeling(data, closed_at, {"highlight": "ecrit le lendemain"})
+
+    assert data["past"][0]["feeling"] == {
+        "rating": 4, "skyQuality": None, "highlight": "ecrit le lendemain", "nextTime": "",
+    }
 
 
 def test_set_past_note_updates_matching_entry():

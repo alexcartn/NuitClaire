@@ -30,10 +30,11 @@
 // tests de Node (voir sessionQueue.test.ts), dont la resolution ESM ne
 // devine pas les extensions, contrairement a Vite.
 import { readJson, writeJson } from "./storage.ts";
-import { captureContext } from "./nightContext.ts";
+import { captureConditions, captureContext } from "./nightContext.ts";
 import type {
   CurrentSession,
   Feeling,
+  NightConditions,
   Note,
   NoteContext,
   Sessions,
@@ -56,7 +57,7 @@ export type SessionOpBody =
   | { kind: "removeItemNote"; designation: string; noteId: string }
   | { kind: "addFreeNote"; noteId: string; text: string; context?: NoteContext | null }
   | { kind: "removeFreeNote"; noteId: string }
-  | { kind: "closeSession" };
+  | { kind: "closeSession"; conditions?: NightConditions | null };
 
 /** `id` identifie l'operation dans la file (pour la retirer une fois
  * acceptee), `at` est l'heure de saisie cote client : c'est elle qui
@@ -102,6 +103,19 @@ export function localIsoNow(now: Date = new Date()): string {
   const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   return `${date}T${time}.${String(now.getMilliseconds()).padStart(3, "0")}000`;
+}
+
+/** Operation de cloture, avec le resume des conditions de la sortie. A part
+ * de `newOp` parce qu'il faut l'heure d'ouverture, que seule la session
+ * connait. */
+export function closeOp(openedAt: string | null): SessionOp {
+  const at = localIsoNow();
+  return {
+    kind: "closeSession",
+    conditions: openedAt ? captureConditions(openedAt, at) : null,
+    id: localId(),
+    at,
+  };
 }
 
 /** Complete un geste avec son identite, son heure de saisie et -- pour une
@@ -290,21 +304,22 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
     case "closeSession": {
       if (!isActive(cur)) return data;
       // Meme resume qu'a la cloture serveur (sessions.close_session) : notes
-      // par cible puis notes libres, jointes par "; ". La date de la nuit est
-      // celle du serveur (elle tient compte de la nuit selectionnee) ; en
-      // local on prend la date du jour, corrigee a la synchronisation.
+      // par cible puis notes libres, jointes par "; ".
       const texts = [
         ...cur.items.flatMap((i) => i.notes.map((n) => n.text)),
         ...cur.freeNotes.map((n) => n.text),
       ];
       const entry = {
-        date: op.at.slice(0, 10),
+        // Datee par son ouverture, pas par sa cloture : une nuit se nomme
+        // par le soir ou elle commence (meme regle que sessions.close_session).
+        date: (cur.openedAt ?? op.at).slice(0, 10),
         score: cur.scoreAtOpen,
         targets: cur.items.map((i) => i.designation).sort(),
         note: texts.join("; "),
         closedAt: op.at,
         timeline: cur.timeline,
         feeling: cur.feeling,
+        conditions: op.conditions ?? null,
       };
       return {
         past: [entry, ...data.past],

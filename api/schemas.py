@@ -220,6 +220,19 @@ class SessionItemOut(BaseModel):
     rating: int | None = None
 
 
+class NightConditions(BaseModel):
+    """Ce que la prevision annoncait sur la duree de la sortie, releve par le
+    client a la cloture (voir l'en-tete de sessions.py). Resume, quand le
+    `context` des notes donne le detail heure par heure."""
+    tempMinC: float | None = None
+    tempMaxC: float | None = None
+    cloudAvgPct: float | None = None
+    seeingAvg: float | None = None
+    transparencyAvg: float | None = None
+    dewSpreadC: float | None = None
+    moonIllum: float | None = None
+
+
 class FeelingOut(BaseModel):
     rating: int | None = None
     skyQuality: int | None = None
@@ -244,6 +257,7 @@ class PastSessionOut(BaseModel):
     closedAt: str
     timeline: list[TimelineEntryOut]
     feeling: FeelingOut
+    conditions: NightConditions | None = None
 
 
 class SessionsOut(BaseModel):
@@ -280,8 +294,19 @@ class AddNote(BaseModel):
     context: NoteContext | None = None
 
 
+class CloseSession(BaseModel):
+    at: str | None = None
+    conditions: NightConditions | None = None
+
+
 class UpdatePastSession(BaseModel):
-    note: str
+    """`note` seule modifie le resume ; les champs de ressenti se completent
+    apres coup, un par un (voir sessions.set_past_feeling)."""
+    note: str | None = None
+    rating: int | None = Field(default=None, ge=1, le=5)
+    skyQuality: int | None = Field(default=None, ge=1, le=5)
+    highlight: str | None = None
+    nextTime: str | None = None
 
 
 class MonthCountOut(BaseModel):

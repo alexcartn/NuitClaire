@@ -55,7 +55,7 @@ export function sendOp(op: SessionOp): Promise<Sessions> {
     case "removeFreeNote":
       return api.deleteFreeNote(op.noteId);
     case "closeSession":
-      return api.closeSession();
+      return api.closeSession(op.at, op.conditions);
   }
 }
 

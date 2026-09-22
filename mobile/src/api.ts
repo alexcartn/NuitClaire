@@ -4,6 +4,7 @@ import type {
   ExposureEntry,
   GeocodeResult,
   Night,
+  NightConditions,
   NoteContext,
   Sessions,
   Settings,
@@ -108,9 +109,10 @@ export const api = {
     request<Sessions>("PUT", "/api/sessions/current/feeling", { body: patch }),
   deleteFreeNote: (noteId: string) =>
     request<Sessions>("DELETE", `/api/sessions/current/notes/${encodeURIComponent(noteId)}`),
-  closeSession: () => request<Sessions>("POST", "/api/sessions/current/close"),
-  updatePastSessionNote: (closedAt: string, note: string) =>
-    request<Sessions>("PUT", `/api/sessions/past/${encodeURIComponent(closedAt)}`, { body: { note } }),
+  closeSession: (at?: string, conditions?: NightConditions | null) =>
+    request<Sessions>("POST", "/api/sessions/current/close", { body: { at, conditions } }),
+  updatePastSession: (closedAt: string, patch: { note?: string } & Partial<Feeling>) =>
+    request<Sessions>("PUT", `/api/sessions/past/${encodeURIComponent(closedAt)}`, { body: patch }),
   reopenSession: (closedAt: string) =>
     request<Sessions>("POST", `/api/sessions/past/${encodeURIComponent(closedAt)}/reopen`),
 

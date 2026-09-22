@@ -153,6 +153,7 @@ def load(path: Path = SESSIONS_PATH) -> dict:
             entry.setdefault("freeNotes", [])
             entry["freeNotes"] = [_migrate_note(n) for n in entry["freeNotes"]]
             entry["feeling"] = {**default_feeling(), **(entry.get("feeling") or {})}
+            entry.setdefault("conditions", None)
             if entry.get("items"):
                 entry["items"] = {k: _migrate_item(v) for k, v in entry["items"].items()}
     return merged
@@ -323,10 +324,22 @@ def set_feeling(data: dict, patch: dict) -> dict:
     return data
 
 
-def close_session(data: dict, today: date, now: datetime) -> dict:
+def close_session(data: dict, today: date, now: datetime,
+                   conditions: dict | None = None) -> dict:
     """Cloture la session en cours : si elle contient au moins une cible ou
     une note libre, la range dans `past` (triee la plus recente en tete) puis
     la vide. Sans effet si la session en cours est deja vide.
+
+    La date de la sortie est celle de son ouverture, pas celle de la cloture :
+    une nuit se nomme par le soir ou elle commence, et on la cloture souvent
+    apres minuit -- la dater du jour de cloture la decalerait d'un jour. Meme
+    raison pour une cloture partie hors ligne et synchronisee le lendemain.
+    `today` ne sert que de repli, quand la session n'a pas d'heure d'ouverture
+    (entree ancienne).
+
+    `conditions` resume ce que la prevision annoncait sur la duree de la
+    sortie (voir l'en-tete du module) : releve par le client, conserve tel
+    quel, absent quand il n'a rien fourni.
 
     `openedAt`, `items` et `freeNotes` (copie complete : cochees et toutes
     les notes horodatees incluses) sont conserves dans l'entree passee en
@@ -337,8 +350,10 @@ def close_session(data: dict, today: date, now: datetime) -> dict:
     if _is_active(cur):
         texts = [n["text"] for item in cur["items"].values() for n in item["notes"]]
         texts += [n["text"] for n in cur["freeNotes"]]
+        opened = cur.get("openedAt")
+        night = datetime.fromisoformat(opened).date() if opened else today
         data["past"].insert(0, {
-            "date": today.isoformat(),
+            "date": night.isoformat(),
             "score": cur["scoreAtOpen"],
             "targets": sorted(cur["items"].keys()),
             "note": "; ".join(texts),
@@ -347,6 +362,7 @@ def close_session(data: dict, today: date, now: datetime) -> dict:
             "items": {k: {**v, "notes": list(v["notes"])} for k, v in cur["items"].items()},
             "freeNotes": list(cur["freeNotes"]),
             "feeling": dict(cur["feeling"]),
+            "conditions": conditions,
         })
     data["current"] = default()["current"]
     return data
@@ -360,6 +376,23 @@ def set_past_note(data: dict, closed_at: str, note: str) -> dict:
     if entry is None:
         raise ValueError(f"aucune sortie cloturee a {closed_at}")
     entry["note"] = note
+    return data
+
+
+def set_past_feeling(data: dict, closed_at: str, patch: dict) -> dict:
+    """Complete ou corrige le ressenti d'une sortie deja cloturee, champ par
+    champ. On rentre rarement remplir « ce que je retiens » avant d'avoir
+    range le materiel : pouvoir l'ecrire le lendemain evite que la case reste
+    vide pour toujours."""
+    _check_rating(patch.get("rating"), "rating")
+    _check_rating(patch.get("skyQuality"), "skyQuality")
+    unknown = set(patch) - set(default_feeling())
+    if unknown:
+        raise ValueError(f"champ(s) de ressenti inconnu(s) : {', '.join(sorted(unknown))}")
+    entry = next((p for p in data["past"] if p["closedAt"] == closed_at), None)
+    if entry is None:
+        raise ValueError(f"aucune sortie cloturee a {closed_at}")
+    entry["feeling"] = {**default_feeling(), **(entry.get("feeling") or {}), **patch}
     return data
 
 

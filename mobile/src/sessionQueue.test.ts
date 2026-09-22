@@ -24,7 +24,7 @@ import {
   parseTargetPrefix,
   pendingNoteIds,
 } from "./sessionQueue.ts";
-import { contextAt } from "./nightContext.ts";
+import { conditionsBetween, contextAt } from "./nightContext.ts";
 import type { SessionOp, SessionOpBody } from "./sessionQueue.ts";
 import type { Sessions } from "./types.ts";
 
@@ -399,4 +399,48 @@ test("la cloture emporte le ressenti dans l'historique", () => {
   assert.equal(data.past[0].feeling.rating, 4);
   assert.equal(data.past[0].feeling.skyQuality, 2);
   assert.deepEqual(data.current.feeling, emptyFeeling());
+});
+
+test("une sortie est datee par son ouverture, pas par sa cloture", () => {
+  // Une nuit se nomme par le soir ou elle commence, et on la cloture souvent
+  // apres minuit (meme regle que sessions.close_session).
+  const data = replay([
+    op({ kind: "addItem", designation: "M31" }, "2026-09-21T22:04:00.000000"),
+    op({ kind: "closeSession" }, "2026-09-22T02:30:00.000000"),
+  ]);
+
+  assert.equal(data.past[0].date, "2026-09-21");
+  assert.equal(data.past[0].closedAt, "2026-09-22T02:30:00.000000");
+});
+
+test("la cloture fige les conditions de la sortie", () => {
+  const night = {
+    moonIllum: 77,
+    hourly: [
+      { time: "2026-09-21T21:00:00", score: 0.9, cloudCoverPct: 2, windGustsKmh: 8,
+        temperatureC: 9.4, dewPointC: 4, seeing: 2, transparency: 2 },
+      { time: "2026-09-21T22:00:00", score: 0.8, cloudCoverPct: 8, windGustsKmh: 9,
+        temperatureC: 6.1, dewPointC: 4.6, seeing: 3, transparency: 2 },
+      // Apres le rangement du materiel : ne raconte pas cette sortie-la.
+      { time: "2026-09-22T04:00:00", score: 0.2, cloudCoverPct: 90, windGustsKmh: 30,
+        temperatureC: -2, dewPointC: -2, seeing: 8, transparency: 8 },
+    ],
+  } as unknown as Parameters<typeof conditionsBetween>[0];
+
+  assert.deepEqual(
+    conditionsBetween(night, "2026-09-21T20:45:00", "2026-09-21T23:10:00"),
+    {
+      tempMinC: 6.1,
+      tempMaxC: 9.4,
+      cloudAvgPct: 5,
+      seeingAvg: 2.5,
+      transparencyAvg: 2,
+      dewSpreadC: 1.5,
+      moonIllum: 77,
+    },
+  );
+});
+
+test("sans prevision, la cloture ne fige rien plutot que d'approcher", () => {
+  assert.equal(conditionsBetween(null, "2026-09-21T21:00:00", "2026-09-21T23:00:00"), null);
 });

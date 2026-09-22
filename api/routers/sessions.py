@@ -11,8 +11,8 @@ from fastapi import APIRouter, HTTPException
 
 import sessions as sessions_store
 from api.deps import current_night, current_score_pct, get_site, sessions_write_lock
-from api.schemas import AddNote, AddSessionItem, SessionsOut, UpdateFeeling, UpdatePastSession, \
-    UpdateSessionItem
+from api.schemas import AddNote, AddSessionItem, CloseSession, SessionsOut, UpdateFeeling, \
+    UpdatePastSession, UpdateSessionItem
 from api.translate import sessions_to_out
 from astro import local_now
 
@@ -142,22 +142,35 @@ def update_feeling(body: UpdateFeeling) -> dict:
 
 
 @router.post("/api/sessions/current/close", response_model=SessionsOut)
-def close_session() -> dict:
+def close_session(body: CloseSession | None = None) -> dict:
     site = get_site()
+    body = body or CloseSession()
     with sessions_write_lock:
         data = sessions_store.load()
         sel, _, _ = current_night(site)
-        sessions_store.close_session(data, sel or local_now(site).date(), local_now(site))
+        sessions_store.close_session(
+            data,
+            sel or local_now(site).date(),
+            _written_at(body.at, site),
+            body.conditions.model_dump() if body.conditions else None,
+        )
         sessions_store.save(data)
         return sessions_to_out(data)
 
 
 @router.put("/api/sessions/past/{closed_at}", response_model=SessionsOut)
 def update_past_session(closed_at: str, body: UpdatePastSession) -> dict:
+    """Retouche d'une sortie cloturee : son resume et/ou son ressenti. Seuls
+    les champs presents dans la requete sont modifies."""
+    sent = body.model_fields_set
+    feeling = {k: getattr(body, k) for k in sent if k != "note"}
     with sessions_write_lock:
         data = sessions_store.load()
         try:
-            sessions_store.set_past_note(data, closed_at, body.note)
+            if "note" in sent and body.note is not None:
+                sessions_store.set_past_note(data, closed_at, body.note)
+            if feeling:
+                sessions_store.set_past_feeling(data, closed_at, feeling)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
         sessions_store.save(data)
