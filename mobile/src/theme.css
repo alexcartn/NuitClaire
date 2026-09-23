@@ -57,9 +57,11 @@
   --ink3: rgba(244, 242, 247, 0.46);
   --accent: oklch(0.74 0.15 326);
   --onaccent: #1a0410;
-  --good: #4ecf86;
-  --mid: #f2c94c;
-  --bad: #ff6b76;
+  /* Voir « Une seule couleur qui appelle » plus bas : meme clarte pour les
+     trois crans, chroma a 87 % de celle de l'accent. */
+  --good: oklch(0.77 0.13 150);
+  --mid: oklch(0.77 0.13 82);
+  --bad: oklch(0.77 0.13 25);
   --stripe: rgba(255, 255, 255, 0.07);
   --bar: rgba(255, 255, 255, 0.14);
 }
@@ -75,12 +77,43 @@
   --ink3: rgba(22, 19, 26, 0.46);
   --accent: oklch(0.52 0.19 326);
   --onaccent: #ffffff;
-  --good: #127940;
-  --mid: #8a6406;
-  --bad: #c5303c;
+  --good: oklch(0.52 0.15 150);
+  --mid: oklch(0.52 0.15 78);
+  --bad: oklch(0.52 0.15 27);
   --stripe: rgba(20, 12, 26, 0.06);
   --bar: rgba(20, 12, 26, 0.12);
 }
+
+/* Une seule couleur qui appelle.
+ *
+ * L'appli a deux langages de couleur : l'accent, qui dit « c'est ici qu'on
+ * agit » (bouton principal, filtre actif, onglet courant, lien), et l'echelle
+ * de qualite bon/moyen/mauvais, qui dit « voila ce que vaut cette mesure »
+ * (score de la nuit, clarte du ciel heure par heure, rafales).
+ *
+ * Les deux se disputaient l'attention. Mesures faites sur l'ancienne palette,
+ * en OKLCH, ou le chroma est comparable d'une teinte a l'autre :
+ *
+ *   sombre : accent C 0,150 | bon C 0,155 | moyen C 0,146 | mauvais C 0,180
+ *
+ * Deux des trois crans de l'echelle etaient donc plus satures que la couleur
+ * de marque, et le vert plus clair qu'elle : sur l'ecran Messier, un badge
+ * « CE SOIR » vert criait plus fort que tout ce sur quoi on peut appuyer. Un
+ * accent ne fonctionne que parce qu'il est rare.
+ *
+ * Et l'echelle n'etait pas une echelle : ses trois crans s'etalaient de L
+ * 0,714 a L 0,850, soit un ecart de clarte de 0,14 entre des valeurs censees
+ * etre trois marches d'une meme mesure. Le jaune sautait aux yeux bien plus
+ * que le rouge, ce qui est exactement l'inverse du sens.
+ *
+ * Donc : une seule clarte pour les trois crans (seule la teinte porte le
+ * sens), et un chroma plafonne a 87 % de celui de l'accent. Verifie : tous
+ * les contrastes restent au-dessus de 4,5:1 sur le fond comme sur les
+ * surfaces. En-dessous de ~80 % de chroma, le feu tricolore vire a la boue et
+ * le rouge ne se lit plus comme une alerte -- d'ou 87 et pas moins.
+ *
+ * Le mode vision nocturne garde ses propres valeurs : tout y etant rouge,
+ * l'echelle y est deja une echelle de luminosite. */
 
 /* Echelles partagees : une taille de texte ou un espacement qui ne s'y
    trouve pas n'a pas de raison d'exister.
@@ -174,6 +207,29 @@ body {
 a {
   color: var(--accent);
   text-decoration: none;
+}
+
+/* Au clavier, rien n'indiquait ou on se trouvait : les styles en ligne des
+ * composants ecrasaient l'anneau par defaut du navigateur sur la plupart des
+ * boutons, et aucun ne le remplacait.
+ *
+ * `:focus-visible` et non `:focus` : au doigt, un bouton garde le focus apres
+ * la pression, et un anneau resterait affiche sur le dernier element touche.
+ *
+ * Le decalage de 2 px n'est pas cosmetique : un bouton deja rempli en accent
+ * (le bouton principal, une puce active, une capture marquee) recevrait sinon
+ * un anneau accent colle a un aplat de la meme couleur, donc invisible. Le
+ * decalage laisse voir la surface qui porte le bouton, et l'anneau se detache.
+ * Une premiere version peignait cet interstice en `--bg` pour en etre sure :
+ * sur une carte, dont la surface n'est pas celle du fond, ca dessinait un
+ * halo grisatre visible. La surface reelle fait le travail.
+ *
+ * `outline` plutot qu'une bordure : elle ne prend pas de place dans la mise en
+ * page, donc rien ne bouge a la prise de focus, et elle suit d'elle-meme les
+ * coins arrondis. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Chiffres, heures, angles, designations d'objets. Renommee depuis

@@ -262,6 +262,54 @@ Une note refusee definitivement par le serveur (cible absente de la session) n'e
 perdue : elle est reposee en note libre avec la cible en tete (`sessionStore.rescueNote`).
 L'attache a la cible saute, le texte non.
 
+### Une seule couleur qui appelle
+
+L'appli a deux langages de couleur : l'accent, qui dit « c'est ici qu'on agit »
+(bouton principal, filtre actif, onglet courant, lien), et l'echelle de qualite
+bon/moyen/mauvais, qui dit « voila ce que vaut cette mesure » (score de la nuit,
+clarte du ciel heure par heure, rafales). Les deux se disputaient l'attention.
+
+Mesure sur l'ancienne palette, en OKLCH, ou le chroma est comparable d'une teinte a
+l'autre. En theme sombre : accent C 0,150, bon C 0,155, moyen C 0,146, mauvais
+C 0,180. Deux des trois crans de l'echelle etaient donc plus satures que la couleur
+de marque, et le vert plus clair qu'elle. Un accent ne fonctionne que parce qu'il
+est rare.
+
+L'echelle n'en etait pas une, par ailleurs : ses trois crans s'etalaient de L 0,714
+a L 0,850, soit 0,14 d'ecart de clarte entre trois marches d'une meme mesure. Le
+jaune sautait aux yeux bien plus que le rouge, l'inverse du sens.
+
+Les trois crans partagent maintenant une seule clarte (seule la teinte porte le
+sens) et un chroma plafonne a 87 % de celui de l'accent. Tous les contrastes restent
+au-dessus de 4,5:1 sur le fond comme sur les surfaces. En-dessous de ~80 % de
+chroma, le feu tricolore vire a la boue et le rouge ne se lit plus comme une alerte,
+d'ou 87 et pas moins.
+
+Le badge « CE SOIR » du catalogue Messier, lui, empruntait le vert de l'echelle pour
+dire un simple oui : ce n'est pas une mesure. Sur une page qui suit une collection,
+l'accent revient au seul geste de l'ecran, marquer une capture ; la faisabilite du
+soir redevient un indice discret, et le filtre « Faisable ce soir uniquement » reste
+la pour qui la cherche vraiment. Quand c'est non, plus rien ne s'affiche : l'absence
+le dit deja, le tiret n'etait que du bruit.
+
+Le mode vision nocturne garde ses propres valeurs : tout y etant rouge, l'echelle y
+est deja une echelle de luminosite.
+
+### Focus visible au clavier
+
+Rien n'indiquait ou on se trouvait : les styles en ligne des composants ecrasaient
+l'anneau par defaut du navigateur, et aucun ne le remplacait. Une regle unique sur
+`:focus-visible` (et non `:focus`, sinon un bouton garde son anneau apres une
+pression au doigt) pose un `outline` a 2 px de decalage.
+
+Le decalage n'est pas cosmetique : un bouton deja rempli en accent recevrait sinon
+un anneau accent colle a un aplat de la meme couleur, donc invisible. Il laisse voir
+la surface qui porte le bouton, et l'anneau se detache. Une premiere version peignait
+cet interstice en `--bg` pour en etre sure, ce qui dessinait un halo grisatre sur les
+cartes, dont la surface n'est pas celle du fond : la surface reelle fait le travail.
+`outline` plutot qu'une bordure, enfin, parce qu'elle ne prend pas de place dans la
+mise en page, donc rien ne bouge a la prise de focus.
+
 ### Trois polices, trois roles
 
 `theme.css` expose `--font-display`, `--font-text` et `--font-num` : aucun

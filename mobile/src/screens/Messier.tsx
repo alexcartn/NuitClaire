@@ -149,17 +149,28 @@ export function Messier({
                     {row.designation}
                   </span>
                   {/* « CE SOIR » est un mot, la designation au-dessus est un
-                      numero : seule la seconde reste en chasse fixe. */}
-                  <span
-                    style={{
-                      fontFamily: "var(--font-display)", fontWeight: 600,
-                      fontSize: "var(--text-xs)", letterSpacing: ".08em",
-                      color: row.feasibleTonight ? "var(--good)" : "var(--ink3)",
-                      background: "var(--surf)", padding: "2px 5px", borderRadius: 4,
-                    }}
-                  >
-                    {row.feasibleTonight ? "CE SOIR" : "—"}
-                  </span>
+                      numero : seule la seconde reste en chasse fixe.
+                      Et ce n'est pas une mesure : ce badge empruntait le vert
+                      de l'echelle bon/moyen/mauvais pour dire un simple oui,
+                      et criait alors plus fort que le seul geste de cet ecran
+                      -- marquer une capture. Sur une page qui suit une
+                      collection, l'accent revient a la capture ; la
+                      faisabilite du soir est un indice, et le filtre
+                      « Faisable ce soir uniquement » est la pour qui la
+                      cherche vraiment. Rien a afficher quand c'est non :
+                      l'absence le dit deja, le tiret n'etait que du bruit. */}
+                  {row.feasibleTonight && (
+                    <span
+                      style={{
+                        fontFamily: "var(--font-display)", fontWeight: 600,
+                        fontSize: "var(--text-xs)", letterSpacing: ".08em",
+                        color: "var(--ink2)",
+                        background: "var(--surf)", padding: "2px 5px", borderRadius: 4,
+                      }}
+                    >
+                      CE SOIR
+                    </span>
+                  )}
                 </div>
               </button>
               <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
