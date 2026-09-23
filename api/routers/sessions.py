@@ -178,12 +178,15 @@ def update_past_session(closed_at: str, body: UpdatePastSession) -> dict:
     """Retouche d'une sortie cloturee : son resume et/ou son ressenti. Seuls
     les champs presents dans la requete sont modifies."""
     sent = body.model_fields_set
-    feeling = {k: getattr(body, k) for k in sent if k != "note"}
+    feeling = {k: getattr(body, k) for k in sent if k not in ("note", "site")}
     with sessions_write_lock:
         data = sessions_store.load()
         try:
             if "note" in sent and body.note is not None:
                 sessions_store.set_past_note(data, closed_at, body.note)
+            if "site" in sent:
+                sessions_store.set_past_site(
+                    data, closed_at, body.site.model_dump() if body.site else None)
             if feeling:
                 sessions_store.set_past_feeling(data, closed_at, feeling)
         except ValueError as exc:

@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { journalToMarkdown, outingToMarkdown, targetHistory } from "./journalRead.ts";
+import { journalToMarkdown, knownSites, outingToMarkdown, targetHistory } from "./journalRead.ts";
 import type { Feeling, PastSession, SessionItem, Sessions } from "./types.ts";
 
 const noFeeling: Feeling = { rating: null, skyQuality: null, highlight: "", nextTime: "" };
@@ -43,7 +43,7 @@ function outing(date: string, over: Partial<PastSession> = {}): PastSession {
 function journal(past: PastSession[], current: Partial<Sessions["current"]> = {}): Sessions {
   return {
     current: {
-      openedAt: null, scoreAtOpen: null, siteAtOpen: null, items: [], freeNotes: [],
+      openedAt: null, scoreAtOpen: null, siteAtOpen: null, conditions: null, items: [], freeNotes: [],
       timeline: [], feeling: noFeeling, ...current,
     },
     past,
@@ -140,4 +140,17 @@ test("l'export complet garde l'ordre du journal et ignore la session en cours", 
   // `toLocaleDateString("fr-FR")` accentue les mois : « août », pas « aout ».
   assert.ok(md.indexOf("20 septembre") < md.indexOf("12 août"), "la plus recente en tete");
   assert.doesNotMatch(md, /Session en cours/);
+});
+
+test("les lieux connus viennent du carnet, sans doublon, le plus recent d'abord", () => {
+  const marson = { name: "Marson", lat: 48.912, lon: 4.529, elevationM: 100, tz: "Europe/Paris" };
+  const col = { name: "Col du Lautaret", lat: 45.034, lon: 6.404, elevationM: 2058, tz: "Europe/Paris" };
+  const data = journal(
+    [outing("2026-09-20", { site: col }), outing("2026-08-12", { site: marson }),
+     outing("2026-07-01", { site: marson }), outing("2026-06-01")],
+    { siteAtOpen: marson },
+  );
+
+  assert.deepEqual(knownSites(data).map((s) => s.name), ["Marson", "Col du Lautaret"]);
+  assert.deepEqual(knownSites(null), []);
 });

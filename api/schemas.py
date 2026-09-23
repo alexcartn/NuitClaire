@@ -254,6 +254,9 @@ class CurrentSessionOut(BaseModel):
     openedAt: str | None
     scoreAtOpen: int | None
     siteAtOpen: OutingSite | None = None
+    # Presentes seulement sur une sortie rouverte pour correction : ce sont
+    # les siennes, et elles priment a la recloture (voir close_session).
+    conditions: NightConditions | None = None
     items: list[SessionItemOut]
     freeNotes: list[NoteOut]
     timeline: list[TimelineEntryOut]
@@ -317,9 +320,11 @@ class CloseSession(BaseModel):
 
 
 class UpdatePastSession(BaseModel):
-    """`note` seule modifie le resume ; les champs de ressenti se completent
-    apres coup, un par un (voir sessions.set_past_feeling)."""
+    """Retouche d'une sortie cloturee. Seuls les champs presents sont
+    modifies : `note` pour le resume, les champs de ressenti un par un (voir
+    sessions.set_past_feeling), `site` pour corriger le lieu."""
     note: str | None = None
+    site: OutingSite | None = None
     rating: int | None = Field(default=None, ge=1, le=5)
     skyQuality: int | None = Field(default=None, ge=1, le=5)
     highlight: str | None = None

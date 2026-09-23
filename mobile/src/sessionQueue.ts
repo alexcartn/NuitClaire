@@ -209,7 +209,10 @@ function reconcileOpen(cur: CurrentSession, at: string): CurrentSession {
   // heure, ni score, ni lieu, ni ressenti (meme regle que
   // sessions._close_if_empty).
   if (!isActive(cur)) {
-    return { ...cur, openedAt: null, scoreAtOpen: null, siteAtOpen: null, feeling: emptyFeeling() };
+    return {
+      ...cur, openedAt: null, scoreAtOpen: null, siteAtOpen: null, conditions: null,
+      feeling: emptyFeeling(),
+    };
   }
   // A l'ouverture, le lieu est celui que l'appli utilise deja pour ses
   // calculs : elle l'a sous la main, y compris hors ligne. Le serveur
@@ -331,12 +334,14 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
         closedAt: op.at,
         timeline: cur.timeline,
         feeling: cur.feeling,
-        conditions: op.conditions ?? null,
+        // Celles de la sortie d'abord : une sortie rouverte pour correction
+        // garde les siennes (meme regle que sessions.close_session).
+        conditions: cur.conditions ?? op.conditions ?? null,
       };
       return {
         past: [entry, ...data.past],
         current: {
-          openedAt: null, scoreAtOpen: null, siteAtOpen: null,
+          openedAt: null, scoreAtOpen: null, siteAtOpen: null, conditions: null,
           items: [], freeNotes: [], timeline: [], feeling: emptyFeeling(),
         },
       };

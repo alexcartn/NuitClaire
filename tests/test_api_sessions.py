@@ -3,7 +3,7 @@ def test_get_sessions_returns_empty_defaults(api_client):
     assert r.status_code == 200
     assert r.json() == {
         "current": {"openedAt": None, "scoreAtOpen": None, "siteAtOpen": None,
-                    "items": [], "freeNotes": [], "timeline": [],
+                    "conditions": None, "items": [], "freeNotes": [], "timeline": [],
                     "feeling": {"rating": None, "skyQuality": None, "highlight": "", "nextTime": ""}},
         "past": [],
     }
@@ -369,3 +369,54 @@ def test_a_later_move_does_not_rewrite_a_past_outing(api_client):
     still = api_client.get("/api/sessions").json()["past"][0]["site"]
     assert still == closed["site"]
     assert still["name"] != "Ailleurs"
+
+
+def test_a_past_outing_place_can_be_corrected(api_client):
+    # Cas reel : parti observer ailleurs sans penser a changer sa position
+    # dans les reglages.
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    closed = api_client.post("/api/sessions/current/close").json()["past"][0]
+    ailleurs = {"name": "Col du Lautaret", "lat": 45.034, "lon": 6.404,
+                "elevationM": 2058.0, "tz": "Europe/Paris"}
+
+    api_client.put(f"/api/sessions/past/{closed['closedAt']}", json={"site": ailleurs})
+
+    corrected = api_client.get("/api/sessions").json()["past"][0]
+    assert corrected["site"] == ailleurs
+    # Les conditions ne sont pas retouchees : il n'existe pas de prevision
+    # retrospective pour le vrai lieu.
+    assert corrected["conditions"] == closed["conditions"]
+
+
+def test_correcting_one_field_leaves_the_others_alone(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.put("/api/sessions/current/feeling", json={"rating": 4})
+    closed = api_client.post("/api/sessions/current/close").json()["past"][0]
+
+    api_client.put(f"/api/sessions/past/{closed['closedAt']}", json={"note": "corrige"})
+
+    after = api_client.get("/api/sessions").json()["past"][0]
+    assert after["note"] == "corrige"
+    assert after["feeling"]["rating"] == 4
+    assert after["site"] == closed["site"]
+
+
+def test_reopening_an_old_outing_keeps_its_own_conditions(api_client):
+    """Une sortie rouverte pour correction repart avec ses conditions
+    d'origine, jamais avec celles du soir ou on la corrige."""
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    conditions = {"tempMinC": 6.1, "tempMaxC": 9.4, "cloudAvgPct": 5.0, "seeingAvg": 2.0,
+                  "transparencyAvg": 2.0, "dewSpreadC": 1.5, "moonIllum": 77.0}
+    closed = api_client.post("/api/sessions/current/close",
+                              json={"conditions": conditions}).json()["past"][0]
+
+    api_client.post(f"/api/sessions/past/{closed['closedAt']}/reopen")
+    api_client.post("/api/sessions/current/items/M13/notes", json={"text": "oubli rattrape"})
+    # Meme si le client en propose de nouvelles -- sa position a pu changer
+    # entre-temps, et la prevision avec elle.
+    autres = {"tempMinC": -3.0, "tempMaxC": 1.0, "cloudAvgPct": 80.0, "seeingAvg": 7.0,
+              "transparencyAvg": 6.0, "dewSpreadC": 0.2, "moonIllum": 12.0}
+    reclosed = api_client.post("/api/sessions/current/close",
+                                json={"conditions": autres}).json()["past"][0]
+
+    assert reclosed["conditions"] == conditions

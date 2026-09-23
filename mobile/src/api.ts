@@ -9,6 +9,7 @@ import type {
   Sessions,
   Settings,
   SettingsUpdate,
+  Site,
   Stats,
   TargetDetail,
   TargetRow,
@@ -111,7 +112,7 @@ export const api = {
     request<Sessions>("DELETE", `/api/sessions/current/notes/${encodeURIComponent(noteId)}`),
   closeSession: (at?: string, conditions?: NightConditions | null) =>
     request<Sessions>("POST", "/api/sessions/current/close", { body: { at, conditions } }),
-  updatePastSession: (closedAt: string, patch: { note?: string } & Partial<Feeling>) =>
+  updatePastSession: (closedAt: string, patch: { note?: string; site?: Site } & Partial<Feeling>) =>
     request<Sessions>("PUT", `/api/sessions/past/${encodeURIComponent(closedAt)}`, { body: patch }),
   reopenSession: (closedAt: string) =>
     request<Sessions>("POST", `/api/sessions/past/${encodeURIComponent(closedAt)}/reopen`),

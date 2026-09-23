@@ -34,6 +34,16 @@ retient, ce qu'on referait autrement) et la note de satisfaction par cible
 La qualite de ciel percue est volontairement distincte du score calcule --
 c'est l'ecart entre les deux qui interesse, pas leur accord.
 
+Tout ce que l'utilisateur a ecrit ou choisi reste modifiable apres coup :
+notes, temps de pose, coches, ressenti, resume, lieu. On reconstitue souvent
+une nuit le lendemain matin, et une case fermee pour toujours reste vide
+pour toujours. Ce que l'appli a releve elle-meme ne l'est pas : les
+horodatages, le score de la nuit, le `context` d'une note et les
+`conditions` d'une sortie sont des traces de ce que l'appli savait a ce
+moment-la. Les rendre modifiables ferait passer de la fiction pour un
+releve -- et une sortie rouverte pour correction repart d'ailleurs avec ses
+conditions d'origine, jamais avec celles du soir ou on la corrige.
+
 Le lieu suit la meme regle que le score : fige a l'ouverture de la session,
 jamais relu ensuite. C'est ce qui permet de savoir d'ou une sortie a ete
 faite -- sans lui, changer de position dans les reglages reecrirait le passe
@@ -77,7 +87,8 @@ def default() -> dict:
     """Retourne une copie fraiche et independante des valeurs par defaut."""
     return {
         "current": {"openedAt": None, "scoreAtOpen": None, "siteAtOpen": None,
-                    "items": {}, "freeNotes": [], "feeling": default_feeling()},
+                    "conditions": None, "items": {}, "freeNotes": [],
+                    "feeling": default_feeling()},
         "past": [],
     }
 
@@ -113,6 +124,7 @@ def _close_if_empty(cur: dict) -> None:
         cur["openedAt"] = None
         cur["scoreAtOpen"] = None
         cur["siteAtOpen"] = None
+        cur["conditions"] = None
         cur["feeling"] = default_feeling()
 
 
@@ -151,6 +163,7 @@ def load(path: Path = SESSIONS_PATH) -> dict:
         if not isinstance(merged["current"].get("feeling"), dict):
             merged["current"]["feeling"] = default_feeling()
         merged["current"].setdefault("siteAtOpen", None)
+        merged["current"].setdefault("conditions", None)
     merged["current"]["items"] = {k: _migrate_item(v) for k, v in merged["current"]["items"].items()}
     merged["current"]["freeNotes"] = [_migrate_note(n) for n in merged["current"]["freeNotes"]]
     merged["current"]["feeling"] = {**default_feeling(), **merged["current"]["feeling"]}
@@ -353,7 +366,11 @@ def close_session(data: dict, today: date, now: datetime,
 
     `conditions` resume ce que la prevision annoncait sur la duree de la
     sortie (voir l'en-tete du module) : releve par le client, conserve tel
-    quel, absent quand il n'a rien fourni.
+    quel. Une sortie rouverte pour correction garde en revanche les siennes,
+    meme si le client en propose de nouvelles : rouvrir sert a corriger ce
+    qu'on a ecrit, pas a refaire dire a l'appli ce qu'elle annoncait cette
+    nuit-la -- d'autant qu'entre-temps la position a pu changer, et la
+    prevision avec elle.
 
     `openedAt`, `items` et `freeNotes` (copie complete : cochees et toutes
     les notes horodatees incluses) sont conserves dans l'entree passee en
@@ -377,7 +394,7 @@ def close_session(data: dict, today: date, now: datetime,
             "items": {k: {**v, "notes": list(v["notes"])} for k, v in cur["items"].items()},
             "freeNotes": list(cur["freeNotes"]),
             "feeling": dict(cur["feeling"]),
-            "conditions": conditions,
+            "conditions": cur.get("conditions") if cur.get("conditions") is not None else conditions,
         })
     data["current"] = default()["current"]
     return data
@@ -408,6 +425,22 @@ def set_past_feeling(data: dict, closed_at: str, patch: dict) -> dict:
     if entry is None:
         raise ValueError(f"aucune sortie cloturee a {closed_at}")
     entry["feeling"] = {**default_feeling(), **(entry.get("feeling") or {}), **patch}
+    return data
+
+
+def set_past_site(data: dict, closed_at: str, site: dict | None) -> dict:
+    """Corrige le lieu d'une sortie cloturee -- typiquement quand on est
+    parti observer ailleurs sans penser a changer sa position dans les
+    reglages.
+
+    Les `conditions` de la sortie ne sont pas retouchees : elles disent ce
+    que la prevision annoncait la ou l'appli se croyait, et il n'existe pas
+    de prevision retrospective pour le vrai lieu. Corriger le lieu repare ce
+    qu'on sait, pas ce qu'on ne sait pas."""
+    entry = next((p for p in data["past"] if p["closedAt"] == closed_at), None)
+    if entry is None:
+        raise ValueError(f"aucune sortie cloturee a {closed_at}")
+    entry["site"] = site
     return data
 
 
@@ -455,6 +488,7 @@ def reopen_session(data: dict, closed_at: str) -> dict:
         "openedAt": entry.get("openedAt") or entry["closedAt"],
         "scoreAtOpen": entry["score"],
         "siteAtOpen": entry.get("site"),
+        "conditions": entry.get("conditions"),
         "items": items,
         "freeNotes": list(entry.get("freeNotes") or []),
         "feeling": {**default_feeling(), **(entry.get("feeling") or {})},

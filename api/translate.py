@@ -28,7 +28,8 @@ def sessions_to_out(data: dict) -> dict:
     ]
     return {
         "current": {"openedAt": cur["openedAt"], "scoreAtOpen": cur["scoreAtOpen"],
-                    "siteAtOpen": cur["siteAtOpen"], "items": items,
+                    "siteAtOpen": cur["siteAtOpen"], "conditions": cur["conditions"],
+                    "items": items,
                     "freeNotes": cur["freeNotes"], "timeline": sessions_store.timeline(cur),
                     "feeling": cur["feeling"]},
         "past": past,

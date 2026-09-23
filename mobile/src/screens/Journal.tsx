@@ -5,11 +5,11 @@ import { applyServer, mutate, refresh, useSessions } from "../useSessions";
 import { closeOp, localNoteId, newOp, parseTargetPrefix } from "../sessionQueue";
 import type { SessionOpBody } from "../sessionQueue";
 import { useTheme } from "../useTheme";
-import { downloadText, journalToMarkdown, outingToMarkdown, siteLine } from "../journalRead";
+import { downloadText, journalToMarkdown, knownSites, outingToMarkdown, siteLine } from "../journalRead";
 import { useWakeLock } from "../useWakeLock";
 import { StatCard } from "../components/StatCard";
 import { TabIcon } from "../components/TabIcon";
-import type { Feeling, NightConditions, NoteContext, TargetRow, TimelineEntry } from "../types";
+import type { Feeling, NightConditions, NoteContext, Site, TargetRow, TimelineEntry } from "../types";
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -117,6 +117,57 @@ function PastConditions({ conditions }: { conditions: NightConditions | null }) 
   ].filter(Boolean);
   if (parts.length === 0) return null;
   return <div className="nc-context nc-mono">{parts.join(" · ")}</div>;
+}
+
+/** Lieu d'une sortie cloturee, corrigeable -- typiquement quand on est parti
+ * observer ailleurs sans penser a changer sa position dans les reglages.
+ *
+ * On choisit parmi les lieux que le carnet connait deja plutot que de
+ * ressaisir des coordonnees : on observe depuis une poignee d'endroits,
+ * presque toujours les memes. Un endroit inedit se pose d'abord dans
+ * Reglages, puis se retrouve ici. */
+function PastPlace({ site, choices, onChange }: {
+  site: Site | null;
+  choices: Site[];
+  onChange: (next: Site) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const others = choices.filter((c) => c.name !== site?.name);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      {site && <div className="nc-context nc-mono">{siteLine(site)}</div>}
+      {(others.length > 0 || !site) && (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="nc-caption"
+          style={{ alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer", color: "var(--ink2)", padding: 0 }}
+        >
+          {open ? "Masquer les lieux" : site ? "Corriger le lieu" : "Indiquer le lieu"}
+        </button>
+      )}
+      {open && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {others.map((choice) => (
+            <button
+              key={choice.name}
+              onClick={() => {
+                onChange(choice);
+                setOpen(false);
+              }}
+              className="nc-chip"
+            >
+              {choice.name}
+            </button>
+          ))}
+          {others.length === 0 && (
+            <p className="nc-caption" style={{ margin: 0 }}>
+              Aucun autre lieu dans le carnet. Posez-le dans Reglages, il apparaitra ici.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Ressenti d'une sortie cloturee, modifiable. On rentre rarement remplir
@@ -258,6 +309,10 @@ function Timeline({ entries, pendingNotes, onDelete }: {
 export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) => void }) {
   const { data, loading, loadError, pendingCount, pendingNotes, syncError, syncCount } = useSessions();
   const fetchStats = useCallback(() => api.stats(), []);
+  // Le lieu configure : c'est justement celui qu'on vient de poser dans
+  // Reglages en rentrant, et qui n'est encore dans aucune sortie.
+  const fetchState = useCallback(() => api.state(), []);
+  const { data: appState } = useFetch(fetchState, [], "state");
   const { data: stats, reload: reloadStats } = useFetch(fetchStats, []);
   const [reopening, setReopening] = useState<string | null>(null);
   const [reopenError, setReopenError] = useState<string | null>(null);
@@ -295,6 +350,12 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
 
   const { current, past } = data;
   const sessionActive = hasSession;
+  // Lieu courant en tete, puis ceux que le carnet connait deja, sans
+  // doublon de nom.
+  const places = [
+    ...(appState ? [appState.site] : []),
+    ...knownSites(data).filter((site) => site.name !== appState?.site.name),
+  ];
 
   const send = (body: SessionOpBody) => mutate(newOp(body));
 
@@ -382,7 +443,10 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
   // d'ensemble serait sinon perdue.
   const close = () => mutate(closeOp(current.openedAt));
 
-  const savePastSession = async (closedAt: string, patch: { note?: string } & Partial<Feeling>) => {
+  const savePastSession = async (
+    closedAt: string,
+    patch: { note?: string; site?: Site } & Partial<Feeling>,
+  ) => {
     // Retouche d'une sortie deja cloturee : pas une saisie de terrain, elle
     // peut rester un aller-retour direct (et le serveur valide `closedAt`).
     try {
@@ -761,7 +825,11 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   </button>
                 ))}
               </div>
-              {p.site && <div className="nc-context nc-mono">{siteLine(p.site)}</div>}
+              <PastPlace
+                site={p.site}
+                choices={places}
+                onChange={(site) => savePastSession(p.closedAt, { site })}
+              />
               <PastConditions conditions={p.conditions} />
               <PastFeeling
                 feeling={p.feeling}
@@ -812,7 +880,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   color: sessionActive || pendingCount > 0 ? "var(--ink3)" : "var(--accent)", padding: 0,
                 }}
               >
-                {reopening === p.closedAt ? "..." : "Rouvrir cette sortie"}
+                {reopening === p.closedAt ? "..." : "Rouvrir pour tout modifier"}
               </button>
             </div>
           ))}

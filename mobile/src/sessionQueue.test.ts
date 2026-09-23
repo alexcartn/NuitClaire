@@ -31,7 +31,7 @@ import type { Sessions } from "./types.ts";
 function emptySessions(): Sessions {
   return {
     current: {
-      openedAt: null, scoreAtOpen: null, siteAtOpen: null, items: [], freeNotes: [],
+      openedAt: null, scoreAtOpen: null, siteAtOpen: null, conditions: null, items: [], freeNotes: [],
       timeline: [], feeling: emptyFeeling(),
     },
     past: [],
@@ -208,7 +208,7 @@ test("dans la meme seconde, une saisie passe apres une note deja enregistree", (
     current: {
       openedAt: "2026-09-21T21:05:30.123456",
       scoreAtOpen: 72,
-      siteAtOpen: null,
+      siteAtOpen: null, conditions: null,
       items: [],
       freeNotes: [note("s1", "deja enregistree", "2026-09-21T21:05:30.123456")],
       timeline: [],
@@ -229,7 +229,7 @@ test("une note en attente se range au bon endroit parmi les notes du serveur", (
     current: {
       openedAt: "2026-09-21T21:00:00",
       scoreAtOpen: 72,
-      siteAtOpen: null,
+      siteAtOpen: null, conditions: null,
       items: [],
       freeNotes: [
         note("s1", "avant", "2026-09-21T21:00:00"),
@@ -265,7 +265,7 @@ test("rejouer la file sur une base serveur ne perd pas les saisies en attente", 
     current: {
       openedAt: "2026-09-21T21:00:00",
       scoreAtOpen: 72,
-      siteAtOpen: null,
+      siteAtOpen: null, conditions: null,
       items: [{
         designation: "M31", addedAt: "2026-09-21T21:00:00", done: false, notes: [],
         exposureMin: null, rating: null,
@@ -446,4 +446,21 @@ test("la cloture fige les conditions de la sortie", () => {
 
 test("sans prevision, la cloture ne fige rien plutot que d'approcher", () => {
   assert.equal(conditionsBetween(null, "2026-09-21T21:00:00", "2026-09-21T23:00:00"), null);
+});
+
+test("recloturer une sortie ancienne ne lui colle pas les conditions de ce soir", () => {
+  // La prevision en cache est celle de la nuit courante. Sans garde, la
+  // sortie de la semaine derniere, rouverte pour correction puis
+  // recloturee, verrait la nuit de ce soir tomber dans son intervalle.
+  const ceSoir = {
+    moonIllum: 60,
+    hourly: [
+      { time: "2026-09-23T21:00:00", score: 0.9, cloudCoverPct: 2, windGustsKmh: 8,
+        temperatureC: 12, dewPointC: 5, seeing: 2, transparency: 2 },
+    ],
+  } as unknown as Parameters<typeof conditionsBetween>[0];
+
+  assert.equal(conditionsBetween(ceSoir, "2026-09-16T21:00:00", "2026-09-23T23:00:00"), null);
+  // Une sortie de ce soir, elle, est bien couverte.
+  assert.ok(conditionsBetween(ceSoir, "2026-09-23T20:30:00", "2026-09-23T23:00:00"));
 });

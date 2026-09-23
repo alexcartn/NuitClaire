@@ -228,6 +228,9 @@ export interface CurrentSession {
   /** Lieu d'ou la sortie est faite, fige a son ouverture : sans lui, changer
    * de position dans les reglages reecrirait le passe. */
   siteAtOpen: Site | null;
+  /** Presentes seulement sur une sortie rouverte pour correction : ce sont
+   * les siennes, et elles priment a la recloture. */
+  conditions: NightConditions | null;
   items: SessionItem[];
   freeNotes: Note[];
   timeline: TimelineEntry[];

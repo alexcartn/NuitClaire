@@ -148,6 +148,28 @@ creerait sinon une cible fantome, qui polluerait durablement historique et
 statistiques. Le texte, lui, n'est jamais perdu : la note refusee est reposee en
 note libre avec la designation en tete (`sessionStore.rescueNote`).
 
+### Ce qui reste modifiable apres coup
+
+Tout ce que l'utilisateur a ecrit ou choisi : notes, temps de pose, coches, ressenti,
+resume, lieu. On reconstitue souvent une nuit le lendemain matin, et une case fermee
+pour toujours reste vide pour toujours. Le resume, le ressenti et le lieu se
+corrigent directement sur la sortie ; le reste passe par "Rouvrir pour tout
+modifier", qui rend la sortie a l'ecran de session en cours.
+
+Ce que l'appli a relevé elle-meme ne l'est pas : horodatages, score de la nuit,
+`context` d'une note, `conditions` d'une sortie. Ce sont des traces de ce que l'appli
+savait a ce moment-la ; les rendre modifiables ferait passer de la fiction pour un
+releve. Une sortie rouverte garde donc ses conditions d'origine meme si le client en
+propose de nouvelles -- entre-temps la position a pu changer, et la prevision avec
+elle. Corriger le lieu ne retouche pas les conditions non plus : elles disent ce que
+la prevision annoncait la ou l'appli se croyait, et il n'existe pas de prevision
+retrospective pour le vrai lieu.
+
+Le lieu se corrige en choisissant parmi les lieux que le carnet connait deja, plus
+celui configure dans Reglages -- c'est justement celui qu'on vient d'y poser en
+rentrant. On observe depuis une poignee d'endroits, presque toujours les memes :
+aucune raison de ressaisir des coordonnees.
+
 ### Lieu d'observation
 
 Une sortie retient d'ou elle a ete faite : le lieu est fige a son ouverture, comme

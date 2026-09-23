@@ -104,6 +104,14 @@ export function conditionsBetween(
   const end = new Date(to).getTime();
   if (Number.isNaN(start) || Number.isNaN(end)) return null;
 
+  // La prevision en cache est celle de la nuit courante. Une sortie ouverte
+  // bien avant elle -- une sortie ancienne rouverte pour correction, puis
+  // recloturee -- verrait sinon la nuit de ce soir tomber dans son
+  // intervalle, et reparterait avec des conditions qui ne sont pas les
+  // siennes.
+  const firstPoint = new Date(night.hourly[0].time).getTime();
+  if (start < firstPoint - MAX_GAP_MS) return null;
+
   const span = night.hourly.filter((p) => {
     const t = new Date(p.time).getTime();
     return t >= start && t <= end;

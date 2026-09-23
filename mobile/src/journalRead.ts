@@ -73,6 +73,28 @@ export function targetHistory(data: Sessions | null, designation: string): Targe
   };
 }
 
+/** Lieux deja utilises dans le journal, le plus recent d'abord, sans
+ * doublon de nom.
+ *
+ * Sert a corriger le lieu d'une sortie sans le ressaisir : on observe depuis
+ * une poignee d'endroits, presque toujours les memes, et ils sont deja tous
+ * dans le carnet. */
+export function knownSites(data: Sessions | null): Site[] {
+  if (!data) return [];
+  const seen = new Set<string>();
+  const sites: Site[] = [];
+  const candidates = [
+    data.current.siteAtOpen,
+    ...data.past.map((outing) => outing.site),
+  ];
+  for (const site of candidates) {
+    if (!site || seen.has(site.name)) continue;
+    seen.add(site.name);
+    sites.push(site);
+  }
+  return sites;
+}
+
 // --- Export Markdown --------------------------------------------------
 
 function hhmm(iso: string): string {
