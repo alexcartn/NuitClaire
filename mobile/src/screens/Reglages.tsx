@@ -3,6 +3,9 @@ import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { useTheme } from "../useTheme";
 import { isIOS, promptInstall, usePwa } from "../pwa";
+import { useCompass } from "../useCompass";
+import { sectorFor } from "../compass";
+import { Compass } from "../components/Compass";
 import { COMPASS_SECTORS } from "../types";
 
 const WINDOW_MODES: { key: "complete" | "habituelle"; label: string }[] = [
@@ -26,6 +29,9 @@ const ALERT_LABEL: Record<string, string> = {
 export function Reglages() {
   const { theme, isSystem, setTheme } = useTheme();
   const { canPromptInstall, installed } = usePwa();
+  const compass = useCompass();
+  // Secteur vise, pour le designer dans la grille d'horizon juste en dessous.
+  const facing = compass.heading != null ? sectorFor(compass.heading) : null;
 
   const fetchSettings = useCallback(() => api.settings(), []);
   const { data, reload: reloadSettings } = useFetch(fetchSettings, []);
@@ -146,6 +152,49 @@ export function Reglages() {
         </p>
       </div>
 
+      {/* Au-dessus de l'horizon degage, et pas ailleurs : c'est en tournant
+          sur soi-meme, dehors, qu'on coche ces secteurs. */}
+      <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11, alignItems: "center" }}>
+        <div className="nc-eyebrow" style={{ alignSelf: "flex-start" }}>Boussole</div>
+        {compass.heading != null && facing ? (
+          <>
+            <Compass heading={compass.heading} facing={facing} />
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span className="nc-mono" style={{ fontSize: 26, color: "var(--accent)" }}>{facing}</span>
+              <span className="nc-mono" style={{ fontSize: 13, color: "var(--ink2)" }}>
+                {Math.round(compass.heading)}°
+              </span>
+            </div>
+            <p className="nc-caption" style={{ margin: 0, textAlign: "center" }}>
+              Direction regardee, d'apres la boussole du telephone.
+            </p>
+          </>
+        ) : compass.state === "unsupported" || compass.state === "denied" ? (
+          <p className="nc-caption" style={{ margin: 0, textAlign: "center" }}>
+            {compass.state === "denied"
+              ? "Acces a la boussole refuse. Vous pouvez l'autoriser dans les reglages du navigateur."
+              : "Ce navigateur ne donne pas acces a la boussole du telephone."}
+          </p>
+        ) : compass.needsPermission ? (
+          <>
+            <button
+              onClick={() => void compass.start()}
+              disabled={compass.state === "asking"}
+              className="nc-btn"
+            >
+              {compass.state === "asking" ? "..." : "Activer la boussole"}
+            </button>
+            <p className="nc-caption" style={{ margin: 0, textAlign: "center" }}>
+              Pour savoir quelles directions vous cochez ci-dessous, sans repere dans le noir.
+            </p>
+          </>
+        ) : (
+          <p className="nc-caption" style={{ margin: 0, textAlign: "center" }}>
+            En attente d'une mesure...
+          </p>
+        )}
+      </div>
+
       {state && (
         <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
           <div className="nc-eyebrow">Horizon degage</div>
@@ -163,6 +212,10 @@ export function Reglages() {
                   background: state.horizon[s] ? "var(--accent)" : "transparent",
                   color: state.horizon[s] ? "var(--onaccent)" : "var(--ink2)",
                   border: `1px solid ${state.horizon[s] ? "var(--accent)" : "var(--line)"}`,
+                  // Secteur vise par la boussole : on pointe le telephone, on
+                  // voit quelle case cocher.
+                  outline: s === facing ? "2px solid var(--accent)" : "none",
+                  outlineOffset: 2,
                 }}
               >
                 {s}

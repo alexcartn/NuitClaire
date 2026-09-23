@@ -61,6 +61,23 @@ desormais de facon coherente partout dans l'appli : cibles faisables, Catalogue 
 graphe d'altitude de la fiche detail (`scoring.in_observation_window`, partage par les
 deux frontends). En mode "Nuit complete" (par defaut), rien de tout ca ne change.
 
+### Boussole
+
+Une boussole dans Reglages, juste au-dessus de l'horizon degage : c'est en tournant
+sur soi-meme, dehors, qu'on coche ces secteurs, et sans repere une fois la nuit
+tombee, savoir ou est le nord tient de la devinette. La rose tourne, le repere reste
+fixe en haut (cap en haut), et le secteur vise est entoure dans la grille juste en
+dessous -- on pointe le telephone, on voit quelle case toucher.
+
+`useCompass` traite les trois particularites de l'API d'orientation : il faut
+l'orientation absolue (`deviceorientationabsolute` sur Chrome, `webkitCompassHeading`
+sur Safari, qui ne publie pas la premiere), iOS exige une autorisation demandee
+depuis un geste de l'utilisateur, et `alpha` compte a l'envers d'un cap. Sans capteur
+ou sans autorisation, l'ecran le dit au lieu d'afficher une aiguille immobile qui
+ferait croire a une mesure ; une ecoute restee muette trois secondes vaut absence de
+magnetometre. `compass.sectorFor` reprend la regle de `astro.compass_sector`, sinon la
+boussole designerait un secteur que le calcul de visibilite appelle autrement.
+
 ### Journal hors ligne
 
 Le journal se remplit a chaud, dehors, ou le reseau est souvent faible ou absent. Une
