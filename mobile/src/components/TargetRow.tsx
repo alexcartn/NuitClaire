@@ -1,5 +1,17 @@
 import type { TargetRow as TargetRowT } from "../types";
 
+/** Une cible dans la liste "Cibles" / resultats de recherche.
+ *
+ * La ligne de chiffres (creneau, altitude, separation lunaire) est ce qui
+ * decide si on pointe cet objet ce soir : elle passe donc devant le type et
+ * le cadrage, et les valeurs y sont lisibles quand les mots qui les
+ * qualifient s'effacent. Elle etait auparavant dans la couleur la plus
+ * eteinte de la palette, sous un nom deux fois plus gros -- l'inverse de ce
+ * que l'oeil doit trouver en premier.
+ *
+ * Le type et le cadrage sont deux natures d'information differentes (ce
+ * qu'est l'objet, et comment il rentre dans le champ) : ils ne portent plus
+ * le meme habillage. */
 export function TargetRowCard({
   row,
   isNew,
@@ -12,32 +24,57 @@ export function TargetRowCard({
   const subtitleParts = [row.commonName, row.ngc && row.ngc !== row.designation ? row.ngc : null].filter(
     Boolean,
   );
+  const feasible = Boolean(row.start && row.end);
   return (
     <button
       onClick={onOpen}
       className="nc-card"
-      style={{ width: "100%", textAlign: "left", display: "flex", gap: 13, cursor: "pointer", color: "var(--ink)" }}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        display: "flex",
+        gap: "var(--space-sm)",
+        cursor: "pointer",
+        color: "var(--ink)",
+      }}
     >
       <div
         className="nc-strip"
-        style={{ width: 78, height: 78, flex: "none", borderRadius: 11, background: "var(--surf2)", overflow: "hidden" }}
+        style={{
+          width: 78, height: 78, flex: "none", borderRadius: 11,
+          background: "var(--surf2)", overflow: "hidden",
+        }}
       >
         {row.imageUrl && (
-          <img src={row.imageUrl} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img
+            src={row.imageUrl}
+            alt=""
+            loading="lazy"
+            // Une vignette qui ne charge pas laisse la place a l'aplat, pas a
+            // l'icone d'image cassee du navigateur : le CDS est parfois lent
+            // ou injoignable, et la liste doit rester presentable.
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
         )}
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span className="nc-mono" style={{ fontSize: 16, fontWeight: 500 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "var(--space-2xs)" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
+          <span className="nc-mono" style={{ fontSize: "var(--text-md)", fontWeight: 500 }}>
             {row.designation}
           </span>
           {isNew && (
+            // Raison du tri : cette cible est un Messier qui manque encore au
+            // catalogue. C'est ce qui la place en tete de liste, autant que ca
+            // se lise.
             <span
               className="nc-mono"
               style={{
-                fontSize: 9,
+                fontSize: "var(--text-xs)",
                 letterSpacing: ".06em",
-                padding: "4px 6px",
+                padding: "3px 7px",
                 borderRadius: 5,
                 background: "var(--accent)",
                 color: "var(--onaccent)",
@@ -47,10 +84,32 @@ export function TargetRowCard({
             </span>
           )}
         </div>
+
+        {/* Le creneau porte la decision, les deux angles la nuancent : deux
+            tailles sur la meme ligne, alignees sur la ligne de base, pour
+            que l'oeil prenne l'heure d'abord sans que la ligne reparte a la
+            ligne. */}
+        <div className="nc-mono" style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2xs)" }}>
+          {feasible ? (
+            <>
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--ink)" }}>
+                {row.start}–{row.end}
+              </span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--ink3)" }}>
+                · alt <span style={{ color: "var(--ink2)" }}>{Math.round(row.altMaxDeg)}°</span>
+                {" · lune "}
+                <span style={{ color: "var(--ink2)" }}>{Math.round(row.moonSepDeg)}°</span>
+              </span>
+            </>
+          ) : (
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--ink3)" }}>infaisable ce soir</span>
+          )}
+        </div>
+
         {subtitleParts.length > 0 && (
           <div
             style={{
-              fontSize: 12,
+              fontSize: "var(--text-xs)",
               color: "var(--ink2)",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -60,17 +119,19 @@ export function TargetRowCard({
             {subtitleParts.join(" · ")}
           </div>
         )}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, color: "var(--ink2)", padding: "4px 7px", border: "1px solid var(--line)", borderRadius: 5 }}>
+
+        <div style={{ display: "flex", gap: "var(--space-2xs)", flexWrap: "wrap", alignItems: "center" }}>
+          <span
+            style={{
+              fontSize: "var(--text-xs)", color: "var(--ink2)", padding: "3px 8px",
+              borderRadius: 5, background: "var(--surf2)",
+            }}
+          >
             {row.type}
           </span>
-          <span style={{ fontSize: 10, color: "var(--ink2)", padding: "4px 7px", border: "1px solid var(--line)", borderRadius: 5 }}>
+          <span className="nc-mono" style={{ fontSize: "var(--text-xs)", color: "var(--ink3)" }}>
             {row.cadrage}
           </span>
-        </div>
-        <div className="nc-mono" style={{ fontSize: 11, color: "var(--ink3)" }}>
-          {row.start && row.end ? `${row.start}–${row.end}` : "infaisable ce soir"} · alt{" "}
-          {Math.round(row.altMaxDeg)}° · lune {Math.round(row.moonSepDeg)}°
         </div>
       </div>
     </button>

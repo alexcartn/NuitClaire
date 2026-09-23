@@ -310,10 +310,10 @@ export function Reglages() {
               style={{
                 background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
-                minHeight: 40, color: "var(--ink)",
+                minHeight: 44, color: "var(--ink)",
               }}
             >
-              <span style={{ fontSize: 13 }}>{ALERT_LABEL[key] ?? key}</span>
+              <span style={{ fontSize: "var(--text-sm)" }}>{ALERT_LABEL[key] ?? key}</span>
               <span
                 style={{
                   width: 46, height: 28, borderRadius: 14, flex: "none",
@@ -322,7 +322,7 @@ export function Reglages() {
                   padding: 3, boxSizing: "border-box",
                 }}
               >
-                <span style={{ width: 22, height: 22, borderRadius: 11, background: "#fff" }} />
+                <span style={{ width: 22, height: 22, borderRadius: 11, background: "var(--surf)" }} />
               </span>
             </button>
           ))}

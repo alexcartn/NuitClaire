@@ -262,6 +262,29 @@ Une note refusee definitivement par le serveur (cible absente de la session) n'e
 perdue : elle est reposee en note libre avec la cible en tete (`sessionStore.rescueNote`).
 L'attache a la cible saute, le texte non.
 
+### Echelles typographique et d'espacement
+
+`theme.css` definit deux echelles en jetons (`--text-*`, `--space-*`), et les
+composants s'y tiennent. Avant, l'appli comptait quatorze tailles de texte, dont
+neuf entre 9 et 17 px : un rapport de 1,06 entre marches, ou deux tailles ne se
+distinguent pas et ne creent donc aucune hierarchie. Et onze valeurs d'ecart
+differentes (3, 5, 7, 9, 11, 14...), ce qui empechait l'oeil de regrouper, tout se
+trouvant a peu pres a la meme distance de tout. L'echelle typographique tient en
+cinq marches de rapport ~1,27 ; l'espacement suit un pas de 4 px.
+
+Les surfaces tactiles ont un plancher de 44 px partout (`.nc-chip`, `.nc-btn-sm`,
+`.nc-icon-btn` et les commandes posees en ligne) : les filtres de catalogue
+tombaient a 27 px et les "x" de suppression du journal plus bas encore, dans une
+appli dont le mode vision nocturne suppose des gants dans le noir. La ou la case
+doit rester petite (la coche "capturee"), la surface est agrandie par un
+rembourrage positif et une marge negative, sans rien deplacer.
+
+La ligne de chiffres d'une cible (`components/TargetRow.tsx`) porte la decision :
+elle passe devant le type et le cadrage, avec le creneau horaire en tete et les
+angles en retrait. Elle etait auparavant dans la couleur la plus eteinte de la
+palette, sous un nom deux fois plus gros -- exactement l'inverse du premier
+principe de `.impeccable.md`.
+
 ### Icones
 
 Les icones de la barre d'onglets sont dessinees en SVG (`mobile/src/components/TabIcon.tsx`)

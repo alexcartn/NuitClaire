@@ -86,7 +86,6 @@ function Rating({ label, scope, value, onChange }: {
             key={n}
             onClick={() => onChange(value === n ? null : n)}
             className={`nc-chip ${value === n ? "nc-chip-active" : ""}`}
-            style={{ minWidth: 32 }}
             aria-pressed={value === n}
             aria-label={`${label} ${scope} : ${n} sur 5`}
           >
@@ -295,7 +294,7 @@ function Timeline({ entries, pendingNotes, onDelete }: {
           {onDelete && (
             <button
               onClick={() => onDelete(e)}
-              style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 13, padding: 0 }}
+              className="nc-icon-btn"
               title="Supprimer cette note"
             >
               ×
@@ -649,20 +648,35 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                     <button
                       onClick={() => toggleDone(item.designation, item.done)}
                       className="nc-mono"
+                      // La case reste petite, sa surface tactile fait 44 px :
+                      // rembourrage positif, marge negative, rien ne bouge.
                       style={{
-                        width: 22, height: 22, flex: "none", borderRadius: 6, cursor: "pointer",
-                        border: `1px solid ${item.done ? "var(--accent)" : "var(--ink3)"}`,
-                        background: item.done ? "var(--accent)" : "transparent",
-                        color: item.done ? "var(--onaccent)" : "transparent",
-                        fontSize: 12, lineHeight: "20px", padding: 0,
+                        width: 44, height: 44, flex: "none", cursor: "pointer",
+                        margin: -11, background: "none", border: "none", padding: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
                       }}
                     >
-                      ✓
+                      <span
+                        style={{
+                          width: 22, height: 22, borderRadius: 6, display: "flex",
+                          alignItems: "center", justifyContent: "center",
+                          border: `1px solid ${item.done ? "var(--accent)" : "var(--ink3)"}`,
+                          background: item.done ? "var(--accent)" : "transparent",
+                          color: item.done ? "var(--onaccent)" : "transparent",
+                          fontSize: "var(--text-xs)",
+                        }}
+                      >
+                        ✓
+                      </span>
                     </button>
                     <button
                       onClick={() => onOpenTarget(item.designation)}
                       className="nc-mono"
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink)", fontSize: 13, fontWeight: 500, padding: 0 }}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer", color: "var(--ink)",
+                        fontSize: "var(--text-sm)", fontWeight: 500,
+                        padding: "var(--space-md) 0", margin: "calc(var(--space-md) * -1) 0",
+                      }}
                     >
                       {item.designation}
                     </button>
@@ -672,7 +686,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                     </span>
                     <button
                       onClick={() => removeItem(item.designation)}
-                      style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 16, padding: "0 4px" }}
+                      className="nc-icon-btn"
                       title="Retirer du journal"
                     >
                       ×

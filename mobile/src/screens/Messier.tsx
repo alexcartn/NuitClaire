@@ -165,7 +165,12 @@ export function Messier({
                   style={{
                     background: isCaptured ? "var(--accent)" : "var(--surf2)",
                     color: isCaptured ? "var(--onaccent)" : "var(--ink2)",
-                    borderRadius: 9, padding: 9, fontSize: 12, textAlign: "center", minHeight: 0,
+                    borderRadius: 9,
+                    padding: "0 var(--space-sm)",
+                    fontSize: "var(--text-xs)",
+                    textAlign: "center",
+                    // `minHeight: 0` annulait le plancher tactile de .nc-btn :
+                    // ces boutons tombaient a 34 px.
                   }}
                 >
                   {isCaptured ? "Capturee ✓" : "Marquer capturee"}
@@ -177,7 +182,7 @@ export function Messier({
       </div>
 
       {!showAll && rest > 0 && (
-        <button onClick={() => setShowAll(true)} className="nc-caption" style={{ background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+        <button onClick={() => setShowAll(true)} className="nc-caption" style={{ background: "none", border: "none", cursor: "pointer", padding: "var(--space-sm) 0", minHeight: 44 }}>
           Voir {rest} objet(s) de plus
         </button>
       )}

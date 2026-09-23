@@ -109,7 +109,7 @@ export function Cibles({
       ))}
 
       {!showAll && rest > 0 && (
-        <button onClick={() => setShowAll(true)} className="nc-caption" style={{ background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+        <button onClick={() => setShowAll(true)} className="nc-caption" style={{ background: "none", border: "none", cursor: "pointer", padding: "var(--space-sm) 0", minHeight: 44 }}>
           Voir {rest} cible(s) de plus
         </button>
       )}

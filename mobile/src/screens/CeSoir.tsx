@@ -83,7 +83,7 @@ export function CeSoir({
         <button
           onClick={onSearch}
           className="nc-btn"
-          style={{ width: 40, height: 40, flex: "none", borderRadius: 20, padding: 0, fontSize: 17 }}
+          style={{ width: 44, height: 44, flex: "none", borderRadius: 22, padding: 0, fontSize: "var(--text-md)" }}
         >
           ⌕
         </button>
