@@ -154,7 +154,9 @@ Tout ce que l'utilisateur a ecrit ou choisi : notes, temps de pose, coches, ress
 resume, lieu. On reconstitue souvent une nuit le lendemain matin, et une case fermee
 pour toujours reste vide pour toujours. Le resume, le ressenti et le lieu se
 corrigent directement sur la sortie ; le reste passe par "Rouvrir pour tout
-modifier", qui rend la sortie a l'ecran de session en cours.
+modifier", qui rend la sortie a l'ecran de session en cours. Le lieu se corrige aussi
+sur la sortie en cours (`set_current_site`) : on s'apercoit souvent une fois installe
+qu'on est parti sans changer sa position dans les reglages.
 
 Ce que l'appli a relevé elle-meme ne l'est pas : horodatages, score de la nuit,
 `context` d'une note, `conditions` d'une sortie. Ce sont des traces de ce que l'appli
@@ -283,8 +285,11 @@ connue s'affiche pendant ce temps (voir "Appli installable").
 La fiche detail d'une cible (Cibles/Catalogue Messier) permet aussi d'ajouter du temps
 d'expo directement, sans passer par le journal de session -- pratique pour rattraper des
 prises anterieures a l'usage de l'appli. C'est un journal libre par cible (`progress.py`,
-`exposure_log`), independant du temps saisi par session (`sessions.py`) ; les deux sources
-sont sommees par `stats.py` pour le total affiche dans les statistiques.
+`exposure_log`), independant du temps saisi par session (`sessions.py`). Les deux sources
+sont sommees partout ou un total est affiche : dans les statistiques (`stats.py`) comme
+sur la fiche detail (`exposureTotalMin`, avec `exposureFreeMin`/`exposureSessionMin` pour
+savoir d'ou vient quoi). La fiche n'affichait auparavant que le journal libre, ce qui
+donnait deux chiffres contradictoires pour la meme question.
 "Journal" permet de saisir un temps d'expo (minutes, un champ par cible et par sortie,
 facultatif -- jamais mesure ni estime par l'appli, voir l'en-tete de `sessions.py`) et
 affiche une section Statistiques (nombre de sorties, score moyen des sorties reussies,

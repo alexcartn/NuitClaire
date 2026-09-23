@@ -137,6 +137,10 @@ export interface TargetDetail extends TargetRow {
   exposureHighMin: number;
   wiki: WikiSummary | null;
   exposureLog: ExposureEntry[];
+  /** Temps saisi sur cette fiche (journal d'expo libre) et temps saisi par
+   * sortie dans le journal de session : deux sources, un seul total. */
+  exposureFreeMin: number;
+  exposureSessionMin: number;
   exposureTotalMin: number;
 }
 

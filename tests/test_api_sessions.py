@@ -420,3 +420,30 @@ def test_reopening_an_old_outing_keeps_its_own_conditions(api_client):
                                 json={"conditions": autres}).json()["past"][0]
 
     assert reclosed["conditions"] == conditions
+
+
+def test_the_current_outing_place_can_be_corrected(api_client):
+    # On s'apercoit souvent une fois installe qu'on est parti sans changer
+    # sa position dans les reglages.
+    api_client.post("/api/sessions/current/notes", json={"text": "installe"})
+    ailleurs = {"name": "Col du Lautaret", "lat": 45.034, "lon": 6.404,
+                "elevationM": 2058.0, "tz": "Europe/Paris"}
+
+    api_client.put("/api/sessions/current/site", json=ailleurs)
+
+    assert api_client.get("/api/sessions").json()["current"]["siteAtOpen"] == ailleurs
+
+
+def test_correcting_the_place_without_a_session_is_refused(api_client):
+    ailleurs = {"name": "Nulle part", "lat": 0.0, "lon": 0.0, "elevationM": 0.0, "tz": "UTC"}
+    assert api_client.put("/api/sessions/current/site", json=ailleurs).status_code == 404
+
+
+def test_a_corrected_place_follows_the_outing_to_the_archive(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    ailleurs = {"name": "Col du Lautaret", "lat": 45.034, "lon": 6.404,
+                "elevationM": 2058.0, "tz": "Europe/Paris"}
+    api_client.put("/api/sessions/current/site", json=ailleurs)
+
+    closed = api_client.post("/api/sessions/current/close").json()["past"][0]
+    assert closed["site"] == ailleurs

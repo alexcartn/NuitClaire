@@ -46,6 +46,8 @@ export function sendOp(op: SessionOp): Promise<Sessions> {
       return api.updateSessionItem(op.designation, { rating: op.rating });
     case "setFeeling":
       return api.updateFeeling(op.patch);
+    case "setSite":
+      return api.updateCurrentSite(op.site);
     case "addItemNote":
       return api.addItemNote(op.designation, op.text, op.at, op.context);
     case "removeItemNote":

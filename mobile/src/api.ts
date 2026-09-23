@@ -108,6 +108,8 @@ export const api = {
     request<Sessions>("POST", "/api/sessions/current/notes", { body: { text, at, context } }),
   updateFeeling: (patch: Partial<Feeling>) =>
     request<Sessions>("PUT", "/api/sessions/current/feeling", { body: patch }),
+  updateCurrentSite: (site: Site) =>
+    request<Sessions>("PUT", "/api/sessions/current/site", { body: site }),
   deleteFreeNote: (noteId: string) =>
     request<Sessions>("DELETE", `/api/sessions/current/notes/${encodeURIComponent(noteId)}`),
   closeSession: (at?: string, conditions?: NightConditions | null) =>

@@ -119,14 +119,15 @@ function PastConditions({ conditions }: { conditions: NightConditions | null }) 
   return <div className="nc-context nc-mono">{parts.join(" · ")}</div>;
 }
 
-/** Lieu d'une sortie cloturee, corrigeable -- typiquement quand on est parti
+/** Lieu d'une sortie, corrigeable -- typiquement quand on est parti
  * observer ailleurs sans penser a changer sa position dans les reglages.
+ * Sert pour la sortie en cours comme pour une sortie cloturee.
  *
  * On choisit parmi les lieux que le carnet connait deja plutot que de
  * ressaisir des coordonnees : on observe depuis une poignee d'endroits,
  * presque toujours les memes. Un endroit inedit se pose d'abord dans
  * Reglages, puis se retrouve ici. */
-function PastPlace({ site, choices, onChange }: {
+function OutingPlace({ site, choices, onChange }: {
   site: Site | null;
   choices: Site[];
   onChange: (next: Site) => void;
@@ -623,12 +624,16 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
           </div>
 
           {/* D'ou cette sortie est faite, fige a son ouverture : changer de
-              position dans les reglages ne doit pas reecrire le passe. */}
-          {current.siteAtOpen && (
-            <div className="nc-context nc-mono" style={{ marginTop: -8 }}>
-              {siteLine(current.siteAtOpen)}
-            </div>
-          )}
+              position dans les reglages ne doit pas reecrire le passe. On
+              s'apercoit souvent une fois installe qu'on est parti sans y
+              penser, d'ou la correction ici aussi. */}
+          <div style={{ marginTop: -8 }}>
+            <OutingPlace
+              site={current.siteAtOpen}
+              choices={places}
+              onChange={(site) => send({ kind: "setSite", site })}
+            />
+          </div>
 
           {current.items.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -825,7 +830,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   </button>
                 ))}
               </div>
-              <PastPlace
+              <OutingPlace
                 site={p.site}
                 choices={places}
                 onChange={(site) => savePastSession(p.closedAt, { site })}

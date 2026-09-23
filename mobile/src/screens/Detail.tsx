@@ -166,13 +166,21 @@ export function Detail({
               <div className="nc-eyebrow">Temps d'expo</div>
               {data.exposureTotalMin > 0 && (
                 <div className="nc-mono" style={{ fontSize: 13, color: "var(--ink)" }}>
-                  {Math.floor(data.exposureTotalMin / 60) > 0
-                    ? `${Math.floor(data.exposureTotalMin / 60)} h ${String(data.exposureTotalMin % 60).padStart(2, "0")}`
-                    : `${data.exposureTotalMin} min`}{" "}
-                  au total
+                  {fmtMinutes(data.exposureTotalMin)} au total
                 </div>
               )}
             </div>
+
+            {/* Le total additionne les deux sources : ce qui est saisi ici et
+                ce qui l'est par sortie dans le journal. Afficher la
+                repartition evite de chercher d'ou vient l'ecart avec ce qu'on
+                a tape ci-dessous. */}
+            {data.exposureSessionMin > 0 && (
+              <div className="nc-caption" style={{ margin: 0 }}>
+                dont {fmtMinutes(data.exposureSessionMin)} saisi(s) dans le journal de session
+                {data.exposureFreeMin > 0 && ` et ${fmtMinutes(data.exposureFreeMin)} ici`}.
+              </div>
+            )}
 
             <p className="nc-caption" style={{ margin: 0 }}>
               Ajoute directement ici, sans passer par le journal -- pratique pour rattraper des prises

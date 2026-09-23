@@ -112,3 +112,32 @@ def test_search_suggest_empty_for_no_match(api_client):
 def test_search_suggest_requires_min_length_query(api_client):
     r = api_client.get("/api/search/suggest", params={"q": ""})
     assert r.status_code == 422
+
+
+def test_target_detail_totals_both_exposure_sources(api_client):
+    """Deux sources, une seule question : combien ai-je pose sur cet objet.
+    Un total plus petit ici que dans les statistiques donnait deux chiffres
+    contradictoires pour la meme chose."""
+    api_client.post("/api/progress/exposure/M13", json={"minutes": 20})
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.put("/api/sessions/current/items/M13", json={"exposureMin": 30})
+
+    detail = api_client.get("/api/targets/M13").json()
+
+    assert detail["exposureFreeMin"] == 20
+    assert detail["exposureSessionMin"] == 30
+    assert detail["exposureTotalMin"] == 50
+
+    # Et c'est le meme total que celui des statistiques.
+    stats = api_client.get("/api/stats").json()
+    assert [e for e in stats["exposureByTarget"] if e["designation"] == "M13"][0]["totalMin"] == 50
+
+
+def test_target_detail_counts_closed_outings_too(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.put("/api/sessions/current/items/M13", json={"exposureMin": 45})
+    api_client.post("/api/sessions/current/close")
+
+    detail = api_client.get("/api/targets/M13").json()
+    assert detail["exposureSessionMin"] == 45
+    assert detail["exposureTotalMin"] == 45

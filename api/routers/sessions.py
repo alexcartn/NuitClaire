@@ -12,8 +12,8 @@ from fastapi import APIRouter, HTTPException
 import sessions as sessions_store
 from catalog import find_target
 from api.deps import current_night, current_score_pct, get_site, sessions_write_lock
-from api.schemas import AddNote, AddSessionItem, CloseSession, SessionsOut, UpdateFeeling, \
-    UpdatePastSession, UpdateSessionItem
+from api.schemas import AddNote, AddSessionItem, CloseSession, OutingSite, SessionsOut, \
+    UpdateFeeling, UpdatePastSession, UpdateSessionItem
 from api.translate import sessions_to_out, site_to_out
 from astro import local_now
 
@@ -150,6 +150,19 @@ def update_feeling(body: UpdateFeeling) -> dict:
         data = sessions_store.load()
         try:
             sessions_store.set_feeling(data, patch)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        sessions_store.save(data)
+        return sessions_to_out(data)
+
+
+@router.put("/api/sessions/current/site", response_model=SessionsOut)
+def update_current_site(body: OutingSite) -> dict:
+    """Corrige le lieu de la sortie en cours (voir sessions.set_current_site)."""
+    with sessions_write_lock:
+        data = sessions_store.load()
+        try:
+            sessions_store.set_current_site(data, body.model_dump())
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
         sessions_store.save(data)

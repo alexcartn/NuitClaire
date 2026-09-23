@@ -36,6 +36,7 @@ import type {
   CurrentSession,
   Feeling,
   NightConditions,
+  Site,
   Note,
   NoteContext,
   Sessions,
@@ -54,6 +55,7 @@ export type SessionOpBody =
   | { kind: "setExposure"; designation: string; minutes: number }
   | { kind: "setItemRating"; designation: string; rating: number | null }
   | { kind: "setFeeling"; patch: Partial<Feeling> }
+  | { kind: "setSite"; site: Site }
   | { kind: "addItemNote"; designation: string; noteId: string; text: string; context?: NoteContext | null }
   | { kind: "removeItemNote"; designation: string; noteId: string }
   | { kind: "addFreeNote"; noteId: string; text: string; context?: NoteContext | null }
@@ -279,6 +281,8 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
         mapItem(cur, op.designation, (i) => ({ ...i, rating: op.rating })),
         op.at,
       );
+    case "setSite":
+      return withCurrent(data, { ...cur, siteAtOpen: op.site }, op.at);
     case "setFeeling":
       // Champ par champ, comme le serveur : deux saisies successives sur des
       // champs differents ne s'effacent pas l'une l'autre.

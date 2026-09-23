@@ -428,6 +428,18 @@ def set_past_feeling(data: dict, closed_at: str, patch: dict) -> dict:
     return data
 
 
+def set_current_site(data: dict, site: dict | None) -> dict:
+    """Corrige le lieu de la sortie en cours -- on s'apercoit souvent une
+    fois installe qu'on est parti sans changer sa position dans les reglages.
+    Refuse sur une session non ouverte : un lieu sans sortie n'a pas de sens,
+    et il serait repris par la suivante."""
+    cur = data["current"]
+    if not _is_active(cur):
+        raise ValueError("aucune session en cours")
+    cur["siteAtOpen"] = site
+    return data
+
+
 def set_past_site(data: dict, closed_at: str, site: dict | None) -> dict:
     """Corrige le lieu d'une sortie cloturee -- typiquement quand on est
     parti observer ailleurs sans penser a changer sa position dans les

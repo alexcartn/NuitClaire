@@ -180,6 +180,10 @@ class TargetDetailOut(TargetRowOut):
     exposureHighMin: int
     wiki: dict | None
     exposureLog: list[ExposureEntryOut]
+    # Temps saisi ici meme (journal d'expo libre) et temps saisi par sortie
+    # dans le journal de session : deux sources, un seul total.
+    exposureFreeMin: int
+    exposureSessionMin: int
     exposureTotalMin: int
 
 

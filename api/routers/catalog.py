@@ -8,6 +8,7 @@ en un seul appel ce qui, cote Streamlit, est reparti entre
 from fastapi import APIRouter, HTTPException, Query
 
 import progress as progress_store
+import sessions as sessions_store
 import settings as settings_store
 from api.deps import cached_wiki_summary, current_night, feasible_rows, get_horizon, get_site, \
     site_from_settings
@@ -100,11 +101,17 @@ def target_detail(designation: str) -> dict:
     low, high = recommended_exposure_minutes(row.get("TypeCode", ""), row.get("Mag"))
     wiki = cached_wiki_summary(wiki_title_candidates(row))
 
-    # Journal d'expo libre par cible (voir progress.py) -- independant du
-    # temps saisi par session (sessions.py), affiche ici pour pouvoir
-    # ajouter/consulter du temps d'expo directement depuis la fiche detail,
-    # sans passer par le journal de session.
+    # Deux sources de temps de pose, et une seule question pour qui regarde
+    # la fiche : combien de temps ai-je pose sur cet objet ? Le journal
+    # d'expo libre par cible (progress.py), saisi ici meme, et le temps
+    # saisi par sortie dans le journal de session (sessions.py). Le total
+    # les additionne -- c'est deja ce que font les statistiques
+    # (`stats.exposure_by_target`), et afficher ici un total plus petit
+    # donnait deux chiffres contradictoires pour la meme chose. Le detail
+    # reste expose, pour savoir d'ou vient quoi.
     exposure_log = progress_store.load()["exposure_log"].get(out["designation"], [])
+    free_min = sum(e["minutes"] for e in exposure_log)
+    session_min = sessions_store.exposure_totals(sessions_store.load()).get(out["designation"], 0)
 
     out.update({
         "altitudeSeries": [
@@ -116,6 +123,8 @@ def target_detail(designation: str) -> dict:
         "exposureLowMin": low, "exposureHighMin": high,
         "wiki": wiki,
         "exposureLog": exposure_log,
-        "exposureTotalMin": sum(e["minutes"] for e in exposure_log),
+        "exposureFreeMin": free_min,
+        "exposureSessionMin": session_min,
+        "exposureTotalMin": free_min + session_min,
     })
     return out
