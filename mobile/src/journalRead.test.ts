@@ -28,6 +28,7 @@ function outing(date: string, over: Partial<PastSession> = {}): PastSession {
   return {
     date,
     score: 80,
+    site: null,
     targets: [],
     note: "",
     closedAt: `${date}T23:59:00.000000`,
@@ -42,8 +43,8 @@ function outing(date: string, over: Partial<PastSession> = {}): PastSession {
 function journal(past: PastSession[], current: Partial<Sessions["current"]> = {}): Sessions {
   return {
     current: {
-      openedAt: null, scoreAtOpen: null, items: [], freeNotes: [], timeline: [],
-      feeling: noFeeling, ...current,
+      openedAt: null, scoreAtOpen: null, siteAtOpen: null, items: [], freeNotes: [],
+      timeline: [], feeling: noFeeling, ...current,
     },
     past,
   };

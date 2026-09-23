@@ -14,7 +14,7 @@ from catalog import find_target
 from api.deps import current_night, current_score_pct, get_site, sessions_write_lock
 from api.schemas import AddNote, AddSessionItem, CloseSession, SessionsOut, UpdateFeeling, \
     UpdatePastSession, UpdateSessionItem
-from api.translate import sessions_to_out
+from api.translate import sessions_to_out, site_to_out
 from astro import local_now
 
 router = APIRouter()
@@ -62,7 +62,7 @@ def add_session_item(body: AddSessionItem) -> dict:
     with sessions_write_lock:
         data = sessions_store.load()
         sessions_store.add_item(data, found["name"], _written_at(body.at, site),
-                                 current_score_pct(site))
+                                 current_score_pct(site), site_to_out(site))
         sessions_store.save(data)
         return sessions_to_out(data)
 
@@ -125,7 +125,8 @@ def add_session_free_note(body: AddNote) -> dict:
         data = sessions_store.load()
         sessions_store.add_free_note(data, body.text, _written_at(body.at, site),
                                       current_score_pct(site),
-                                      body.context.model_dump() if body.context else None)
+                                      body.context.model_dump() if body.context else None,
+                                      site_to_out(site))
         sessions_store.save(data)
         return sessions_to_out(data)
 

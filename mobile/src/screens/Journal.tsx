@@ -5,7 +5,7 @@ import { applyServer, mutate, refresh, useSessions } from "../useSessions";
 import { closeOp, localNoteId, newOp, parseTargetPrefix } from "../sessionQueue";
 import type { SessionOpBody } from "../sessionQueue";
 import { useTheme } from "../useTheme";
-import { downloadText, journalToMarkdown, outingToMarkdown } from "../journalRead";
+import { downloadText, journalToMarkdown, outingToMarkdown, siteLine } from "../journalRead";
 import { useWakeLock } from "../useWakeLock";
 import { StatCard } from "../components/StatCard";
 import { TabIcon } from "../components/TabIcon";
@@ -453,6 +453,22 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
               sub="cible(s) capturee(s)"
             />
           </div>
+          {stats.outingsBySite.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="nc-caption" style={{ margin: 0 }}>Lieux d'observation</div>
+              {stats.outingsBySite.slice(0, 5).map((s) => (
+                <div key={s.name} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12 }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.name}
+                  </span>
+                  <span className="nc-mono" style={{ color: "var(--ink2)", flex: "none" }}>
+                    {s.count} sortie(s)
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {stats.exposureByTarget.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div className="nc-caption" style={{ margin: 0 }}>Expo cumulee par cible</div>
@@ -541,6 +557,14 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
               </div>
             )}
           </div>
+
+          {/* D'ou cette sortie est faite, fige a son ouverture : changer de
+              position dans les reglages ne doit pas reecrire le passe. */}
+          {current.siteAtOpen && (
+            <div className="nc-context nc-mono" style={{ marginTop: -8 }}>
+              {siteLine(current.siteAtOpen)}
+            </div>
+          )}
 
           {current.items.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -737,6 +761,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   </button>
                 ))}
               </div>
+              {p.site && <div className="nc-context nc-mono">{siteLine(p.site)}</div>}
               <PastConditions conditions={p.conditions} />
               <PastFeeling
                 feeling={p.feeling}

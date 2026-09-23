@@ -225,6 +225,9 @@ export interface NightConditions {
 export interface CurrentSession {
   openedAt: string | null;
   scoreAtOpen: number | null;
+  /** Lieu d'ou la sortie est faite, fige a son ouverture : sans lui, changer
+   * de position dans les reglages reecrirait le passe. */
+  siteAtOpen: Site | null;
   items: SessionItem[];
   freeNotes: Note[];
   timeline: TimelineEntry[];
@@ -234,6 +237,7 @@ export interface CurrentSession {
 export interface PastSession {
   date: string;
   score: number | null;
+  site: Site | null;
   targets: string[];
   note: string;
   closedAt: string;
@@ -260,6 +264,12 @@ export interface TargetExposure {
   totalMin: number;
 }
 
+export interface SiteCount {
+  name: string;
+  count: number;
+  lastDate: string;
+}
+
 export interface Stats {
   totalOutings: number;
   outingsByMonth: MonthCount[];
@@ -268,6 +278,7 @@ export interface Stats {
   avgScoreSuccessful: number | null;
   avgRating: number | null;
   ratedOutings: number;
+  outingsBySite: SiteCount[];
   exposureByTarget: TargetExposure[];
   totalExposureMin: number;
 }

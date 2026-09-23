@@ -31,8 +31,8 @@ import type { Sessions } from "./types.ts";
 function emptySessions(): Sessions {
   return {
     current: {
-      openedAt: null, scoreAtOpen: null, items: [], freeNotes: [], timeline: [],
-      feeling: emptyFeeling(),
+      openedAt: null, scoreAtOpen: null, siteAtOpen: null, items: [], freeNotes: [],
+      timeline: [], feeling: emptyFeeling(),
     },
     past: [],
   };
@@ -208,6 +208,7 @@ test("dans la meme seconde, une saisie passe apres une note deja enregistree", (
     current: {
       openedAt: "2026-09-21T21:05:30.123456",
       scoreAtOpen: 72,
+      siteAtOpen: null,
       items: [],
       freeNotes: [note("s1", "deja enregistree", "2026-09-21T21:05:30.123456")],
       timeline: [],
@@ -228,6 +229,7 @@ test("une note en attente se range au bon endroit parmi les notes du serveur", (
     current: {
       openedAt: "2026-09-21T21:00:00",
       scoreAtOpen: 72,
+      siteAtOpen: null,
       items: [],
       freeNotes: [
         note("s1", "avant", "2026-09-21T21:00:00"),
@@ -263,6 +265,7 @@ test("rejouer la file sur une base serveur ne perd pas les saisies en attente", 
     current: {
       openedAt: "2026-09-21T21:00:00",
       scoreAtOpen: 72,
+      siteAtOpen: null,
       items: [{
         designation: "M31", addedAt: "2026-09-21T21:00:00", done: false, notes: [],
         exposureMin: null, rating: null,

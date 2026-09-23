@@ -233,6 +233,16 @@ class NightConditions(BaseModel):
     moonIllum: float | None = None
 
 
+class OutingSite(BaseModel):
+    """Lieu d'ou la sortie a ete faite, fige a son ouverture (voir l'en-tete
+    de sessions.py). Absent des sorties anterieures a sa conservation."""
+    name: str
+    lat: float
+    lon: float
+    elevationM: float
+    tz: str
+
+
 class FeelingOut(BaseModel):
     rating: int | None = None
     skyQuality: int | None = None
@@ -243,6 +253,7 @@ class FeelingOut(BaseModel):
 class CurrentSessionOut(BaseModel):
     openedAt: str | None
     scoreAtOpen: int | None
+    siteAtOpen: OutingSite | None = None
     items: list[SessionItemOut]
     freeNotes: list[NoteOut]
     timeline: list[TimelineEntryOut]
@@ -252,6 +263,7 @@ class CurrentSessionOut(BaseModel):
 class PastSessionOut(BaseModel):
     date: str
     score: int | None
+    site: OutingSite | None = None
     targets: list[str]
     note: str
     closedAt: str
@@ -324,10 +336,17 @@ class TargetExposureOut(BaseModel):
     totalMin: int
 
 
+class SiteCountOut(BaseModel):
+    name: str
+    count: int
+    lastDate: str
+
+
 class StatsOut(BaseModel):
     totalOutings: int
     avgRating: float | None = None
     ratedOutings: int = 0
+    outingsBySite: list[SiteCountOut] = []
     outingsByMonth: list[MonthCountOut]
     capturesByMonth: list[MonthCountOut]
     successfulOutings: int

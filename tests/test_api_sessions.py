@@ -2,8 +2,8 @@ def test_get_sessions_returns_empty_defaults(api_client):
     r = api_client.get("/api/sessions")
     assert r.status_code == 200
     assert r.json() == {
-        "current": {"openedAt": None, "scoreAtOpen": None, "items": [], "freeNotes": [],
-                    "timeline": [],
+        "current": {"openedAt": None, "scoreAtOpen": None, "siteAtOpen": None,
+                    "items": [], "freeNotes": [], "timeline": [],
                     "feeling": {"rating": None, "skyQuality": None, "highlight": "", "nextTime": ""}},
         "past": [],
     }
@@ -329,3 +329,43 @@ def test_a_target_is_stored_in_its_catalogue_form(api_client):
     api_client.post("/api/sessions/current/items", json={"designation": "m 31"})
     items = api_client.get("/api/sessions").json()["current"]["items"]
     assert [i["designation"] for i in items] == ["IC0434", "M31"]
+
+
+def test_session_records_where_it_was_opened(api_client):
+    """Sans lieu fige, changer de position dans les reglages reecrirait le
+    passe : toutes les sorties se retrouveraient au dernier endroit
+    configure."""
+    api_client.post("/api/sessions/current/notes", json={"text": "en route"})
+    site = api_client.get("/api/sessions").json()["current"]["siteAtOpen"]
+    assert site is not None
+    assert site["name"] and isinstance(site["lat"], float) and isinstance(site["lon"], float)
+
+
+def test_the_place_follows_the_outing_through_close_and_reopen(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    opened = api_client.get("/api/sessions").json()["current"]["siteAtOpen"]
+
+    closed = api_client.post("/api/sessions/current/close").json()["past"][0]
+    assert closed["site"] == opened
+
+    reopened = api_client.post(f"/api/sessions/past/{closed['closedAt']}/reopen").json()
+    assert reopened["current"]["siteAtOpen"] == opened
+
+
+def test_emptying_a_session_forgets_its_place(api_client):
+    r = api_client.post("/api/sessions/current/notes", json={"text": "essai"})
+    note_id = r.json()["current"]["freeNotes"][0]["id"]
+    api_client.delete(f"/api/sessions/current/notes/{note_id}")
+    assert api_client.get("/api/sessions").json()["current"]["siteAtOpen"] is None
+
+
+def test_a_later_move_does_not_rewrite_a_past_outing(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    closed = api_client.post("/api/sessions/current/close").json()["past"][0]
+
+    api_client.put("/api/settings", json={"site": {"name": "Ailleurs", "lat": 45.0, "lon": 1.0,
+                                                    "elevationM": 300.0, "tz": "Europe/Paris"}})
+
+    still = api_client.get("/api/sessions").json()["past"][0]["site"]
+    assert still == closed["site"]
+    assert still["name"] != "Ailleurs"

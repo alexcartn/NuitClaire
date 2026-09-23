@@ -58,6 +58,27 @@ def avg_rating(past: list[dict]) -> tuple[float | None, int]:
     return avg, len(rated)
 
 
+def outings_by_site(past: list[dict]) -> list[dict]:
+    """Sorties par lieu d'observation, les plus frequents d'abord, avec la
+    date de la derniere. Regroupe par nom de lieu : deux sorties depuis le
+    meme jardin ont le meme nom, meme si les coordonnees ont bouge de
+    quelques metres entre deux relevés GPS. Les sorties sans lieu (anterieures
+    a sa conservation) ne sont pas comptees, et surtout pas rangees sous un
+    lieu invente."""
+    counts: Counter = Counter()
+    last: dict[str, str] = {}
+    for p in past:
+        site = p.get("site")
+        if not site or not site.get("name"):
+            continue
+        name = site["name"]
+        counts[name] += 1
+        if p["date"] > last.get(name, ""):
+            last[name] = p["date"]
+    return [{"name": name, "count": count, "lastDate": last[name]}
+            for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
 def exposure_by_target(sessions_data: dict, progress_data: dict) -> list[dict]:
     """Minutes d'expo cumulees par cible, deux sources sommees : le temps
     saisi par session (sessions.exposure_totals) et le journal d'expo libre
@@ -85,6 +106,7 @@ def compute(sessions_data: dict, progress_data: dict) -> dict:
         "totalOutings": len(past),
         "avgRating": rating,
         "ratedOutings": nb_rated,
+        "outingsBySite": outings_by_site(past),
         "outingsByMonth": outings_by_month(past),
         "capturesByMonth": captures_by_month(past),
         "successfulOutings": nb_successful,

@@ -148,6 +148,21 @@ creerait sinon une cible fantome, qui polluerait durablement historique et
 statistiques. Le texte, lui, n'est jamais perdu : la note refusee est reposee en
 note libre avec la designation en tete (`sessionStore.rescueNote`).
 
+### Lieu d'observation
+
+Une sortie retient d'ou elle a ete faite : le lieu est fige a son ouverture, comme
+le score (`siteAtOpen`, puis `site` une fois cloturee). Sans cela, changer de
+position dans Reglages reecrirait le passe et toutes les sorties se retrouveraient au
+dernier endroit configure. Ce n'est pas un releve GPS pris a l'insu de
+l'utilisateur : c'est la position que l'appli utilisait deja pour ses calculs ce
+soir-la.
+
+Le lieu s'affiche sur la session en cours et sur chaque sortie passee, part dans
+l'export, et `stats.outings_by_site` en tire un recapitulatif ("Marson, 4 sorties").
+Le regroupement se fait par nom : deux sorties depuis le meme jardin portent le meme
+nom, meme si les coordonnees bougent de quelques metres entre deux releves. Les
+sorties anterieures a cette conservation ne sont pas rangees sous un lieu invente.
+
 ### Relecture : fiche par cible et export
 
 Deux vues derivees du journal deja present sur l'appareil

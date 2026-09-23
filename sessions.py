@@ -34,6 +34,13 @@ retient, ce qu'on referait autrement) et la note de satisfaction par cible
 La qualite de ciel percue est volontairement distincte du score calcule --
 c'est l'ecart entre les deux qui interesse, pas leur accord.
 
+Le lieu suit la meme regle que le score : fige a l'ouverture de la session,
+jamais relu ensuite. C'est ce qui permet de savoir d'ou une sortie a ete
+faite -- sans lui, changer de position dans les reglages reecrirait le passe
+et toutes les sorties passees se retrouveraient au dernier endroit
+configure. Ce n'est pas une mesure GPS prise a l'insu de l'utilisateur :
+c'est la position que l'appli utilisait deja pour ses calculs ce soir-la.
+
 Le score de la nuit est capture une seule fois, a l'ouverture de la session
 (premiere cible ou premiere note libre ajoutee) et reutilise tel quel a la
 cloture -- jamais re-interroge en direct a ce moment-la : c'est une
@@ -51,7 +58,7 @@ import db
 SESSIONS_PATH = Path(__file__).parent / "data" / "sessions.json"
 
 _DEFAULT_FROZEN = MappingProxyType({
-    "current": MappingProxyType({"openedAt": None, "scoreAtOpen": None,
+    "current": MappingProxyType({"openedAt": None, "scoreAtOpen": None, "siteAtOpen": None,
                                   "items": MappingProxyType({}), "freeNotes": (),
                                   "feeling": MappingProxyType({})}),
     "past": (),
@@ -69,8 +76,8 @@ def default_feeling() -> dict:
 def default() -> dict:
     """Retourne une copie fraiche et independante des valeurs par defaut."""
     return {
-        "current": {"openedAt": None, "scoreAtOpen": None, "items": {}, "freeNotes": [],
-                    "feeling": default_feeling()},
+        "current": {"openedAt": None, "scoreAtOpen": None, "siteAtOpen": None,
+                    "items": {}, "freeNotes": [], "feeling": default_feeling()},
         "past": [],
     }
 
@@ -105,6 +112,7 @@ def _close_if_empty(cur: dict) -> None:
     if not _is_active(cur):
         cur["openedAt"] = None
         cur["scoreAtOpen"] = None
+        cur["siteAtOpen"] = None
         cur["feeling"] = default_feeling()
 
 
@@ -142,6 +150,7 @@ def load(path: Path = SESSIONS_PATH) -> dict:
             merged["current"]["freeNotes"] = []
         if not isinstance(merged["current"].get("feeling"), dict):
             merged["current"]["feeling"] = default_feeling()
+        merged["current"].setdefault("siteAtOpen", None)
     merged["current"]["items"] = {k: _migrate_item(v) for k, v in merged["current"]["items"].items()}
     merged["current"]["freeNotes"] = [_migrate_note(n) for n in merged["current"]["freeNotes"]]
     merged["current"]["feeling"] = {**default_feeling(), **merged["current"]["feeling"]}
@@ -154,6 +163,7 @@ def load(path: Path = SESSIONS_PATH) -> dict:
             entry["freeNotes"] = [_migrate_note(n) for n in entry["freeNotes"]]
             entry["feeling"] = {**default_feeling(), **(entry.get("feeling") or {})}
             entry.setdefault("conditions", None)
+            entry.setdefault("site", None)
             if entry.get("items"):
                 entry["items"] = {k: _migrate_item(v) for k, v in entry["items"].items()}
     return merged
@@ -185,13 +195,16 @@ def save(data: dict, path: Path = SESSIONS_PATH) -> None:
     os.replace(tmp, path)
 
 
-def add_item(data: dict, designation: str, now: datetime, score_now: int | None) -> dict:
+def add_item(data: dict, designation: str, now: datetime, score_now: int | None,
+              site_now: dict | None = None) -> dict:
     """Ajoute `designation` a la session en cours. Si la session est vide,
-    l'ouvre (fige `openedAt`/`scoreAtOpen`) -- idempotent si la cible y est deja."""
+    l'ouvre (fige `openedAt`/`scoreAtOpen`/`siteAtOpen`) -- idempotent si la
+    cible y est deja."""
     cur = data["current"]
     if not _is_active(cur):
         cur["openedAt"] = now.isoformat()
         cur["scoreAtOpen"] = score_now
+        cur["siteAtOpen"] = site_now
     cur["items"].setdefault(designation, {"addedAt": now.isoformat(), "done": False, "notes": [],
                                            "exposureMin": None, "rating": None})
     return data
@@ -265,7 +278,7 @@ def remove_item_note(data: dict, designation: str, note_id: str) -> dict:
 
 
 def add_free_note(data: dict, text: str, now: datetime, score_now: int | None,
-                   context: dict | None = None) -> dict:
+                   context: dict | None = None, site_now: dict | None = None) -> dict:
     """Ajoute une note libre (sans cible associee) a la session en cours --
     l'ouvre si c'est la toute premiere entree de la nuit, meme regle que
     `add_item` (une note libre a 21h avant la premiere cible pointee compte
@@ -274,6 +287,7 @@ def add_free_note(data: dict, text: str, now: datetime, score_now: int | None,
     if not _is_active(cur):
         cur["openedAt"] = now.isoformat()
         cur["scoreAtOpen"] = score_now
+        cur["siteAtOpen"] = site_now
     cur["freeNotes"].append(_new_note(text, now, context))
     return data
 
@@ -355,6 +369,7 @@ def close_session(data: dict, today: date, now: datetime,
         data["past"].insert(0, {
             "date": night.isoformat(),
             "score": cur["scoreAtOpen"],
+            "site": cur["siteAtOpen"],
             "targets": sorted(cur["items"].keys()),
             "note": "; ".join(texts),
             "closedAt": now.isoformat(),
@@ -439,6 +454,7 @@ def reopen_session(data: dict, closed_at: str) -> dict:
     data["current"] = {
         "openedAt": entry.get("openedAt") or entry["closedAt"],
         "scoreAtOpen": entry["score"],
+        "siteAtOpen": entry.get("site"),
         "items": items,
         "freeNotes": list(entry.get("freeNotes") or []),
         "feeling": {**default_feeling(), **(entry.get("feeling") or {})},

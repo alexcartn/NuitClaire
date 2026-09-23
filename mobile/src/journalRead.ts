@@ -6,7 +6,7 @@
  * Le journal est deja sur l'appareil, y compris hors ligne, et ces vues ne
  * sont que des facons de le lire. Par consequent, rien ici n'invente non
  * plus : ce qui n'a pas ete saisi reste absent. */
-import type { Feeling, NightConditions, Sessions, SessionItem, TimelineEntry } from "./types";
+import type { Feeling, NightConditions, Sessions, SessionItem, Site, TimelineEntry } from "./types";
 
 // --- Historique d'une cible ------------------------------------------
 
@@ -89,6 +89,16 @@ function num(value: number, digits = 1): string {
   return value.toFixed(digits).replace(".", ",");
 }
 
+/** "Marson · 48,912 N 4,529 E" : ou la sortie a ete faite. Les coordonnees
+ * a trois decimales, soit une centaine de metres -- de quoi retrouver le
+ * champ, pas de quoi pretendre a la precision d'un releve. */
+export function siteLine(site: Site | null): string | null {
+  if (!site) return null;
+  const deg = (value: number, positive: string, negative: string) =>
+    `${Math.abs(value).toFixed(3).replace(".", ",")} ${value >= 0 ? positive : negative}`;
+  return `${site.name} · ${deg(site.lat, "N", "S")} ${deg(site.lon, "E", "O")}`;
+}
+
 function conditionsLine(c: NightConditions | null): string | null {
   if (!c) return null;
   const parts = [
@@ -139,6 +149,7 @@ export function outingToMarkdown(outing: Sessions["past"][number]): string {
   const lines: string[] = [`## ${longDate(outing.date)}`, ""];
 
   const meta = [
+    siteLine(outing.site),
     outing.score != null ? `score ${outing.score}/100` : null,
     conditionsLine(outing.conditions),
   ].filter(Boolean);

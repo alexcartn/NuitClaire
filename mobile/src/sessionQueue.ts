@@ -29,9 +29,10 @@
 // Extension explicite : ce module est importe tel quel par le lanceur de
 // tests de Node (voir sessionQueue.test.ts), dont la resolution ESM ne
 // devine pas les extensions, contrairement a Vite.
-import { readJson, writeJson } from "./storage.ts";
+import { readCache, readJson, writeJson } from "./storage.ts";
 import { captureConditions, captureContext } from "./nightContext.ts";
 import type {
+  AppState,
   CurrentSession,
   Feeling,
   NightConditions,
@@ -205,9 +206,18 @@ function isActive(cur: CurrentSession): boolean {
  * reponse. */
 function reconcileOpen(cur: CurrentSession, at: string): CurrentSession {
   // Vidée de sa derniere entree, la session redevient non ouverte : ni
-  // heure, ni score, ni ressenti (meme regle que sessions._close_if_empty).
-  if (!isActive(cur)) return { ...cur, openedAt: null, scoreAtOpen: null, feeling: emptyFeeling() };
-  if (cur.openedAt === null) return { ...cur, openedAt: at };
+  // heure, ni score, ni lieu, ni ressenti (meme regle que
+  // sessions._close_if_empty).
+  if (!isActive(cur)) {
+    return { ...cur, openedAt: null, scoreAtOpen: null, siteAtOpen: null, feeling: emptyFeeling() };
+  }
+  // A l'ouverture, le lieu est celui que l'appli utilise deja pour ses
+  // calculs : elle l'a sous la main, y compris hors ligne. Le serveur
+  // recrira le sien a la synchronisation, c'est le meme.
+  if (cur.openedAt === null) {
+    const known = readCache<AppState>("state");
+    return { ...cur, openedAt: at, siteAtOpen: known ? known.site : null };
+  }
   return cur;
 }
 
@@ -313,6 +323,7 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
         // Datee par son ouverture, pas par sa cloture : une nuit se nomme
         // par le soir ou elle commence (meme regle que sessions.close_session).
         date: (cur.openedAt ?? op.at).slice(0, 10),
+        site: cur.siteAtOpen,
         score: cur.scoreAtOpen,
         targets: cur.items.map((i) => i.designation).sort(),
         items: cur.items,
@@ -325,8 +336,8 @@ export function applyOp(data: Sessions, op: SessionOp): Sessions {
       return {
         past: [entry, ...data.past],
         current: {
-          openedAt: null, scoreAtOpen: null, items: [], freeNotes: [], timeline: [],
-          feeling: emptyFeeling(),
+          openedAt: null, scoreAtOpen: null, siteAtOpen: null,
+          items: [], freeNotes: [], timeline: [], feeling: emptyFeeling(),
         },
       };
     }

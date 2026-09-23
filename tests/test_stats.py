@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import progress
 from sessions import add_item, close_session, default, set_item_exposure
 from stats import avg_score_successful, captures_by_month, compute, exposure_by_target, \
-    outings_by_month, successful_outings
+    outings_by_month, outings_by_site, successful_outings
 
 NOW = datetime(2026, 9, 16, 22, 0)
 
@@ -110,6 +110,28 @@ def test_compute_on_empty_journal():
     assert result == {
         "totalOutings": 0, "outingsByMonth": [], "capturesByMonth": [],
         "successfulOutings": 0, "avgScoreSuccessful": None,
-        "avgRating": None, "ratedOutings": 0,
+        "avgRating": None, "ratedOutings": 0, "outingsBySite": [],
         "exposureByTarget": [], "totalExposureMin": 0,
     }
+
+
+def _site(name: str) -> dict:
+    return {"name": name, "lat": 48.9, "lon": 4.5, "elevationM": 120.0, "tz": "Europe/Paris"}
+
+
+def test_outings_by_site_counts_the_most_frequent_first():
+    past = [
+        {"date": "2026-09-20", "site": _site("Marson")},
+        {"date": "2026-08-12", "site": _site("Col du Lautaret")},
+        {"date": "2026-07-01", "site": _site("Marson")},
+    ]
+    assert outings_by_site(past) == [
+        {"name": "Marson", "count": 2, "lastDate": "2026-09-20"},
+        {"name": "Col du Lautaret", "count": 1, "lastDate": "2026-08-12"},
+    ]
+
+
+def test_outings_without_a_place_are_not_filed_under_an_invented_one():
+    # Sorties anterieures a la conservation du lieu.
+    past = [{"date": "2026-09-20", "site": None}, {"date": "2026-08-12"}]
+    assert outings_by_site(past) == []
