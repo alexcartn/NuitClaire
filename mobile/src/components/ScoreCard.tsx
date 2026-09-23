@@ -8,12 +8,12 @@ export function ScoreCard({ night }: { night: Night }) {
     <div className="nc-card nc-card-lg" style={{ display: "flex", flexDirection: "column", gap: 17 }}>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
         <div
-          className="nc-mono"
+          className="nc-num"
           style={{ fontSize: 62, lineHeight: 0.82, letterSpacing: "-.045em", fontWeight: 500, color: qualityColor(night.score) }}
         >
           {night.scorePct}
         </div>
-        <div className="nc-mono" style={{ fontSize: 14, color: "var(--ink3)", marginBottom: 6 }}>
+        <div className="nc-num" style={{ fontSize: 14, color: "var(--ink3)", marginBottom: 6 }}>
           /100
         </div>
         <div style={{ flex: 1 }} />

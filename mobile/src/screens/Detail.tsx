@@ -102,7 +102,7 @@ export function Detail({
       {data && (
         <>
           <div>
-            <div className="nc-mono" style={{ fontSize: 30, fontWeight: 500, letterSpacing: "-.02em" }}>
+            <div className="nc-num" style={{ fontSize: 30, fontWeight: 500, letterSpacing: "-.02em" }}>
               {data.designation}
             </div>
             {(data.commonName || (data.ngc && data.ngc !== data.designation)) && (
@@ -124,7 +124,7 @@ export function Detail({
           <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div className="nc-eyebrow">Hauteur 19h → 06h</div>
-              <div className="nc-mono" style={{ fontSize: 11, color: "var(--accent)" }}>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--accent)" }}>
                 fenetre pointable
               </div>
             </div>
@@ -154,7 +154,7 @@ export function Detail({
                 }}
               >
                 <div style={{ fontSize: 13, color: "var(--ink2)" }}>{k}</div>
-                <div className="nc-mono" style={{ fontSize: 12, textAlign: "right" }}>
+                <div className="nc-num" style={{ fontSize: 12, textAlign: "right" }}>
                   {v}
                 </div>
               </div>
@@ -165,7 +165,7 @@ export function Detail({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div className="nc-eyebrow">Temps d'expo</div>
               {data.exposureTotalMin > 0 && (
-                <div className="nc-mono" style={{ fontSize: 13, color: "var(--ink)" }}>
+                <div className="nc-num" style={{ fontSize: 13, color: "var(--ink)" }}>
                   {fmtMinutes(data.exposureTotalMin)} au total
                 </div>
               )}
@@ -215,10 +215,10 @@ export function Detail({
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {data.exposureLog.map((e) => (
                   <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className="nc-mono" style={{ fontSize: 11, color: "var(--ink3)", width: 48, flex: "none" }}>
+                    <span className="nc-num" style={{ fontSize: 11, color: "var(--ink3)", width: 48, flex: "none" }}>
                       {fmtExposureDate(e.at)}
                     </span>
-                    <span className="nc-mono" style={{ fontSize: 12, flex: 1 }}>
+                    <span className="nc-num" style={{ fontSize: 12, flex: 1 }}>
                       {e.minutes} min
                     </span>
                     <button

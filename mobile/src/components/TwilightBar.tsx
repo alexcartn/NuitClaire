@@ -29,13 +29,19 @@ export function TwilightBar({ night }: { night: Night }) {
           <div key={i} style={{ width: `${pct(s.from, s.to, total)}%`, background: s.color }} />
         ))}
       </div>
+      {/* Seules les heures passent en chasse fixe : « crepuscule » et « nuit
+          astro » nomment le moment, ils ne le mesurent pas. */}
       <div
-        className="nc-mono"
-        style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink2)" }}
+        style={{
+          display: "flex", justifyContent: "space-between",
+          fontSize: "var(--text-xs)", color: "var(--ink2)",
+        }}
       >
-        <span>crepuscule {fmt(night.civilDusk)}</span>
+        <span>
+          crepuscule <span className="nc-num">{fmt(night.civilDusk)}</span>
+        </span>
         <span style={{ color: "var(--accent)" }}>
-          nuit astro {fmt(night.astroDusk)} → {fmt(night.astroDawn)}
+          nuit astro <span className="nc-num">{fmt(night.astroDusk)} → {fmt(night.astroDawn)}</span>
         </span>
       </div>
     </div>

@@ -122,7 +122,8 @@ export function CeSoir({
         />
         <StatCard
           label="Buee"
-          value={<span style={{ fontSize: 20 }}>{n.dewRisk}</span>}
+          valueIsWord
+          value={n.dewRisk}
           sub={`Anti-buee : ${n.dewAdvice}`}
         />
         <StatCard
@@ -149,9 +150,7 @@ export function CeSoir({
           <span style={{ fontSize: 16 }}>{targetCount} cibles pointables ce soir</span>
           <span style={{ fontSize: 12, opacity: 0.7 }}>dont {uncapturedMessier} Messier pas encore captures</span>
         </span>
-        <span className="nc-mono" style={{ fontSize: 16 }}>
-          →
-        </span>
+        <span style={{ fontSize: 16 }}>→</span>
       </button>
 
       <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>

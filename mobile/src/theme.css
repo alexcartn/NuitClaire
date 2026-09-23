@@ -1,4 +1,51 @@
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap");
+/* Trois familles, trois roles, aucune requete reseau.
+ *
+ * Auto-hebergees plutot que chargees depuis Google Fonts : l'ancien
+ * `@import` vers fonts.googleapis.com etait une requete vers un autre
+ * domaine, que le service worker n'intercepte pas (voir l'en-tete de
+ * public/sw.js). Ouverte hors ligne -- le cas pour lequel toute la PWA a ete
+ * faite -- l'appli retombait donc sur le monospace du systeme. Les fichiers
+ * sont maintenant dans public/fonts/, donc dans le prechargement du worker.
+ *
+ * Trois fichiers variables, 71 ko au total, telecharges une fois.
+ *
+ * Familjen Grotesk (titres et intitules) : assez de caractere pour que
+ * l'appli ait un visage, assez de corps pour tenir en rouge sur noir -- une
+ * didone ou une graisse fine disparaitraient en mode vision nocturne, ou
+ * tout est monochrome a faible luminance.
+ *
+ * Atkinson Hyperlegible Next (texte courant) : dessinee par le Braille
+ * Institute pour maximiser la distinction entre caracteres voisins. Ce
+ * n'est pas un argument d'accessibilite abstrait ici : on lit cet ecran
+ * dehors, a bout de bras, en rouge, avec un oeil adapte a l'obscurite.
+ *
+ * Atkinson Hyperlegible Mono (chiffres et designations) : meme raison,
+ * plus le zero barre -- `NGC 0891` et `M101` ne pardonnent pas une
+ * confusion entre 0 et O. Chasse fixe pour que les colonnes d'heures et
+ * d'angles s'alignent.
+ *
+ * L'ancienne pile etait "Helvetica Neue", Helvetica, system-ui : c'est-a-dire
+ * la police par defaut du telephone, donc pas un choix. */
+@font-face {
+  font-family: "Familjen Grotesk";
+  src: url("/fonts/familjen-grotesk.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("/fonts/atkinson-hyperlegible-next.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  src: url("/fonts/atkinson-hyperlegible-mono.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
 
 [data-theme="dark"] {
   --bg: #0a090c;
@@ -47,6 +94,14 @@
    (3, 5, 7, 9, 11, 14...), ce qui empechait l'oeil de regrouper : tout se
    trouvait a peu pres a la meme distance de tout. */
 :root {
+  /* Trois roles, jamais la famille en dur dans un composant : un titre
+     demande --font-display, une phrase --font-text, un chiffre --font-num.
+     La question a se poser devant un bout de texte n'est pas « quelle
+     police » mais « qu'est-ce que c'est ». */
+  --font-display: "Familjen Grotesk", "Helvetica Neue", sans-serif;
+  --font-text: "Atkinson Hyperlegible Next", "Helvetica Neue", sans-serif;
+  --font-num: "Atkinson Hyperlegible Mono", ui-monospace, monospace;
+
   --text-xs: 11px;
   --text-sm: 14px;
   --text-md: 18px;
@@ -71,6 +126,17 @@
    nocturne a chaque note. Les tailles sont augmentees plus bas : on s'en
    sert dehors, a bout de bras, souvent avec des gants. */
 [data-theme="night"] {
+  /* L'echelle typographique entiere monte d'environ deux pixels, plutot
+     qu'une surcharge par classe : c'est le meme geste pour tout l'ecran, et
+     les rapports entre les marches sont conserves. Les surcharges qui
+     restent plus bas ne touchent que les surfaces tactiles et les
+     rembourrages, qui ne suivent pas la taille du texte. */
+  --text-xs: 13px;
+  --text-sm: 16px;
+  --text-md: 20px;
+  --text-lg: 25px;
+  --text-xl: 31px;
+
   --bg: #000000;
   --surf: #0d0302;
   --surf2: #170604;
@@ -101,7 +167,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Helvetica Neue", Helvetica, system-ui, sans-serif;
+  font-family: var(--font-text);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -110,8 +176,15 @@ a {
   text-decoration: none;
 }
 
-.nc-mono {
-  font-family: "JetBrains Mono", monospace;
+/* Chiffres, heures, angles, designations d'objets. Renommee depuis
+   `.nc-num` : le nom disait la police, il dit maintenant le role -- ce qui
+   rend visible, a la lecture du code, un intitule qui n'a rien a faire en
+   chasse fixe. */
+.nc-num {
+  font-family: var(--font-num);
+  /* Atkinson Mono a un zero barre : `NGC 0891` ne peut plus se lire
+     `NGC O891`. C'est la raison du choix, autant l'expliciter. */
+  font-variant-numeric: tabular-nums;
 }
 
 .nc-strip {
@@ -138,20 +211,28 @@ a {
   padding: 16px 18px 26px;
 }
 
+/* Intitule de section. Etait en chasse fixe, comme les chiffres : un
+   intitule n'est pas une valeur, et le monospace ne lui apportait qu'un
+   vernis technique. En Familjen capitalise et espace, il redevient ce
+   qu'il est -- une etiquette gravee au-dessus d'un cadran. */
 .nc-eyebrow {
-  font: 500 var(--text-xs)/1 "JetBrains Mono", monospace;
-  letter-spacing: 0.16em;
+  font: 600 var(--text-xs)/1 var(--font-display);
+  letter-spacing: 0.14em;
   color: var(--ink3);
   text-transform: uppercase;
 }
 
+/* Titre d'ecran : avec l'intitule au-dessus, le seul endroit ou la police
+   d'affichage parle. Legerement resserre, comme tout caractere pris a
+   grande taille : l'interlettrage dessine pour du 14 px baille a 23. */
 .nc-title {
-  font: 400 var(--text-lg)/1.15 "Helvetica Neue", Helvetica, sans-serif;
+  font: 600 var(--text-lg)/1.12 var(--font-display);
+  letter-spacing: -0.01em;
   margin-top: 8px;
 }
 
 .nc-sub {
-  font: 400 var(--text-sm)/1.45 "Helvetica Neue", Helvetica, sans-serif;
+  font: 400 var(--text-sm)/1.45 var(--font-text);
   color: var(--ink2);
   margin-top: 5px;
 }
@@ -169,7 +250,7 @@ a {
 }
 
 .nc-btn {
-  font: 400 var(--text-sm)/1.2 "Helvetica Neue", Helvetica, sans-serif;
+  font: 400 var(--text-sm)/1.2 var(--font-text);
   border-radius: 11px;
   padding: 13px;
   cursor: pointer;
@@ -204,7 +285,7 @@ a {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 9px;
-  font: 400 var(--text-sm)/1.3 "Helvetica Neue", Helvetica, sans-serif;
+  font: 400 var(--text-sm)/1.3 var(--font-text);
   color: var(--ink);
 }
 
@@ -231,7 +312,9 @@ a {
   min-width: 44px;
   padding: 0 var(--space-sm);
   border-radius: 22px;
-  font: 500 var(--text-xs)/1 "JetBrains Mono", monospace;
+  /* Une puce porte un mot ("Faisable ce soir", "Galaxie", "Buee"), pas une
+     valeur : elle suit le texte, pas les chiffres. */
+  font: 600 var(--text-xs)/1 var(--font-text);
   border: 1px solid var(--line);
   background: transparent;
   color: var(--ink2);
@@ -264,7 +347,7 @@ a {
 }
 
 .nc-caption {
-  font: 400 var(--text-xs)/1.45 "Helvetica Neue", Helvetica, sans-serif;
+  font: 400 var(--text-xs)/1.45 var(--font-text);
   color: var(--ink3);
 }
 
@@ -275,10 +358,6 @@ a {
   font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--ink3);
-}
-
-[data-theme="night"] .nc-context {
-  font-size: 12px;
 }
 
 /* Bandeau "nouvelle version" : au-dessus du contenu, sous la barre
@@ -292,7 +371,7 @@ a {
   padding: 10px 16px calc(10px + env(safe-area-inset-top, 0px));
   background: var(--surf2);
   border-bottom: 1px solid var(--line);
-  font: 400 var(--text-sm)/1.3 "Helvetica Neue", Helvetica, sans-serif;
+  font: 400 var(--text-sm)/1.3 var(--font-text);
   color: var(--ink2);
 }
 
@@ -333,7 +412,7 @@ a {
 }
 
 .nc-tab-label {
-  font: 400 10px/1.2 "Helvetica Neue", Helvetica, sans-serif;
+  font: 400 var(--text-xs)/1.2 var(--font-text);
 }
 
 /* Poignee d'un RangeSlider (voir components/RangeSlider.tsx) : deux <input
@@ -390,39 +469,23 @@ a {
    deviennent des cibles trop petites. Regroupe ici plutot que disperse dans
    les composants, pour que le reste du code ignore l'existence du mode. */
 [data-theme="night"] .nc-btn {
-  font-size: 15px;
   padding: 15px;
   min-height: 52px;
 }
 
 [data-theme="night"] .nc-btn-sm {
-  font-size: var(--text-sm);
   padding: 0 var(--space-md);
   min-height: 52px;
 }
 
 [data-theme="night"] .nc-input {
-  font-size: 15px;
   padding: 12px;
   min-height: 48px;
 }
 
 [data-theme="night"] .nc-chip {
   min-height: 52px;
-  font-size: var(--text-sm);
   padding: 0 var(--space-md);
-}
-
-[data-theme="night"] .nc-log-entry {
-  font-size: 14px;
-}
-
-[data-theme="night"] .nc-caption {
-  font-size: 13px;
-}
-
-[data-theme="night"] .nc-tab-label {
-  font-size: 11px;
 }
 
 [data-theme="night"] .nc-tab-icon svg {

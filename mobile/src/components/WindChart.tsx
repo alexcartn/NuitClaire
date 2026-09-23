@@ -45,7 +45,7 @@ export function WindChart({ hourly, buckets = 13 }: { hourly: HourlyPoint[]; buc
         })}
       </div>
       <div
-        className="nc-mono"
+        className="nc-num"
         style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ink3)" }}
       >
         <span>{formatHour(points[0].time)}</span>

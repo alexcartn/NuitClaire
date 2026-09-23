@@ -125,8 +125,13 @@ export function Reglages() {
       <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
         <div className="nc-eyebrow">Adresse</div>
         {data && (
-          <div className="nc-mono" style={{ fontSize: 13, color: "var(--ink2)" }}>
-            Actuelle : {data.site.name} · {data.site.lat.toFixed(4)}, {data.site.lon.toFixed(4)}
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--ink2)" }}>
+            {/* Un nom de commune n'est pas une coordonnee : seuls les deux
+                nombres passent en chasse fixe. */}
+            Actuelle : {data.site.name} ·{" "}
+            <span className="nc-num">
+              {data.site.lat.toFixed(4)}, {data.site.lon.toFixed(4)}
+            </span>
           </div>
         )}
         <input
@@ -160,8 +165,8 @@ export function Reglages() {
           <>
             <Compass heading={compass.heading} facing={facing} />
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span className="nc-mono" style={{ fontSize: 26, color: "var(--accent)" }}>{facing}</span>
-              <span className="nc-mono" style={{ fontSize: 13, color: "var(--ink2)" }}>
+              <span className="nc-num" style={{ fontSize: 26, color: "var(--accent)" }}>{facing}</span>
+              <span className="nc-num" style={{ fontSize: 13, color: "var(--ink2)" }}>
                 {Math.round(compass.heading)}°
               </span>
             </div>
@@ -206,7 +211,7 @@ export function Reglages() {
               <button
                 key={s}
                 onClick={() => toggleSector(s)}
-                className="nc-mono"
+                className="nc-num"
                 style={{
                   textAlign: "center", padding: "14px 0", borderRadius: 11, fontSize: 13, cursor: "pointer",
                   background: state.horizon[s] ? "var(--accent)" : "transparent",
@@ -242,12 +247,12 @@ export function Reglages() {
               <span>
                 {w.label}
                 {w.key === "habituelle" && (
-                  <span className="nc-mono" style={{ color: "var(--ink3)", marginLeft: 6, fontSize: 12 }}>
+                  <span className="nc-num" style={{ color: "var(--ink3)", marginLeft: 6, fontSize: 12 }}>
                     ({fmtHour(data.viewWindow.startHour)}–{fmtHour(data.viewWindow.endHour)})
                   </span>
                 )}
               </span>
-              {data.windowMode === w.key && <span className="nc-mono">●</span>}
+              {data.windowMode === w.key && <span>●</span>}
             </button>
           ))}
 
@@ -261,7 +266,7 @@ export function Reglages() {
                     start: e.target.value,
                     end: windowDraft?.end ?? fmtHour(data.viewWindow.endHour),
                   })}
-                  className="nc-mono"
+                  className="nc-num"
                   style={{
                     flex: 1, background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
                     padding: "7px 9px", fontSize: 13, color: "var(--ink)",
@@ -275,7 +280,7 @@ export function Reglages() {
                     start: windowDraft?.start ?? fmtHour(data.viewWindow.startHour),
                     end: e.target.value,
                   })}
-                  className="nc-mono"
+                  className="nc-num"
                   style={{
                     flex: 1, background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
                     padding: "7px 9px", fontSize: 13, color: "var(--ink)",

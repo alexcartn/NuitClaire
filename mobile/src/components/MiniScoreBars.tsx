@@ -36,7 +36,7 @@ export function MiniScoreBars({ hourly, buckets = 11 }: { hourly: HourlyPoint[];
         ))}
       </div>
       <div
-        className="nc-mono"
+        className="nc-num"
         style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ink3)" }}
       >
         <span>{formatHour(points[0].time)}</span>

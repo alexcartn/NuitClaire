@@ -68,7 +68,7 @@ export function Messier({
         <div style={{ height: 8, borderRadius: 4, background: "var(--bar)", overflow: "hidden" }}>
           <div style={{ width: `${capturedPct}%`, height: "100%", background: "var(--accent)" }} />
         </div>
-        <div className="nc-mono" style={{ fontSize: 11, color: "var(--ink3)" }}>
+        <div className="nc-num" style={{ fontSize: 11, color: "var(--ink3)" }}>
           {capturedPct}% du catalogue
         </div>
       </div>
@@ -136,16 +136,27 @@ export function Messier({
                     src={row.imageUrl}
                     alt=""
                     loading="lazy"
+                    // Meme raison que dans TargetRow : une vignette absente
+                    // laisse la place a l'aplat, pas a l'icone cassee.
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                     style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 )}
                 <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: 8 }}>
-                  <span className="nc-mono" style={{ fontSize: 13, color: "var(--ink)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}>
+                  <span className="nc-num" style={{ fontSize: 13, color: "var(--ink)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}>
                     {row.designation}
                   </span>
+                  {/* « CE SOIR » est un mot, la designation au-dessus est un
+                      numero : seule la seconde reste en chasse fixe. */}
                   <span
-                    className="nc-mono"
-                    style={{ fontSize: 9, color: row.feasibleTonight ? "var(--good)" : "var(--ink3)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}
+                    style={{
+                      fontFamily: "var(--font-display)", fontWeight: 600,
+                      fontSize: "var(--text-xs)", letterSpacing: ".08em",
+                      color: row.feasibleTonight ? "var(--good)" : "var(--ink3)",
+                      background: "var(--surf)", padding: "2px 5px", borderRadius: 4,
+                    }}
                   >
                     {row.feasibleTonight ? "CE SOIR" : "—"}
                   </span>

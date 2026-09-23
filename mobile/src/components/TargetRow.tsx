@@ -62,7 +62,7 @@ export function TargetRowCard({
       </div>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "var(--space-2xs)" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
-          <span className="nc-mono" style={{ fontSize: "var(--text-md)", fontWeight: 500 }}>
+          <span className="nc-num" style={{ fontSize: "var(--text-md)", fontWeight: 500 }}>
             {row.designation}
           </span>
           {isNew && (
@@ -70,7 +70,7 @@ export function TargetRowCard({
             // catalogue. C'est ce qui la place en tete de liste, autant que ca
             // se lise.
             <span
-              className="nc-mono"
+              className="nc-num"
               style={{
                 fontSize: "var(--text-xs)",
                 letterSpacing: ".06em",
@@ -89,14 +89,29 @@ export function TargetRowCard({
             tailles sur la meme ligne, alignees sur la ligne de base, pour
             que l'oeil prenne l'heure d'abord sans que la ligne reparte a la
             ligne. */}
-        <div className="nc-mono" style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2xs)" }}>
+        <div
+          className="nc-num"
+          style={{
+            display: "flex", alignItems: "baseline",
+            // Assez d'ecart pour separer les deux groupes sans ponctuation :
+            // le point median qui les separait avant se retrouvait orphelin
+            // en tete de ligne des que la ligne cassait.
+            gap: "var(--space-xs)",
+            // Et elle casse : a 390 px de large, le creneau et les deux
+            // angles demandent 240 px pour 230 disponibles. C'est entre les
+            // deux groupes que la coupure doit tomber -- « 20:00– / 04:00 »
+            // coupe en deux une seule valeur, et ne se lit plus. Sur un
+            // ecran plus large, tout revient sur une ligne.
+            flexWrap: "wrap",
+          }}
+        >
           {feasible ? (
             <>
-              <span style={{ fontSize: "var(--text-sm)", color: "var(--ink)" }}>
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--ink)", whiteSpace: "nowrap" }}>
                 {row.start}–{row.end}
               </span>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--ink3)" }}>
-                · alt <span style={{ color: "var(--ink2)" }}>{Math.round(row.altMaxDeg)}°</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--ink3)", whiteSpace: "nowrap" }}>
+                alt <span style={{ color: "var(--ink2)" }}>{Math.round(row.altMaxDeg)}°</span>
                 {" · lune "}
                 <span style={{ color: "var(--ink2)" }}>{Math.round(row.moonSepDeg)}°</span>
               </span>
@@ -129,7 +144,7 @@ export function TargetRowCard({
           >
             {row.type}
           </span>
-          <span className="nc-mono" style={{ fontSize: "var(--text-xs)", color: "var(--ink3)" }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--ink3)" }}>
             {row.cadrage}
           </span>
         </div>

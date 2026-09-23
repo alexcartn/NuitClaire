@@ -63,7 +63,7 @@ export function TempDewChart({ hourly, buckets = 24 }: { hourly: HourlyPoint[]; 
         <polyline points={toPolyline(temps, min, span)} fill="none" stroke={TEMP_COLOR} strokeWidth={2} />
       </svg>
       <div
-        className="nc-mono"
+        className="nc-num"
         style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ink3)" }}
       >
         <span>{formatHour(points[0].time)}</span>

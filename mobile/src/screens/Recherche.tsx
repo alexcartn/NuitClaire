@@ -72,7 +72,7 @@ export function Recherche({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="M31, NGC7380, IC434..."
-          className="nc-mono"
+          className="nc-num"
           style={{
             flex: 1, boxSizing: "border-box", background: "var(--surf)",
             border: "1px solid var(--accent)", borderRadius: 13, padding: "13px 14px",
@@ -102,7 +102,7 @@ export function Recherche({
               className="nc-card"
               style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "left", cursor: "pointer", color: "var(--ink)" }}
             >
-              <span className="nc-mono" style={{ fontSize: 15, width: 70, flex: "none" }}>
+              <span className="nc-num" style={{ fontSize: 15, width: 70, flex: "none" }}>
                 {s.designation}
               </span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--ink2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

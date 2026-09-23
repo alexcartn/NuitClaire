@@ -262,6 +262,39 @@ Une note refusee definitivement par le serveur (cible absente de la session) n'e
 perdue : elle est reposee en note libre avec la cible en tete (`sessionStore.rescueNote`).
 L'attache a la cible saute, le texte non.
 
+### Trois polices, trois roles
+
+`theme.css` expose `--font-display`, `--font-text` et `--font-num` : aucun
+composant ne nomme une famille, il nomme la nature de ce qu'il affiche. La
+question devant un bout de texte n'est pas « quelle police » mais « est-ce un
+titre, une phrase ou une valeur ».
+
+- **Familjen Grotesk** pour les titres et les intitules de section. Assez de
+  caractere pour que l'appli ait un visage, assez de corps pour tenir en rouge
+  sur noir : une graisse fine ou une forte modulation disparaitraient en mode
+  vision nocturne, ou tout est monochrome a faible luminance.
+- **Atkinson Hyperlegible Next** pour le texte courant. Dessinee par le Braille
+  Institute pour maximiser la distinction entre caracteres voisins. Ce n'est pas
+  un argument d'accessibilite abstrait ici : on lit cet ecran dehors, a bout de
+  bras, en rouge, avec un oeil adapte a l'obscurite.
+- **Atkinson Hyperlegible Mono** pour les chiffres et les designations. Meme
+  raison, plus le zero barre : `NGC 0891` ne peut plus se lire `NGC O891`. Chasse
+  fixe pour que les heures et les angles s'alignent d'une ligne a l'autre.
+
+L'ancienne pile etait `"Helvetica Neue", Helvetica, system-ui` pour le texte,
+c'est-a-dire la police par defaut du telephone, donc pas un choix ; et JetBrains
+Mono servait autant aux intitules (« CATALOGUE MESSIER », « CE SOIR », les
+puces de filtre) qu'aux valeurs, ou il n'apportait qu'un vernis technique. La
+chasse fixe est maintenant reservee a ce qui se mesure.
+
+Les trois fichiers sont auto-heberges dans `mobile/public/fonts/` (variables, 71
+ko au total). C'est aussi une correction : le `@import` vers
+`fonts.googleapis.com` visait un autre domaine, que le service worker
+n'intercepte pas -- ouverte hors ligne, le cas pour lequel toute la PWA a ete
+faite, l'appli retombait sur le monospace du systeme. Les polices sont
+desormais dans son prechargement, et `index.html` les precharge pour que le
+premier rendu ne saute pas.
+
 ### Echelles typographique et d'espacement
 
 `theme.css` definit deux echelles en jetons (`--text-*`, `--space-*`), et les
@@ -271,6 +304,12 @@ distinguent pas et ne creent donc aucune hierarchie. Et onze valeurs d'ecart
 differentes (3, 5, 7, 9, 11, 14...), ce qui empechait l'oeil de regrouper, tout se
 trouvant a peu pres a la meme distance de tout. L'echelle typographique tient en
 cinq marches de rapport ~1,27 ; l'espacement suit un pas de 4 px.
+
+Le mode vision nocturne fait monter l'echelle entiere d'environ deux pixels, en
+un seul endroit, au lieu de surcharger la taille classe par classe : les
+rapports entre les marches sont conserves, et les surcharges qui restent ne
+touchent que les rembourrages et les surfaces tactiles, qui ne suivent pas la
+taille du texte.
 
 Les surfaces tactiles ont un plancher de 44 px partout (`.nc-chip`, `.nc-btn-sm`,
 `.nc-icon-btn` et les commandes posees en ligne) : les filtres de catalogue

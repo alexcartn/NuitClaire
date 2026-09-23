@@ -57,7 +57,7 @@ function ContextLine({ context }: { context: NoteContext | null }) {
   ].filter(Boolean);
   if (parts.length === 0) return null;
   return (
-    <div className="nc-context nc-mono">
+    <div className="nc-context nc-num">
       {parts.join(" · ")}
     </div>
   );
@@ -115,7 +115,7 @@ function PastConditions({ conditions }: { conditions: NightConditions | null }) 
     conditions.dewSpreadC != null ? `ecart rosee ${n(conditions.dewSpreadC, "°")}` : null,
   ].filter(Boolean);
   if (parts.length === 0) return null;
-  return <div className="nc-context nc-mono">{parts.join(" · ")}</div>;
+  return <div className="nc-context nc-num">{parts.join(" · ")}</div>;
 }
 
 /** Lieu d'une sortie, corrigeable -- typiquement quand on est parti
@@ -135,7 +135,7 @@ function OutingPlace({ site, choices, onChange }: {
   const others = choices.filter((c) => c.name !== site?.name);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      {site && <div className="nc-context nc-mono">{siteLine(site)}</div>}
+      {site && <div className="nc-context nc-num">{siteLine(site)}</div>}
       {(others.length > 0 || !site) && (
         <button
           onClick={() => setOpen((v) => !v)}
@@ -188,7 +188,7 @@ function PastFeeling({ feeling, onChange }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
       {scores.length > 0 && (
-        <div className="nc-mono" style={{ fontSize: 11, color: "var(--ink2)" }}>{scores.join(" · ")}</div>
+        <div className="nc-num" style={{ fontSize: 11, color: "var(--ink2)" }}>{scores.join(" · ")}</div>
       )}
       {feeling.highlight && (
         <div className="nc-caption" style={{ margin: 0 }}>Je retiens : {feeling.highlight}</div>
@@ -281,13 +281,13 @@ function Timeline({ entries, pendingNotes, onDelete }: {
       {entries.map((e) => (
         <div key={e.id} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <span className="nc-log-entry">
-            <span className="nc-mono">{fmtTime(e.at)}</span>
+            <span className="nc-num">{fmtTime(e.at)}</span>
             {" · "}
             {e.target ? <span style={{ color: "var(--ink)", fontWeight: 500 }}>{e.target}</span> : "Note libre"}
             {" — "}
             {e.text}
             {pendingNotes?.has(e.id) && (
-              <span className="nc-mono" style={{ color: "var(--ink3)", fontSize: 11 }}> · en attente</span>
+              <span style={{ color: "var(--ink3)", fontSize: 11 }}> · en attente</span>
             )}
             <ContextLine context={e.context} />
           </span>
@@ -525,7 +525,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {s.name}
                   </span>
-                  <span className="nc-mono" style={{ color: "var(--ink2)", flex: "none" }}>
+                  <span className="nc-num" style={{ color: "var(--ink2)", flex: "none" }}>
                     {s.count} sortie(s)
                   </span>
                 </div>
@@ -538,8 +538,8 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
               <div className="nc-caption" style={{ margin: 0 }}>Expo cumulee par cible</div>
               {stats.exposureByTarget.slice(0, 6).map((e) => (
                 <div key={e.designation} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                  <span className="nc-mono">{e.designation}</span>
-                  <span className="nc-mono" style={{ color: "var(--ink2)" }}>{fmtExposure(e.totalMin)}</span>
+                  <span className="nc-num">{e.designation}</span>
+                  <span className="nc-num" style={{ color: "var(--ink2)" }}>{fmtExposure(e.totalMin)}</span>
                 </div>
               ))}
             </div>
@@ -554,7 +554,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
             value={targetQuery}
             onChange={(e) => setTargetQuery(e.target.value)}
             placeholder="Ajouter une cible : M31, NGC7380..."
-            className="nc-input nc-mono"
+            className="nc-input nc-num"
           />
           <button type="submit" className="nc-btn" style={{ flex: "none" }} disabled={searchingTarget}>
             {searchingTarget ? "..." : "Chercher"}
@@ -567,7 +567,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
             )}
             {targetResults.map((r) => (
               <div key={r.designation} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="nc-mono" style={{ fontSize: 12, width: 70, flex: "none" }}>{r.designation}</span>
+                <span className="nc-num" style={{ fontSize: 12, width: 70, flex: "none" }}>{r.designation}</span>
                 <span className="nc-caption" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.commonName || r.type}
                 </span>
@@ -596,7 +596,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
           </div>
           {prefix && (
             <p className="nc-caption" style={{ margin: 0 }}>
-              Sera rattachee a <span className="nc-mono" style={{ color: "var(--accent)" }}>{prefix.designation}</span>
+              Sera rattachee a <span className="nc-num" style={{ color: "var(--accent)" }}>{prefix.designation}</span>
               {prefixIsNew ? ", ajoutee a la session." : "."}
             </p>
           )}
@@ -616,7 +616,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <div style={{ fontSize: 15 }}>Session en cours</div>
             {current.openedAt && (
-              <div className="nc-mono" style={{ fontSize: 11, color: "var(--accent)" }}>
+              <div className="nc-num" style={{ fontSize: 11, color: "var(--accent)" }}>
                 {fmtTime(current.openedAt)} → {current.scoreAtOpen != null ? `score ${current.scoreAtOpen}` : ""}
               </div>
             )}
@@ -647,7 +647,6 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                     <button
                       onClick={() => toggleDone(item.designation, item.done)}
-                      className="nc-mono"
                       // La case reste petite, sa surface tactile fait 44 px :
                       // rembourrage positif, marge negative, rien ne bouge.
                       style={{
@@ -671,7 +670,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                     </button>
                     <button
                       onClick={() => onOpenTarget(item.designation)}
-                      className="nc-mono"
+                      className="nc-num"
                       style={{
                         background: "none", border: "none", cursor: "pointer", color: "var(--ink)",
                         fontSize: "var(--text-sm)", fontWeight: 500,
@@ -725,7 +724,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                       style={{ flex: "none", width: 72 }}
                     />
                     {item.exposureMin != null && (
-                      <span className="nc-mono" style={{ fontSize: 11, color: "var(--ink3)" }}>
+                      <span className="nc-num" style={{ fontSize: 11, color: "var(--ink3)" }}>
                         {fmtExposure(item.exposureMin)} cette sortie
                       </span>
                     )}
@@ -818,7 +817,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
             <div key={p.closedAt} className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div style={{ fontSize: 14, textTransform: "capitalize" }}>{fmtDate(p.date)}</div>
-                <div className="nc-mono" style={{ fontSize: 11, color: "var(--ink2)" }}>
+                <div className="nc-num" style={{ fontSize: 11, color: "var(--ink2)" }}>
                   {p.score != null ? `score ${p.score}` : "score n/d"}
                 </div>
               </div>
@@ -833,7 +832,7 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
                   <button
                     key={designation}
                     onClick={() => onOpenTarget(designation)}
-                    className="nc-mono"
+                    className="nc-num"
                     style={{
                       background: "none", border: "none", padding: 0, cursor: "pointer",
                       fontSize: 12, color: "var(--ink2)", textDecoration: "underline",

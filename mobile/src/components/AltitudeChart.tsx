@@ -44,7 +44,7 @@ export function AltitudeChart({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div className="nc-mono" style={{ display: "flex", gap: 4 }}>
+      <div className="nc-num" style={{ display: "flex", gap: 4 }}>
         {points.map((p, i) => (
           <span
             key={i}
@@ -72,7 +72,7 @@ export function AltitudeChart({
         ))}
       </div>
       <div
-        className="nc-mono"
+        className="nc-num"
         style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ink3)" }}
       >
         {series
