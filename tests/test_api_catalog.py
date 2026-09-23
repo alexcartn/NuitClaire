@@ -17,6 +17,38 @@ def test_list_targets_filters_by_type(api_client):
     assert all(r["type"] == one_type for r in filtered)
 
 
+def test_list_targets_puts_uncaptured_messier_first(api_client):
+    """Le sous-titre de l'ecran Cibles annonce ce tri : il doit exister.
+
+    `discovery_sort_key` etait testee unitairement mais n'etait branchee que
+    dans app.py (Streamlit). L'API mobile rendait l'ordre du catalogue, et
+    comme l'ecran n'affiche que 24 lignes avant pagination, la priorite aux
+    Messier manquants n'apparaissait nulle part."""
+    rows = api_client.get("/api/targets").json()
+    messier_positions = [i for i, r in enumerate(rows) if r["messierId"]]
+    assert messier_positions, "le catalogue de test doit contenir des Messier"
+    # Rien n'est capture dans ce client de test : tous les Messier faisables
+    # sont donc « manquants », et doivent occuper le haut de la liste d'un
+    # seul tenant. Avec l'ordre du catalogue, le premier tombait en 9e
+    # position.
+    assert messier_positions == list(range(len(messier_positions)))
+
+
+def test_list_targets_demotes_a_captured_messier(api_client):
+    """Capturer une cible la fait reculer : c'est tout l'interet du tri."""
+    rows = api_client.get("/api/targets").json()
+    head = rows[0]
+    assert head["messierId"], "la premiere ligne doit etre un Messier manquant"
+
+    api_client.put(f"/api/messier/{head['messierId']}", json={"captured": True})
+    try:
+        after = [r["designation"] for r in api_client.get("/api/targets").json()]
+        assert after[0] != head["designation"]
+        assert after.index(head["designation"]) > 0
+    finally:
+        api_client.put(f"/api/messier/{head['messierId']}", json={"captured": False})
+
+
 def test_list_messier_only_feasible_filters_out_infeasible(api_client):
     all_rows = api_client.get("/api/messier").json()
     feasible_rows = api_client.get("/api/messier", params={"onlyFeasible": "true"}).json()

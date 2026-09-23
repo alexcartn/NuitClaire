@@ -16,7 +16,7 @@ from api.schemas import TargetDetailOut, TargetRowOut, TargetSuggestionOut
 from api.translate import row_to_target_out
 from catalog import find_target, search_prefix
 from rows import day_frame, row_from_search
-from scoring import recommended_exposure_minutes, target_altitude_series
+from scoring import discovery_sort_key, recommended_exposure_minutes, target_altitude_series
 from wiki import wiki_title_candidates
 
 router = APIRouter()
@@ -31,6 +31,16 @@ def list_targets(types: list[str] | None = Query(default=None)) -> list[dict]:
     if sel is None:
         return []
     rows = feasible_rows(site, sel, horizon, window_mode, "targets", s["view_window"])
+    # Meme tri que la galerie Streamlit (app.py) : Messier pas encore
+    # captures d'abord, puis cadrages simples, puis heures disponibles.
+    # `feasible_rows` rend l'ordre du catalogue (NGC0040, IC0010, NGC0103...),
+    # ou les Messier manquants tombaient aux positions 9, 10, 11, 22, 25, 46...
+    # L'appli mobile n'en affiche que 24 avant « Voir N cibles de plus » :
+    # le classement que l'ecran annonce dans son sous-titre etait donc
+    # invisible la ou il sert, alors que `discovery_sort_key` existait et
+    # etait deja testee.
+    captured = set(progress_store.load()["messier_captured"])
+    rows = sorted(rows, key=lambda r: discovery_sort_key(r, captured))
     if types:
         rows = [r for r in rows if r["Type"] in types]
     return [row_to_target_out(r) for r in rows]
