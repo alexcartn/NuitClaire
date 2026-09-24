@@ -18,11 +18,11 @@ GOOD_TYPES = {"G", "GPair", "GTrpl", "GGroup", "GCl", "OCl", "Cl+N", "PN",
 
 TYPE_FR = {
     "G": "galaxie", "GPair": "galaxie", "GTrpl": "galaxie", "GGroup": "galaxie",
-    "GCl": "amas globulaire", "OCl": "amas ouvert", "Cl+N": "amas + nebuleuse",
-    "PN": "nebuleuse planetaire", "Neb": "nebuleuse", "EmN": "nebuleuse",
-    "HII": "region HII", "RfN": "nebuleuse par reflexion",
-    "SNR": "remanent de supernova", "*Ass": "association d'etoiles",
-    "**": "etoile double",
+    "GCl": "amas globulaire", "OCl": "amas ouvert", "Cl+N": "amas + nébuleuse",
+    "PN": "nébuleuse planétaire", "Neb": "nébuleuse", "EmN": "nébuleuse",
+    "HII": "région HII", "RfN": "nébuleuse par réflexion",
+    "SNR": "rémanent de supernova", "*Ass": "association d'étoiles",
+    "**": "étoile double",
 }
 LP_FILTER_TYPES = {"PN", "Neb", "EmN", "HII", "SNR", "Cl+N"}
 

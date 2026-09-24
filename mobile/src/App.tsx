@@ -251,7 +251,7 @@ export default function App() {
             onBrowseType={(type) => {
               // « Cibles » s'ouvre deja filtree (voir useRemembered).
               remember("cibles:types", [type]);
-              remember("cibles:all", false);
+              remember("cibles:hour", null);
               changeTab("cibles");
             }}
             onCancel={back}

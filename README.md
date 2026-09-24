@@ -31,9 +31,13 @@ cours + historique). Cote tests JS, la logique sans DOM est couverte
 le rendu des ecrans est verifie a la main
 via Playwright.
 
-"Cibles" a un filtre magnitude (curseur a deux poignees, mini et maxi independants --
-`RangeSlider` cote mobile, `st.slider` en mode plage cote Streamlit) en plus du filtre par
-type -- calcule cote client sur les lignes deja chargees, pas d'appel API supplementaire.
+"Cibles" (mobile) est organisee comme la page Messier (`ciblesView.ts`, pur et teste) :
+filtres dans une section repliable (types, magnitude avec un curseur a deux poignees,
+cadre unique seulement), une grille « A quelle heure ? » qui compte les cibles
+pointables heure par heure et filtre la liste sur l'heure touchee, puis des groupes
+repliables : Messier a capturer d'abord, puis un groupe par type. Tout est filtre sur
+le telephone a partir d'une seule liste : filtrer par type cote serveur faisait
+disparaitre les autres types des puces. Cote Streamlit, `st.slider` en mode plage.
 Cote mobile, "Messier" n'a plus ces filtres : c'est la page de l'objectif des 110 (voir
 "Objectif Messier").
 

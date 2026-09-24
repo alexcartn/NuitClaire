@@ -7,6 +7,16 @@ from pathlib import Path
 DATA_DIR = Path(__file__).parent / "data"
 
 
+# Les CSV portent des types sans accents (voir scripts/build_catalog.py) :
+# corriges au chargement, l'interface les affiche tels quels.
+_TYPE_FR_ACCENTS = {
+    "amas + nebuleuse": "amas + nébuleuse", "nebuleuse planetaire": "nébuleuse planétaire",
+    "nebuleuse": "nébuleuse", "region HII": "région HII",
+    "nebuleuse par reflexion": "nébuleuse par réflexion", "remanent de supernova": "rémanent de supernova",
+    "association d'etoiles": "association d'étoiles", "etoile double": "étoile double",
+}
+
+
 def _load_csv(path: Path) -> list[dict]:
     rows = []
     with open(path, encoding="utf-8") as f:
@@ -16,7 +26,7 @@ def _load_csv(path: Path) -> list[dict]:
                 "ngc_name": row["ngc_name"] or None,
                 "common_name": row["common_name"],
                 "type": row["type"],
-                "type_fr": row["type_fr"],
+                "type_fr": _TYPE_FR_ACCENTS.get(row["type_fr"], row["type_fr"]),
                 "ra": float(row["ra_h"]),
                 "dec": float(row["dec_deg"]),
                 "w": float(row["size_w_arcmin"]) if row["size_w_arcmin"] else None,
