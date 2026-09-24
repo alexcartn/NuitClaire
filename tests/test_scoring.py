@@ -105,7 +105,7 @@ def test_target_feasibility_reasons_bad_weather_and_moon_both_reported(monkeypat
     }, index=idx)
     target = {"name": "Test", "ra": 0.0, "dec": 0.0}
     reasons = target_feasibility_reasons(df, target)
-    assert any("meteo" in r for r in reasons)
+    assert any("score minimum" in r for r in reasons)
     assert any("Lune" in r for r in reasons)
 
 
@@ -168,31 +168,106 @@ def test_recommended_exposure_minutes_unknown_type_uses_default():
     assert recommended_exposure_minutes("???", 8.0) == (30, 60)
 
 
-def test_hourly_score_vetoes_when_low_clouds_opaque():
-    # Meme avec le reste de la nuit parfait, une couche basse quasi-opaque
-    # (>80%) doit mettre le score a 0 -- avant ce veto, la moyenne ponderee
-    # de `clouds` diluait ce cas et le score pouvait remonter a ~0.7+.
-    row = pd.Series({
-        "cloud_cover_low": 90, "cloud_cover_mid": 0, "cloud_cover_high": 0,
+def _hour(**overrides) -> pd.Series:
+    """Une heure parfaite (ciel pur, pas de Lune, calme, sec, bon seeing),
+    modifiee par `overrides`."""
+    row = {
+        "cloud_cover_low": 0, "cloud_cover_mid": 0, "cloud_cover_high": 0,
         "moon_alt": -10, "moon_illum": 0,
         "wind_gusts_10m": 0,
         "temperature_2m": 10, "dew_point_2m": 0,
         "seeing": 1, "transparency": 1,
         "precipitation_probability": 0,
-    })
-    assert hourly_score(row) == 0.0
+    }
+    row.update(overrides)
+    return pd.Series(row)
 
 
-def test_hourly_score_not_vetoed_when_low_clouds_below_threshold():
-    row = pd.Series({
-        "cloud_cover_low": 80, "cloud_cover_mid": 0, "cloud_cover_high": 0,
-        "moon_alt": -10, "moon_illum": 0,
-        "wind_gusts_10m": 0,
-        "temperature_2m": 10, "dew_point_2m": 0,
-        "seeing": 1, "transparency": 1,
-        "precipitation_probability": 0,
-    })
-    assert hourly_score(row) > 0.0
+def test_hourly_score_perfect_hour_is_one():
+    assert hourly_score(_hour()) == 1.0
+
+
+def test_hourly_score_overcast_is_zero_whatever_the_layer():
+    # Le modele additif donnait 84 a une couche moyenne complete et 92 a une
+    # couche haute complete : le vent et la buee rapportaient des points
+    # d'office, et ces couches ne pesaient que 30 % et 10 %.
+    for layer in ("cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"):
+        assert hourly_score(_hour(**{layer: 100})) == 0.0
+
+
+def test_hourly_score_uses_total_cloud_cover_when_present():
+    # La couverture totale d'Open-Meteo prime sur la recombinaison des couches.
+    assert hourly_score(_hour(cloud_cover=100, cloud_cover_low=10)) == 0.0
+
+
+def test_hourly_score_light_haze_stays_good():
+    assert hourly_score(_hour(cloud_cover_high=20)) >= 0.8
+
+
+def test_hourly_score_full_moon_alone_is_not_a_good_night():
+    score = hourly_score(_hour(moon_alt=45, moon_illum=95))
+    assert 0.4 <= score < 0.6
+
+
+def test_hourly_score_full_moon_and_clouds_is_bad():
+    # Le cas signale : grosse Lune et nuages notes 76 par l'ancien modele.
+    score = hourly_score(_hour(moon_alt=45, moon_illum=95, cloud_cover_mid=50))
+    assert score < 0.3
+
+
+def test_hourly_score_low_moon_hurts_less_than_high_moon():
+    low = hourly_score(_hour(moon_alt=10, moon_illum=90))
+    high = hourly_score(_hour(moon_alt=60, moon_illum=90))
+    assert low > high
+
+
+def test_hourly_score_rain_vetoes():
+    assert hourly_score(_hour(precipitation_probability=80)) == 0.0
+
+
+def test_hourly_score_unknown_clouds_is_not_scored():
+    # Hors prevision : pas de score plutot qu'un score calcule sur des trous.
+    score = hourly_score(_hour(cloud_cover_low=float("nan"), cloud_cover_mid=float("nan"),
+                               cloud_cover_high=float("nan")))
+    assert pd.isna(score)
+
+
+def test_hourly_score_missing_seeing_is_not_penalised():
+    assert hourly_score(_hour(seeing=None, transparency=None)) == 1.0
+
+
+def _moonlit_night(sep: float, monkeypatch):
+    """Nuit claire sous une pleine Lune haute, cible plein sud a 50 deg."""
+    import scoring
+
+    monkeypatch.setattr(scoring, "target_altaz", lambda *a, **k: (50.0, 180.0))
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: sep)
+    idx = pd.date_range("2026-09-15 21:00", periods=4, freq="1h")
+    rows = [_hour(moon_alt=50, moon_illum=98)] * 4
+    return scoring.score_frame(pd.DataFrame(rows, index=idx))
+
+
+def test_emission_nebula_with_lp_filter_stays_feasible_under_full_moon(monkeypatch):
+    df = _moonlit_night(60, monkeypatch)
+    nebula = {"name": "NGC7000", "ra": 0.0, "dec": 0.0, "filter": "LP", "w": 10, "h": 10}
+    galaxy = {"name": "M31", "ra": 0.0, "dec": 0.0, "filter": "sans", "w": 10, "h": 10}
+    assert target_windows(df, nebula)["hours"] == 4
+    assert target_windows(df, galaxy)["hours"] == 0
+
+
+def test_moon_far_from_target_hurts_less(monkeypatch):
+    import scoring
+
+    target = {"name": "M31", "ra": 0.0, "dec": 0.0, "filter": "sans"}
+    near = scoring.target_score(scoring._target_sky_frame(_moonlit_night(35, monkeypatch), target), target)
+    far = scoring.target_score(scoring._target_sky_frame(_moonlit_night(150, monkeypatch), target), target)
+    assert (far > near).all()
+
+
+def test_lp_target_tolerates_a_closer_moon_before_the_veto(monkeypatch):
+    df = _moonlit_night(20, monkeypatch)
+    nebula = {"name": "NGC7000", "ra": 0.0, "dec": 0.0, "filter": "LP", "w": 10, "h": 10}
+    assert target_windows(df, nebula)["hours"] == 4
 
 
 def _make_cloud_df():

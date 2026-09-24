@@ -3,7 +3,7 @@ from itertools import groupby
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from config import WEIGHTS, SEESTAR, SITE, VIEW_WINDOW
+from config import SCORE_MODEL, SEESTAR, SITE, VIEW_WINDOW
 from astro import target_altaz, moon_separation, compass_sector, COMPASS_SECTORS
 
 
@@ -19,43 +19,83 @@ def wind_quality(gust_kmh: float) -> float:
     return 1 - _clamp((gust_kmh - 10) / 30)
 
 
+def _num(value, default=None):
+    """Valeur numerique d'une colonne, ou `default` si absente ou NaN."""
+    return default if value is None or pd.isna(value) else value
+
+
+def total_cloud_pct(row: pd.Series) -> float | None:
+    """Couverture nuageuse totale (%) : celle d'Open-Meteo quand elle est la,
+    sinon recombinee depuis les trois couches (probabilite qu'un point du
+    ciel soit degage sous chacune). None quand la prevision ne couvre pas
+    l'heure -- le score n'est alors pas calcule plutot qu'invente."""
+    total = _num(row.get("cloud_cover"))
+    if total is not None:
+        return float(total)
+    layers = [_num(row.get(k)) for k in ("cloud_cover_low", "cloud_cover_mid", "cloud_cover_high")]
+    if all(v is None for v in layers):
+        return None
+    clear = 1.0
+    for v in layers:
+        clear *= 1 - _clamp((v or 0) / 100)
+    return 100 * (1 - clear)
+
+
+def sky_factor(row: pd.Series) -> float:
+    """Tout ce qui ne depend pas de la cible : nuages, vent, buee, seeing.
+    Multiplies entre eux, de 0 (heure perdue) a 1. NaN si la prevision
+    nuages manque."""
+    if (_num(row.get("precipitation_probability"), 0)) > 50:
+        return 0.0
+    cloud = total_cloud_pct(row)
+    if cloud is None:
+        return float("nan")
+    m = SCORE_MODEL
+    clouds = 1 - _clamp(cloud / m["cloud_opaque_pct"]) ** m["cloud_curve"]
+    gust = _num(row.get("wind_gusts_10m"), 0)
+    wind = 1 - (1 - m["wind_floor"]) * _clamp((gust - m["wind_calm_kmh"]) / (m["wind_max_kmh"] - m["wind_calm_kmh"]))
+    # Ecart T - Td < 1 deg C = buee quasi certaine ; au-dela de 5, aucune.
+    spread = _num(row.get("temperature_2m"), 10) - _num(row.get("dew_point_2m"), 0)
+    dew = 1 - m["dew_max_penalty"] * (1 - _clamp((spread - 1) / 4))
+    s, t = _num(row.get("seeing")), _num(row.get("transparency"))
+    seeing = 1.0 if s is None or t is None else \
+        1 - m["seeing_max_penalty"] * _clamp(((s - 1) / 7 + (t - 1) / 7) / 2)
+    return clouds * wind * dew * seeing
+
+
+def moon_light(row: pd.Series) -> float:
+    """Part du ciel eclaire par la Lune, de 0 (sous l'horizon ou nouvelle) a
+    1 (pleine et a plus de `moon_full_alt_deg`)."""
+    alt = _num(row.get("moon_alt"), -90)
+    if alt <= 0:
+        return 0.0
+    return _clamp(_num(row.get("moon_illum"), 0) / 100) * _clamp(alt / SCORE_MODEL["moon_full_alt_deg"])
+
+
+def moon_penalty(light, moon_sep_deg=None, lp_filter: bool = False):
+    """Ce que la Lune retire au score, pour une cible donnee ou pour la nuit.
+
+    Sans cible (`moon_sep_deg` None), on prend le cas le plus defavorable --
+    cible sans filtre, Lune proche -- : le score de la nuit reste severe, et
+    c'est la liste des cibles qui dit ce qui reste faisable. Fonctionne sur
+    des scalaires comme sur des colonnes pandas."""
+    m = SCORE_MODEL
+    k = m["moon_penalty_lp"] if lp_filter else m["moon_penalty_broadband"]
+    if moon_sep_deg is None:
+        return k * light
+    far = ((moon_sep_deg - 30) / 90).clip(0, 1) if hasattr(moon_sep_deg, "clip") \
+        else _clamp((moon_sep_deg - 30) / 90)
+    return k * light * (1 - m["moon_far_relief"] * far)
+
+
 def hourly_score(row: pd.Series) -> float:
-    """Chaque sous-score va de 0 (redhibitoire) a 1 (ideal)."""
-    # Nuages : les bas pesent plus que les hauts (les cirrus tuent la transparence mais pas tout)
-    low, mid, high = row.get("cloud_cover_low", 0), row.get("cloud_cover_mid", 0), row.get("cloud_cover_high", 0)
-    clouds = 1 - _clamp((0.6 * low + 0.3 * mid + 0.1 * high) / 100)
-
-    # Lune : penalite proportionnelle a illumination x altitude
-    moon = 1.0
-    if row.get("moon_alt", -90) > 0:
-        moon = 1 - _clamp((row["moon_illum"] / 100) * _clamp(row["moon_alt"] / 60))
-
-    wind = wind_quality(row.get("wind_gusts_10m", 0) or 0)
-
-    # Rosee : ecart T - Td < 2 deg C = buee quasi certaine
-    spread = (row.get("temperature_2m", 10) or 10) - (row.get("dew_point_2m", 0) or 0)
-    dew = _clamp((spread - 1) / 5)
-
-    # Seeing / transparence 7Timer (1 = excellent, 8 = mauvais)
-    s, t = row.get("seeing"), row.get("transparency")
-    if pd.notna(s) and pd.notna(t):
-        st = 1 - _clamp(((s - 1) / 7 + (t - 1) / 7) / 2)
-    else:
-        st = 0.6  # inconnu : neutre
-
-    # Pluie : veto
-    if (row.get("precipitation_probability", 0) or 0) > 50:
-        return 0.0
-
-    # Nuages bas : veto -- une couche basse quasi opaque bouche le ciel
-    # quelles que soient les couches au-dessus (contrairement a la moyenne
-    # ponderee de `clouds`, qui dilue ce cas et laisse remonter le score).
-    if low > 80:
-        return 0.0
-
-    return round(
-        WEIGHTS["clouds"] * clouds + WEIGHTS["moon"] * moon + WEIGHTS["wind"] * wind
-        + WEIGHTS["dew"] * dew + WEIGHTS["seeing_transp"] * st, 3)
+    """Score astro d'une heure, de 0 (heure perdue) a 1 : facteur ciel
+    (nuages, vent, buee, seeing) multiplie par l'obscurite laissee par la
+    Lune, dans le cas le plus defavorable (voir `moon_penalty`)."""
+    sky = sky_factor(row)
+    if pd.isna(sky):
+        return float("nan")
+    return round(sky * (1 - moon_penalty(moon_light(row))), 3)
 
 
 def in_observation_window(index: pd.DatetimeIndex, view_mode_key: str,
@@ -92,7 +132,11 @@ def view_window_df(df: pd.DataFrame, view_mode_key: str, view_window: dict | Non
 
 
 def score_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Ajoute le score de la nuit, et ses deux composantes que les cibles
+    recombinent a leur facon (voir `target_score`)."""
     df = df.copy()
+    df["sky"] = df.apply(sky_factor, axis=1)
+    df["moon_light"] = df.apply(moon_light, axis=1)
     df["score"] = df.apply(hourly_score, axis=1)
     return df
 
@@ -266,16 +310,40 @@ def target_altitude_series(df: pd.DataFrame, target: dict, site: dict = SITE) ->
     return _target_sky_frame(df, target, site=site)[["alt", "az", "sector", "moon_sep"]]
 
 
+def _uses_lp(target: dict) -> bool:
+    """Cible en emission, photographiee avec le filtre LP du S50 (colonne
+    `filter` du catalogue : nebuleuses, regions HII, planetaires, remanents)."""
+    return target.get("filter") == "LP"
+
+
+def target_score(d: pd.DataFrame, target: dict) -> pd.Series:
+    """Score horaire pour cette cible : meme facteur ciel que la nuit, mais une
+    penalite lunaire qui tient compte de la separation Lune-cible et du
+    filtre. Une nebuleuse en emission reste photographiable sous une Lune qui
+    rend une galaxie inexploitable. Repli sur le score de la nuit pour un
+    tableau qui ne porte pas les composantes."""
+    if "sky" not in d or "moon_light" not in d:
+        return d["score"]
+    return d["sky"] * (1 - moon_penalty(d["moon_light"], d["moon_sep"], _uses_lp(target)))
+
+
+def _moon_veto(d: pd.DataFrame, target: dict) -> pd.Series:
+    """Heures ou la Lune, brillante et levee, est trop pres de la cible pour
+    quoi que ce soit : 30 deg sans filtre, 15 deg avec le filtre LP."""
+    limit = 15 if _uses_lp(target) else 30
+    return (d["moon_alt"] > 0) & (d["moon_sep"] < limit) & (d["moon_illum"] > 40)
+
+
 def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
                     site: dict = SITE) -> dict:
-    """Pour une cible, heures ou alt/azimut dans les plages autorisees et score OK."""
+    """Pour une cible, heures ou alt/azimut dans les plages autorisees et score
+    OK -- le score propre a la cible (voir `target_score`), pas celui de la nuit."""
     horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
     d = _target_sky_frame(df, target, site=site)
     open_sectors = {s for s, is_open in horizon.items() if is_open}
     ok = d[(d["alt"] >= SEESTAR["min_alt_deg"]) & (d["alt"] <= SEESTAR["max_alt_deg"])
-           & (d["score"] >= 0.6) & (d["sector"].isin(open_sectors))]
-    if not ok.empty:
-        ok = ok[~((ok["moon_alt"] > 0) & (ok["moon_sep"] < 30) & (ok["moon_illum"] > 40))]
+           & (target_score(d, target) >= 0.6) & (d["sector"].isin(open_sectors))
+           & ~_moon_veto(d, target)]
     return {
         "name": target["name"], "type": target.get("type_fr", target.get("type", "")),
         "filter": target.get("filter", "sans"),
@@ -303,8 +371,8 @@ def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | N
 
     alt_ok = (d["alt"] >= SEESTAR["min_alt_deg"]) & (d["alt"] <= SEESTAR["max_alt_deg"])
     sector_ok = d["sector"].isin(open_sectors)
-    score_ok = d["score"] >= 0.6  # meme seuil que target_windows
-    moon_ok = ~((d["moon_alt"] > 0) & (d["moon_sep"] < 30) & (d["moon_illum"] > 40))
+    score_ok = target_score(d, target) >= 0.6  # meme seuil que target_windows
+    moon_ok = ~_moon_veto(d, target)
 
     reasons = []
     if not alt_ok.any():
@@ -315,8 +383,8 @@ def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | N
         reasons.append("Ne passe dans un secteur d'horizon degage que hors de sa "
                         "fenetre d'altitude exploitable.")
     if not score_ok.any():
-        reasons.append("Aucune heure de la nuit n'atteint le score meteo minimum "
-                        "(nuages, vent, seeing...).")
+        reasons.append("Aucune heure de la nuit n'atteint le score minimum pour cette "
+                        "cible (nuages, Lune, vent, seeing...).")
     if not moon_ok.any():
         reasons.append("Trop proche d'une Lune brillante toute la nuit.")
     if not reasons and not (alt_ok & sector_ok & score_ok & moon_ok).any():

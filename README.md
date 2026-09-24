@@ -452,6 +452,27 @@ locaux). `pip install -r api/requirements-api.txt` installe le client `supabase`
 - Si la meteo est injoignable, "Catalogue Messier" affiche quand meme les 110 objets,
   faisabilite inconnue. Les ecrans en erreur proposent "Reessayer".
 
+### Score astro
+
+Le score horaire (`scoring.hourly_score`) multiplie ses facteurs au lieu de les additionner :
+le pire l'emporte. L'ancien modele additif (nuages 40 %, Lune 20 %, vent 15 %, buee 15 %,
+seeing 10 %) donnait 84/100 a un ciel entierement couvert de nuages moyens : vent et buee
+rapportaient 30 points d'office, les couches moyennes et hautes ne pesaient presque rien,
+et une pleine Lune ne retirait jamais plus de 20 points.
+
+- Nuages : couverture totale, 20 % -> 0,85, 50 % -> 0,50, 85 % et plus -> 0.
+- Lune : penalite selon l'illumination et l'altitude (pleine a partir de 30 deg).
+- Vent : sans effet jusqu'a 15 km/h de rafales, plancher a 40 km/h.
+- Buee : 15 % au plus (le S50 chauffe son optique). Seeing/transparence 7Timer : 20 % au
+  plus, aucune penalite quand la prevision manque.
+
+Le score de la nuit prend la Lune au pire (cible sans filtre, proche de la Lune). Chaque
+cible a ensuite son propre score (`scoring.target_score`) : la penalite lunaire baisse
+avec la separation, et une cible en emission photographiee avec le filtre LP (colonne
+`filter` du catalogue) n'en subit qu'environ la moitie ; elle tolere aussi une Lune a
+15 deg au lieu de 30. Sous une pleine Lune claire, la nuit tombe vers 48 et les galaxies
+disparaissent de la liste, pas les nebuleuses. Les reglages sont dans `config.SCORE_MODEL`.
+
 ### Code d'acces de l'API
 
 Sans authentification, n'importe qui connaissant l'URL de l'API pouvait lire et modifier
@@ -486,7 +507,7 @@ Vercel separes sur le meme repo GitHub :
 - hips2fits (CDS, Centre de Donnees astronomiques de Strasbourg) : vignettes de reference DSS2 par coordonnees
 
 ## Fichiers
-- config.py            : coordonnees par defaut, champ du Seestar, ponderations, horizon par defaut
+- config.py            : coordonnees par defaut, champ du Seestar, modele du score (SCORE_MODEL), horizon par defaut
 - weather.py            : appels API meteo
 - astro.py              : ephemerides, secteurs cardinaux, crepuscules
 - geocode.py            : adresse -> lat/lon

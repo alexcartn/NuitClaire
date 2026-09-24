@@ -18,13 +18,39 @@ SEESTAR = {
     "max_alt_deg": 85,      # zenith : le suivi alt-az decroche
 }
 
-# Ponderation du score (somme = 1)
-WEIGHTS = {
-    "clouds": 0.40,
-    "moon": 0.20,
-    "wind": 0.15,
-    "dew": 0.15,
-    "seeing_transp": 0.10,
+# Modele du score astro horaire (voir `scoring.hourly_score`). Les facteurs se
+# multiplient au lieu de s'additionner : le pire l'emporte, comme dehors. Le
+# modele additif precedent donnait 84/100 a un ciel entierement couvert de
+# nuages moyens (vent et buee rapportaient 30 points d'office, une couche
+# moyenne a 100 % n'en retirait que 12, une pleine lune jamais plus de 20).
+SCORE_MODEL = {
+    # Couverture nuageuse totale a partir de laquelle l'heure est perdue. Le
+    # facteur nuages vaut 1 - (couverture / seuil) ** courbe : la courbe
+    # epargne les petits pourcentages (20 % -> 0,85 ; 50 % -> 0,50 ;
+    # 80 % -> 0,08), qu'une prevision affiche souvent par ciel pur.
+    "cloud_opaque_pct": 85,
+    "cloud_curve": 1.3,
+    # Penalite maximale de la Lune (pleine, haute, proche de la cible) pour
+    # une cible sans filtre (galaxies, amas, nebuleuses par reflexion)...
+    "moon_penalty_broadband": 0.55,
+    # ... et pour une cible en emission observee avec le filtre LP (bi-bande
+    # Ha/OIII du S50), qui coupe l'essentiel de la lumiere lunaire.
+    "moon_penalty_lp": 0.25,
+    # Altitude lunaire a partir de laquelle la Lune eclaire le ciel a plein.
+    "moon_full_alt_deg": 30,
+    # Loin de la cible, la Lune gene moins : a 120 deg et au-dela, sa
+    # penalite est reduite de cette part.
+    "moon_far_relief": 0.3,
+    # Rafales sans effet jusqu'a `wind_calm_kmh`, facteur au plancher a
+    # `wind_max_kmh` et au-dela.
+    "wind_calm_kmh": 15,
+    "wind_max_kmh": 40,
+    "wind_floor": 0.3,
+    # Penalite maximale de la buee : le S50 a sa propre resistance chauffante.
+    "dew_max_penalty": 0.15,
+    # Penalite maximale seeing/transparence 7Timer (prevision grossiere, pas
+    # de penalite quand elle manque plutot qu'une valeur neutre inventee).
+    "seeing_max_penalty": 0.2,
 }
 
 # Une seule nuit (celle du jour meme) est chargee et affichee, dans les deux

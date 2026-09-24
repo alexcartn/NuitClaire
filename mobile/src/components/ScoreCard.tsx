@@ -19,7 +19,7 @@ export function ScoreCard({ night }: { night: Night }) {
         <div style={{ flex: 1 }} />
         <div style={{ textAlign: "right", marginBottom: 4 }}>
           <div style={{ fontSize: "var(--text-md)" }}>{night.scoreLabel}</div>
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--ink3)", marginTop: 4 }}>score astro de la nuit</div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--ink3)", marginTop: 4 }}>score de la nuit, cibles sans filtre</div>
         </div>
       </div>
       <MiniScoreBars hourly={night.hourly} />
