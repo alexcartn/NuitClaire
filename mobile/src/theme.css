@@ -1042,3 +1042,17 @@ a {
 .nc-month-active .nc-month-count {
   color: var(--onaccent);
 }
+
+/* Resume d'une cible de la session : toute la ligne deplie ou replie. */
+.nc-item-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}

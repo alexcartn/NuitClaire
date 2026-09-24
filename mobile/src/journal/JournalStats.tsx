@@ -1,4 +1,5 @@
 import { StatCard } from "../components/StatCard";
+import { Section } from "../components/Section";
 import { plural } from "../format";
 import { fmtExposure } from "./format";
 import type { Stats } from "../types";
@@ -7,8 +8,8 @@ export function JournalStats({ stats }: { stats: Stats }) {
   if (stats.totalOutings === 0) return null;
   const thisMonth = stats.capturesByMonth.find((m) => m.month === new Date().toISOString().slice(0, 7))?.count ?? 0;
   return (
-    <div className="nc-card nc-stack">
-      <div className="nc-eyebrow">Statistiques</div>
+    // Repliee par defaut : utile a la relecture, pas pendant la saisie.
+    <Section id="journal-stats" title="Statistiques" defaultOpen={false}>
       <div className="nc-grid-2">
         <StatCard
           label="Sorties"
@@ -56,6 +57,6 @@ export function JournalStats({ stats }: { stats: Stats }) {
           ))}
         </div>
       )}
-    </div>
+    </Section>
   );
 }

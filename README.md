@@ -501,6 +501,17 @@ rend 13 atteignables avec un horizon sud degage ; les 8 restants (M6, M7, M54, M
 M69, M70, M83) demandent une sortie plus au sud. Cocher un Messier fait dans le journal
 propose de le marquer capture.
 
+### Journal
+
+Organise comme Messier et Cibles (`journalView.ts`, pur et teste) :
+
+- saisie (cible, note, evenements en un appui) en tete, toujours ouverte ;
+- session en cours : chaque cible replie sur une ligne (heure, notes, pose, note sur 5),
+  une seule depliee a la fois, la derniere ajoutee par defaut ;
+- « Mes sorties » : l'annee, douze mois avec le nombre de sorties, puis celles du mois
+  touche, chacune repliee sur son resume (date, score, cibles) ;
+- statistiques en fin de page, repliees par defaut.
+
 ### Recherche
 
 Par designation (prefixe : « M3 », « NGC70 ») ou par nom, en francais ou en anglais, sans

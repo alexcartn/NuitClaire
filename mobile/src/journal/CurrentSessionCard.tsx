@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
 import { messierIdOf } from "../messierDex";
-import { fmtHM, plural } from "../format";
+import { itemSummary } from "../journalView";
+import { TabIcon } from "../components/TabIcon";
+import { fmtHM } from "../format";
 import { tap } from "../haptics";
 import { localNoteId } from "../sessionQueue";
 import type { SessionOpBody } from "../sessionQueue";
@@ -28,6 +30,14 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
   const [exposureDraft, setExposureDraft] = useState<Record<string, string>>({});
   const [feelingDraft, setFeelingDraft] = useState<Partial<Record<keyof Feeling, string>>>({});
 
+  // Une seule cible depliee a la fois, la derniere ajoutee au depart : six
+  // cibles depliees faisaient une page entiere de champs.
+  const latest = [...current.items].sort((a, b) => (a.addedAt < b.addedAt ? 1 : -1))[0]?.designation ?? null;
+  const [openItem, setOpenItem] = useState<string | null>(latest);
+  // Une cible qu'on vient d'ajouter s'ouvre : c'est elle qu'on va noter.
+  useEffect(() => {
+    if (latest) setOpenItem(latest);
+  }, [latest]);
   const [capturing, setCapturing] = useState<string | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
@@ -122,10 +132,22 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
                 >
                   {item.designation}
                 </button>
-                <span className="nc-caption nc-grow">
-                  ajoutée {fmtHM(item.addedAt)}
-                  {item.notes.length > 0 && ` · ${plural(item.notes.length, "note", "notes")}`}
-                </span>
+                {/* Toute la ligne ouvre ou replie la cible ; son resume dit ce
+                    qui a deja ete saisi sans avoir a la deplier. */}
+                <button
+                  onClick={() => setOpenItem((cur) => (cur === item.designation ? null : item.designation))}
+                  className="nc-caption nc-grow nc-item-toggle"
+                  aria-expanded={openItem === item.designation}
+                  aria-label={`${openItem === item.designation ? "Replier" : "Déplier"} ${item.designation}`}
+                >
+                  <span className="nc-ellipsis">
+                    {fmtHM(item.addedAt)}
+                    {itemSummary(item) && ` · ${itemSummary(item)}`}
+                  </span>
+                  <span className={`nc-section-chevron ${openItem === item.designation ? "nc-section-chevron-open" : ""}`}>
+                    <TabIcon name="chevron" />
+                  </span>
+                </button>
                 <button
                   onClick={() => send({ kind: "removeItem", designation: item.designation })}
                   className="nc-icon-btn"
@@ -154,6 +176,8 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
               })()}
               {captureError && <div className="nc-notice">{captureError}</div>}
 
+              {openItem === item.designation && (
+              <>
               <div className="nc-row">
                 <input
                   value={itemNoteDraft[item.designation] ?? ""}
@@ -198,6 +222,8 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
                 value={item.rating}
                 onChange={(rating) => send({ kind: "setItemRating", designation: item.designation, rating })}
               />
+              </>
+              )}
             </div>
           ))}
         </div>

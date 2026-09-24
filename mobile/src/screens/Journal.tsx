@@ -99,8 +99,6 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
 
       <SyncBanner pendingCount={pendingCount} syncError={syncError} loadError={loadError} />
 
-      {stats && <JournalStats stats={stats} />}
-
       <AddToSession items={current.items} send={send} />
 
       {sessionActive ? (
@@ -132,6 +130,8 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
         onReopen={reopen}
         onOpenTarget={onOpenTarget}
       />
+
+      {stats && <JournalStats stats={stats} />}
     </div>
   );
 }
