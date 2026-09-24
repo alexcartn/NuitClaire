@@ -71,4 +71,5 @@ def api_client(monkeypatch):
     deps._night_cache.clear()
     deps._rows_cache.clear()
     deps._wiki_cache.clear()
+    deps._season_cache.clear()
     return TestClient(app)

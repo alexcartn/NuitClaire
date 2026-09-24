@@ -18,13 +18,16 @@ import type { Feeling, Site } from "../types";
 
 /** Le carnet : session en cours, puis sorties passees. Chaque bloc vit dans
  * src/journal/ ; ce fichier en faisait 900 lignes a lui seul. */
-export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) => void }) {
+export function Journal({ onOpenTarget, onCaptureChange }: {
+  onOpenTarget: (designation: string) => void;
+  onCaptureChange: () => void;
+}) {
   const { data, loading, loadError, pendingCount, pendingNotes, syncError, syncCount } = useSessions();
   const fetchStats = useCallback(() => api.stats(), []);
   // Le lieu configure : c'est justement celui qu'on vient de poser dans
   // Reglages en rentrant, et qui n'est encore dans aucune sortie.
   const fetchState = useCallback(() => api.state(), []);
-  const { data: appState } = useFetch(fetchState, [], "state");
+  const { data: appState, reload: reloadAppState } = useFetch(fetchState, [], "state");
   const { data: stats, reload: reloadStats } = useFetch(fetchStats, []);
   const [reopening, setReopening] = useState<string | null>(null);
   const [reopenError, setReopenError] = useState<string | null>(null);
@@ -105,6 +108,11 @@ export function Journal({ onOpenTarget }: { onOpenTarget: (designation: string) 
           current={current}
           places={places}
           pendingNotes={pendingNotes}
+          captured={new Set(appState?.messierCaptured ?? [])}
+          onCaptureChange={() => {
+            reloadAppState();
+            onCaptureChange();
+          }}
           send={send}
           onClose={close}
           onOpenTarget={onOpenTarget}

@@ -1,6 +1,6 @@
 import type { AltitudePoint, ViewWindow } from "../types";
 
-const MIN_ALT = 20; // SEESTAR.min_alt_deg
+const MIN_ALT = 20; // SEESTAR.min_alt_deg, sauf Messier bas (voir minAlt)
 const MAX_ALT = 85; // SEESTAR.max_alt_deg
 
 function fmtHour(iso: string): string {
@@ -25,8 +25,12 @@ export function AltitudeChart({
   horizon,
   windowMode,
   viewWindow,
+  minAlt = MIN_ALT,
 }: {
   series: AltitudePoint[];
+  /** Hauteur minimale de cet objet (scoring.min_alt_for) : 12 deg pour un
+   * Messier qui ne monte jamais a 20 depuis ce site. */
+  minAlt?: number;
   horizon?: Record<string, boolean>;
   windowMode?: string;
   viewWindow?: ViewWindow;
@@ -34,7 +38,7 @@ export function AltitudeChart({
   // Calcule une fois (reutilise pour la ligne de secteurs et pour les barres,
   // pour ne pas dupliquer la regle "pointable" a deux endroits).
   const points = series.map((p) => {
-    const inRange = p.alt >= MIN_ALT && p.alt <= MAX_ALT;
+    const inRange = p.alt >= minAlt && p.alt <= MAX_ALT;
     const sectorOpen = horizon ? !!horizon[p.sector] : true;
     const hour = new Date(p.time).getHours() + new Date(p.time).getMinutes() / 60;
     const inWindow =

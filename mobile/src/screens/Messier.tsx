@@ -1,208 +1,298 @@
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
-import { useRemembered } from "../useRemembered";
+import { useSessions, mutate } from "../useSessions";
+import { newOp } from "../sessionQueue";
 import { plural } from "../format";
 import { tap } from "../haptics";
+import { buildDex, captureDates, MESSIER_TOTAL, MONTHS_FR, pace, type DexEntry } from "../messierDex";
 import { StaleNotice } from "../components/StaleNotice";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
-import { MagnitudeFilter, TypeChips, distinctTypes, magnitudeBounds } from "../components/CatalogFilters";
 
-const MESSIER_TOTAL = 110;
-const PAGE_SIZE = 24;
+/** Dernier mois de la periode de visibilite en cours (pour « visible
+ * jusqu'en novembre »). */
+function visibleUntil(e: DexEntry, month0: number): string | null {
+  if (!e.season) return null;
+  let last: number | null = null;
+  for (let k = 0; k < 12; k++) {
+    const m = (month0 + k) % 12;
+    if (e.season.monthHours[m] > 0) last = m;
+    else break;
+  }
+  return last === null ? null : MONTHS_FR[last];
+}
 
+const LIST_MAX = 6;
+
+/** "environ 8 mois", "environ 2 ans et demi". */
+function remainingLabel(months: number): string {
+  if (months < 18) return `environ ${months} mois`;
+  const halfYears = Math.round(months / 6) / 2;
+  const whole = Math.floor(halfYears);
+  return `environ ${whole} an${whole > 1 ? "s" : ""}${halfYears % 1 ? " et demi" : ""}`;
+}
+
+function fmtCaptureDate(iso: string): string {
+  return new Date(iso + "T00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "2-digit" });
+}
+
+/** Rangee de designations a toucher pour ouvrir la fiche. */
+function DexChips({ entries, onOpen }: { entries: DexEntry[]; onOpen: (d: string) => void }) {
+  return (
+    <div className="nc-row nc-wrap" style={{ gap: "var(--space-xs)" }}>
+      {entries.map((e) => (
+        <button key={e.id} onClick={() => onOpen(e.designation)} className="nc-chip nc-num">
+          {e.designation}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Le Pokedex Messier : l'objectif des 110. « Cibles » repond a « quoi
+ * photographier ce soir » sur tout le catalogue ; cette page-ci repond a
+ * « ou en suis-je, et que chasser ensuite » -- d'ou l'absence de filtres par
+ * type ou magnitude, qui etaient la meme liste qu'a cote (voir messierDex.ts
+ * pour le classement). */
 export function Messier({
   captured,
   onOpenTarget,
-  onCaptureChange,
 }: {
   captured: Set<string>;
   onOpenTarget: (designation: string) => void;
-  onCaptureChange: () => void;
 }) {
-  // Memorises (voir useRemembered) : revenir d'une fiche retrouve l'ecran
-  // tel qu'on l'avait laisse.
-  const [onlyFeasible, setOnlyFeasible] = useRemembered("messier:feasible", false);
-  const [types, setTypes] = useRemembered<string[]>("messier:types", []);
-  const [magRange, setMagRange] = useRemembered<[number, number] | null>("messier:mag", null);
-  const [showAll, setShowAll] = useRemembered("messier:all", false);
-  const [captureError, setCaptureError] = useState<string | null>(null);
+  const fetchRows = useCallback(() => api.messier(false), []);
+  const rows = useFetch(fetchRows, [], "messier:false");
+  const fetchSeason = useCallback(() => api.messierSeason(), []);
+  const season = useFetch(fetchSeason, [], "messier-season");
+  const sessions = useSessions();
+  const [showAllGrid, setShowAllGrid] = useState(true);
+  const [addedTonight, setAddedTonight] = useState(false);
+  const [openTonight, setOpenTonight] = useState(false);
+  const [openLast, setOpenLast] = useState(false);
 
-  const fetchMessier = useCallback(() => api.messier(onlyFeasible), [onlyFeasible]);
-  const { data: rows, loading, error, fetchedAt, reload } = useFetch(
-    fetchMessier,
-    [onlyFeasible],
-    `messier:${onlyFeasible}`,
+  const today = new Date();
+  const month = today.getMonth() + 1;
+
+  const ngcToId = useMemo(
+    () => new Map((rows.data ?? []).filter((r) => r.ngc && r.messierId).map((r) => [r.ngc!.toUpperCase(), r.messierId!])),
+    [rows.data],
   );
+  const dates = useMemo(() => captureDates(sessions.data, ngcToId), [sessions.data, ngcToId]);
+  const dex = useMemo(
+    () => buildDex(rows.data, season.data, captured, dates, month),
+    [rows.data, season.data, captured, dates, month],
+  );
+  const rhythm = pace(dates, dex.capturedCount, today);
+  const pct = Math.round((dex.capturedCount / MESSIER_TOTAL) * 100);
+  const feasibilityUnknown = !!rows.data?.length && rows.data.every((r) => r.feasibleTonight == null);
+  const loading = (rows.loading && !rows.data) || (season.loading && !season.data);
 
-  const allTypes = useMemo(() => distinctTypes(rows), [rows]);
-  const magBounds = useMemo(() => magnitudeBounds(rows), [rows]);
-  // Meteo injoignable cote serveur : le catalogue arrive sans la faisabilite
-  // du soir (voir api/routers/catalog.py). On le dit, plutot que de laisser
-  // croire que rien n'est visible.
-  const feasibilityUnknown = !!rows?.length && rows.every((r) => r.feasibleTonight == null);
+  // Les premiers seulement : une nuit ne suffit pas a 27 objets, et le plan
+  // se lit mieux court. Le bouton ajoute ce qui est affiche.
+  const tonightShown = openTonight ? dex.tonight : dex.tonight.slice(0, LIST_MAX);
+  const lastShown = openLast ? dex.lastChance : dex.lastChance.slice(0, LIST_MAX);
 
-  const toggleCapture = async (messierId: string, isCaptured: boolean) => {
-    setCaptureError(null);
-    try {
-      await api.updateMessierCapture(messierId, !isCaptured);
-      tap();
-      onCaptureChange();
-    } catch {
-      setCaptureError("Capture non enregistrée : pas de réseau ? Réessayez dans un instant.");
-    }
+  const addTonight = () => {
+    tonightShown.forEach((e) => mutate(newOp({ kind: "addItem", designation: e.designation })));
+    tap();
+    setAddedTonight(true);
   };
 
-  const toggleType = (t: string) =>
-    setTypes((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]));
-
-  const filtered = useMemo(() => {
-    const [lo, hi] = magRange ?? [-Infinity, Infinity];
-    return (rows ?? []).filter(
-      (r) => (types.length === 0 || types.includes(r.type)) && (r.mag == null || (r.mag >= lo && r.mag <= hi)),
-    );
-  }, [rows, types, magRange]);
-
-  const shown = showAll ? filtered : filtered.slice(0, PAGE_SIZE);
-  const rest = filtered.length - shown.length;
-
-  const capturedPct = Math.round((captured.size / MESSIER_TOTAL) * 100);
+  const shownGrid = showAllGrid ? dex.entries : dex.entries.filter((e) => !e.captured);
 
   return (
     <div className="nc-screen">
       <ScreenHeader
-        eyebrow="Catalogue Messier"
-        title={`${captured.size} sur ${MESSIER_TOTAL} capturés`}
+        eyebrow="Objectif Messier"
+        title={
+          <>
+            <span className="nc-num">{dex.capturedCount}</span> sur {MESSIER_TOTAL} capturés
+          </>
+        }
       />
 
-      <div className="nc-stack-xs">
-        <div style={{ height: 8, borderRadius: 4, background: "var(--bar)", overflow: "hidden" }}>
-          <div style={{ width: `${capturedPct}%`, height: "100%", background: "var(--accent)" }} />
+      <div className="nc-card nc-stack">
+        <div style={{ height: 10, borderRadius: 5, background: "var(--bar)", overflow: "hidden" }}>
+          <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
         </div>
-        <div className="nc-num nc-caption">{capturedPct} % du catalogue</div>
+        <div className="nc-grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+          <div className="nc-stack-xs" style={{ gap: 0 }}>
+            <span className="nc-num" style={{ fontSize: "var(--text-lg)" }}>{pct} %</span>
+            <span className="nc-caption">du catalogue</span>
+          </div>
+          <div className="nc-stack-xs" style={{ gap: 0 }}>
+            <span className="nc-num" style={{ fontSize: "var(--text-lg)" }}>{rhythm.thisMonth}</span>
+            <span className="nc-caption">ce mois-ci</span>
+          </div>
+          <div className="nc-stack-xs" style={{ gap: 0 }}>
+            <span className="nc-num" style={{ fontSize: "var(--text-lg)" }}>{rhythm.thisYear}</span>
+            <span className="nc-caption">cette année</span>
+          </div>
+        </div>
+        <p className="nc-caption" style={{ margin: 0 }}>
+          {rhythm.monthsToGo != null
+            ? `À ce rythme (${plural(rhythm.lastYear, "capture datée", "captures datées")} sur 12 mois), il reste ${remainingLabel(rhythm.monthsToGo)} de chasse.`
+            : "Le rythme s'affichera avec au moins trois captures datées par le journal."}
+          {dex.outOfReach.length > 0 &&
+            ` ${plural(dex.outOfReach.length, "objet reste", "objets restent")} hors de portée d'ici.`}
+        </p>
       </div>
 
-      <button
-        onClick={() => setOnlyFeasible((v) => !v)}
-        className={`nc-chip ${onlyFeasible ? "nc-chip-active" : ""}`}
-        style={{ alignSelf: "flex-start" }}
-        aria-pressed={onlyFeasible}
-      >
-        Faisable ce soir uniquement
-      </button>
-
-      <TypeChips types={allTypes} selected={types} onToggle={toggleType} />
-      <MagnitudeFilter bounds={magBounds} value={magRange} onChange={setMagRange} />
-
-      {loading && !rows && <p className="nc-caption">Chargement…</p>}
-      {error &&
-        (rows ? (
-          <StaleNotice when={fetchedAt} />
-        ) : (
-          <ErrorNotice message="Impossible de charger le catalogue." onRetry={reload} />
-        ))}
+      {loading && <p className="nc-caption">Chargement…</p>}
+      {rows.error &&
+        (rows.data ? <StaleNotice when={rows.fetchedAt} /> : <ErrorNotice message="Impossible de charger le catalogue." onRetry={rows.reload} />)}
+      {season.error && !season.data && (
+        <ErrorNotice message="Impossible de calculer les saisons." onRetry={season.reload} />
+      )}
       {feasibilityUnknown && (
         <div className="nc-notice">
-          Prévision météo injoignable : le catalogue s'affiche, mais la visibilité de ce soir n'est pas connue.
+          Prévision météo injoignable : la chasse de ce soir n'est pas connue, le reste l'est.
         </div>
       )}
-      {onlyFeasible && rows && rows.length === 0 && !error && (
-        <p className="nc-caption">Aucun Messier faisable ce soir, ou prévision indisponible.</p>
-      )}
-      {rows && rows.length > 0 && filtered.length === 0 && (
-        <p className="nc-caption">Aucun objet ne correspond à ces filtres.</p>
-      )}
-      {captureError && <div className="nc-notice">{captureError}</div>}
 
-      <div className="nc-grid-2" style={{ gap: "var(--space-sm)" }}>
-        {shown.map((row) => {
-          const isCaptured = !!row.messierId && captured.has(row.messierId);
-          return (
-            <div key={row.designation} className="nc-card" style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <button
-                onClick={() => onOpenTarget(row.designation)}
-                className="nc-strip"
-                style={{
-                  position: "relative", height: 84, background: "var(--surf2)", border: "none",
-                  borderBottom: "1px solid var(--line)", cursor: "pointer", padding: 0, overflow: "hidden",
-                }}
-              >
-                {row.imageUrl && (
-                  <img
-                    src={row.imageUrl}
-                    alt=""
-                    loading="lazy"
-                    // Meme raison que dans TargetRow : une vignette absente
-                    // laisse la place a l'aplat, pas a l'icone cassee.
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                )}
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: 8 }}>
-                  <span className="nc-num" style={{ fontSize: "var(--text-sm)", color: "var(--ink)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}>
-                    {row.designation}
-                  </span>
-                  {/* « CE SOIR » est un mot, la designation au-dessus est un
-                      numero : seule la seconde reste en chasse fixe.
-                      Et ce n'est pas une mesure : ce badge empruntait le vert
-                      de l'echelle bon/moyen/mauvais pour dire un simple oui,
-                      et criait alors plus fort que le seul geste de cet ecran
-                      -- marquer une capture. Sur une page qui suit une
-                      collection, l'accent revient a la capture ; la
-                      faisabilite du soir est un indice, et le filtre
-                      « Faisable ce soir uniquement » est la pour qui la
-                      cherche vraiment. Rien a afficher quand c'est non :
-                      l'absence le dit deja, le tiret n'etait que du bruit. */}
-                  {row.feasibleTonight && (
-                    <span
-                      style={{
-                        fontFamily: "var(--font-display)", fontWeight: 600,
-                        fontSize: "var(--text-xs)", letterSpacing: ".08em",
-                        color: "var(--ink2)",
-                        background: "var(--surf)", padding: "2px 5px", borderRadius: 4,
-                      }}
-                    >
-                      CE SOIR
-                    </span>
-                  )}
-                </div>
+      {dex.tonight.length > 0 && (
+        <div className="nc-card nc-stack" style={{ borderColor: "var(--accent)" }}>
+          <div className="nc-row nc-between nc-baseline">
+            <div className="nc-eyebrow">À chasser ce soir</div>
+            <span className="nc-caption">{plural(dex.tonight.length, "manquant", "manquants")}</span>
+          </div>
+          <div className="nc-stack-xs">
+            {tonightShown.map((e) => (
+              <button key={e.id} onClick={() => onOpenTarget(e.designation)} className="nc-plan-row">
+                <span className="nc-num nc-none" style={{ fontSize: "var(--text-sm)" }}>
+                  {e.row?.start}–{e.row?.end}
+                </span>
+                <span className="nc-num nc-none" style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>
+                  {e.designation}
+                </span>
+                <span className="nc-grow nc-ellipsis nc-caption" style={{ margin: 0 }}>
+                  {e.leavingSoon ? "dernière chance · " : ""}
+                  {e.row?.commonName || e.row?.type}
+                </span>
               </button>
-              <div className="nc-stack-xs" style={{ padding: "var(--space-xs)" }}>
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--ink2)", minHeight: 30 }}>
-                  {row.commonName || row.type}
-                </div>
-                <button
-                  onClick={() => row.messierId && toggleCapture(row.messierId, isCaptured)}
-                  aria-pressed={isCaptured}
-                  aria-label={`${row.designation} capturé`}
-                  className="nc-btn"
-                  style={{
-                    background: isCaptured ? "var(--accent)" : "var(--surf2)",
-                    color: isCaptured ? "var(--onaccent)" : "var(--ink2)",
-                    borderRadius: 9,
-                    padding: "0 var(--space-sm)",
-                    fontSize: "var(--text-xs)",
-                    textAlign: "center",
-                    // `minHeight: 0` annulait le plancher tactile de .nc-btn :
-                    // ces boutons tombaient a 34 px.
-                  }}
-                >
-                  {isCaptured ? "Capturé ✓" : "Marquer capturé"}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {!showAll && rest > 0 && (
-        <button onClick={() => setShowAll(true)} className="nc-link" style={{ alignSelf: "center" }}>
-          Voir {plural(rest, "objet de plus", "objets de plus")}
-        </button>
+            ))}
+          </div>
+          {dex.tonight.length > LIST_MAX && (
+            <button onClick={() => setOpenTonight((v) => !v)} className="nc-link" aria-expanded={openTonight}>
+              {openTonight ? "Réduire" : `Voir les ${dex.tonight.length - LIST_MAX} autres`}
+            </button>
+          )}
+          <button onClick={addTonight} disabled={addedTonight} className="nc-btn">
+            {addedTonight
+              ? "Ajoutés au journal ✓"
+              : `Ajouter ${tonightShown.length === 1 ? "cet objet" : `ces ${tonightShown.length}`} au journal`}
+          </button>
+        </div>
       )}
+
+      {dex.lastChance.length > 0 && (
+        <div className="nc-card nc-stack">
+          <div className="nc-eyebrow">Dernière chance</div>
+          <p className="nc-caption" style={{ margin: 0 }}>
+            Encore visibles le soir, plus dans un ou deux mois : sinon, rendez-vous l'an prochain.
+          </p>
+          <div className="nc-stack-xs">
+            {lastShown.map((e) => (
+              <button key={e.id} onClick={() => onOpenTarget(e.designation)} className="nc-plan-row">
+                <span className="nc-num nc-none" style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>
+                  {e.designation}
+                </span>
+                <span className="nc-grow nc-ellipsis nc-caption" style={{ margin: 0 }}>
+                  {e.row?.commonName || e.row?.type}
+                </span>
+                <span className="nc-caption nc-none">jusqu'en {visibleUntil(e, month - 1)}</span>
+              </button>
+            ))}
+          </div>
+          {dex.lastChance.length > LIST_MAX && (
+            <button onClick={() => setOpenLast((v) => !v)} className="nc-link" aria-expanded={openLast}>
+              {openLast ? "Réduire" : `Voir les ${dex.lastChance.length - LIST_MAX} autres`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {dex.thisMonth.length > 0 && (
+        <div className="nc-stack-xs">
+          <div className="nc-eyebrow">Visibles ce mois-ci, pas ce soir</div>
+          <DexChips entries={dex.thisMonth} onOpen={onOpenTarget} />
+        </div>
+      )}
+
+      {dex.upcoming.length > 0 && (
+        <div className="nc-stack">
+          <div className="nc-eyebrow">À venir</div>
+          {dex.upcoming.map((g) => (
+            <div key={g.month} className="nc-stack-xs">
+              <span className="nc-caption" style={{ textTransform: "capitalize" }}>
+                {MONTHS_FR[g.month - 1]}
+              </span>
+              <DexChips entries={g.entries} onOpen={onOpenTarget} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {dex.hiddenByHorizon.length > 0 && (
+        <div className="nc-stack-xs">
+          <div className="nc-eyebrow">Masqués par ton horizon</div>
+          <p className="nc-caption" style={{ margin: 0 }}>
+            Assez hauts depuis ici, mais seulement dans des directions non cochées dans Réglages.
+          </p>
+          <DexChips entries={dex.hiddenByHorizon} onOpen={onOpenTarget} />
+        </div>
+      )}
+
+      {dex.outOfReach.length > 0 && (
+        <div className="nc-stack-xs">
+          <div className="nc-eyebrow">Hors de portée d'ici</div>
+          <p className="nc-caption" style={{ margin: 0 }}>
+            Culminent sous {dex.outOfReach[0].season?.minAltDeg ?? 12}° depuis ce site : il faudra une sortie
+            plus au sud.
+          </p>
+          <DexChips entries={dex.outOfReach} onOpen={onOpenTarget} />
+        </div>
+      )}
+
+      <div className="nc-stack">
+        <div className="nc-row nc-between">
+          <div className="nc-eyebrow">Le catalogue</div>
+          <button
+            onClick={() => setShowAllGrid((v) => !v)}
+            className={`nc-chip ${showAllGrid ? "" : "nc-chip-active"}`}
+            aria-pressed={!showAllGrid}
+          >
+            Manquants seulement
+          </button>
+        </div>
+        <div className="nc-dex-grid">
+          {shownGrid.map((e) => (
+            <button
+              key={e.id}
+              onClick={() => onOpenTarget(e.designation)}
+              className={`nc-dex-cell ${e.captured ? "nc-dex-captured" : "nc-strip"}`}
+              aria-label={`${e.designation}${e.captured ? ", capturé" : ""}${e.tonight ? ", visible ce soir" : ""}`}
+            >
+              {e.captured && e.row?.imageUrl && (
+                <img
+                  src={e.row.imageUrl}
+                  alt=""
+                  loading="lazy"
+                  onError={(ev) => {
+                    ev.currentTarget.style.display = "none";
+                  }}
+                />
+              )}
+              <span className="nc-dex-number nc-num">{e.designation}</span>
+              {e.captured
+                ? e.capturedOn && <span className="nc-dex-note nc-num">{fmtCaptureDate(e.capturedOn)}</span>
+                : e.tonight && <span className="nc-dex-note">ce soir</span>}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { api } from "../api";
+import { messierIdOf } from "../messierDex";
 import { fmtHM, plural } from "../format";
 import { tap } from "../haptics";
 import { localNoteId } from "../sessionQueue";
@@ -10,8 +12,12 @@ import { Rating } from "./Rating";
 import { Timeline } from "./Timeline";
 
 /** La sortie en cours : cibles, fil de la nuit, ressenti, cloture. */
-export function CurrentSessionCard({ current, places, pendingNotes, send, onClose, onOpenTarget }: {
+export function CurrentSessionCard({ current, places, pendingNotes, captured, send, onClose, onOpenTarget, onCaptureChange }: {
   current: CurrentSession;
+  /** Messier deja captures (identifiants "31"...), pour proposer la capture
+   * quand une cible Messier est cochee faite. */
+  captured: Set<string>;
+  onCaptureChange: () => void;
   places: Site[];
   pendingNotes: Set<string>;
   send: (body: SessionOpBody) => void;
@@ -22,9 +28,29 @@ export function CurrentSessionCard({ current, places, pendingNotes, send, onClos
   const [exposureDraft, setExposureDraft] = useState<Record<string, string>>({});
   const [feelingDraft, setFeelingDraft] = useState<Partial<Record<keyof Feeling, string>>>({});
 
+  const [capturing, setCapturing] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
   const toggleDone = (designation: string, done: boolean) => {
     send({ kind: "setDone", designation, done: !done });
     tap();
+  };
+
+  /** Cocher un Messier « fait » ne le marque pas capture d'office : une
+   * sortie ratee se coche aussi. On le propose, en un appui, juste sous la
+   * cible -- plus besoin d'aller le refaire dans l'onglet Messier. */
+  const markCaptured = async (id: string) => {
+    setCapturing(id);
+    setCaptureError(null);
+    try {
+      await api.updateMessierCapture(id, true);
+      tap();
+      onCaptureChange();
+    } catch {
+      setCaptureError("Capture non enregistrée : pas de réseau ? Réessayez plus tard.");
+    } finally {
+      setCapturing(null);
+    }
   };
 
   const saveExposure = (designation: string, raw: string) => {
@@ -109,6 +135,24 @@ export function CurrentSessionCard({ current, places, pendingNotes, send, onClos
                   ×
                 </button>
               </div>
+
+              {(() => {
+                const id = messierIdOf(item.designation);
+                if (!item.done || !id || captured.has(id)) return null;
+                return (
+                  <div className="nc-row nc-between nc-notice">
+                    <span>{item.designation} rejoint ton objectif Messier ?</span>
+                    <button
+                      onClick={() => markCaptured(id)}
+                      disabled={capturing === id}
+                      className="nc-chip nc-chip-active nc-none"
+                    >
+                      {capturing === id ? "…" : "Marquer capturé"}
+                    </button>
+                  </div>
+                );
+              })()}
+              {captureError && <div className="nc-notice">{captureError}</div>}
 
               <div className="nc-row">
                 <input

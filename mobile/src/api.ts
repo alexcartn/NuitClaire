@@ -3,6 +3,7 @@ import type {
   Feeling,
   ExposureEntry,
   GeocodeResult,
+  MessierSeason,
   Night,
   NightBrief,
   NightConditions,
@@ -103,6 +104,7 @@ export const api = {
   targets: (types?: string[]) => get<TargetRow[]>("/api/targets", types?.length ? { types } : undefined),
   messier: (onlyFeasible?: boolean) =>
     get<TargetRow[]>("/api/messier", onlyFeasible ? { onlyFeasible: "true" } : undefined),
+  messierSeason: () => get<MessierSeason[]>("/api/messier/season"),
   search: (q: string) => get<TargetRow[]>("/api/search", { q }),
   searchSuggest: (q: string, limit = 8) =>
     get<TargetSuggestion[]>("/api/search/suggest", { q, limit: String(limit) }),

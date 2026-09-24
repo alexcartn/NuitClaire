@@ -310,6 +310,22 @@ def target_altitude_series(df: pd.DataFrame, target: dict, site: dict = SITE) ->
     return _target_sky_frame(df, target, site=site)[["alt", "az", "sector", "moon_sep"]]
 
 
+def culmination_deg(dec_deg: float, lat_deg: float) -> float:
+    """Hauteur maximale d'un objet au-dessus de l'horizon, a son passage au
+    meridien (sans refraction)."""
+    return 90 - abs(lat_deg - dec_deg)
+
+
+def min_alt_for(target: dict, site: dict = SITE) -> float:
+    """Hauteur minimale exigee pour cette cible : celle du Seestar, sauf pour
+    un Messier qui ne monte jamais assez depuis ce site (voir
+    `SEESTAR["low_messier_min_alt_deg"]`)."""
+    if target.get("messier") and target.get("dec") is not None \
+            and culmination_deg(target["dec"], site["lat"]) < SEESTAR["low_messier_culmination_deg"]:
+        return SEESTAR["low_messier_min_alt_deg"]
+    return SEESTAR["min_alt_deg"]
+
+
 def _uses_lp(target: dict) -> bool:
     """Cible en emission, photographiee avec le filtre LP du S50 (colonne
     `filter` du catalogue : nebuleuses, regions HII, planetaires, remanents)."""
@@ -341,7 +357,8 @@ def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
     horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
     d = _target_sky_frame(df, target, site=site)
     open_sectors = {s for s, is_open in horizon.items() if is_open}
-    ok = d[(d["alt"] >= SEESTAR["min_alt_deg"]) & (d["alt"] <= SEESTAR["max_alt_deg"])
+    min_alt = min_alt_for(target, site)
+    ok = d[(d["alt"] >= min_alt) & (d["alt"] <= SEESTAR["max_alt_deg"])
            & (target_score(d, target) >= 0.6) & (d["sector"].isin(open_sectors))
            & ~_moon_veto(d, target)]
     return {
@@ -354,6 +371,7 @@ def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
         "max_alt": round(d["alt"].max(), 0),
         "min_moon_sep": round(d["moon_sep"].min(), 0),
         "size": (target.get("w"), target.get("h")),
+        "min_alt": min_alt,
     }
 
 
@@ -369,7 +387,8 @@ def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | N
     d = _target_sky_frame(df, target, site=site)
     open_sectors = {s for s, is_open in horizon.items() if is_open}
 
-    alt_ok = (d["alt"] >= SEESTAR["min_alt_deg"]) & (d["alt"] <= SEESTAR["max_alt_deg"])
+    min_alt = min_alt_for(target, site)
+    alt_ok = (d["alt"] >= min_alt) & (d["alt"] <= SEESTAR["max_alt_deg"])
     sector_ok = d["sector"].isin(open_sectors)
     score_ok = target_score(d, target) >= 0.6  # meme seuil que target_windows
     moon_ok = ~_moon_veto(d, target)
@@ -377,7 +396,7 @@ def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | N
     reasons = []
     if not alt_ok.any():
         reasons.append(
-            f"Ne monte jamais entre {SEESTAR['min_alt_deg']:.0f}° et {SEESTAR['max_alt_deg']:.0f}° "
+            f"Ne monte jamais entre {min_alt:.0f}° et {SEESTAR['max_alt_deg']:.0f}° "
             f"d'altitude cette nuit (maximum atteint : {d['alt'].max():.0f}°).")
     elif not (alt_ok & sector_ok).any():
         reasons.append("Ne passe dans un secteur d'horizon degage que hors de sa "

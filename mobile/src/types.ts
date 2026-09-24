@@ -112,6 +112,18 @@ export interface TargetRow {
   feasibleTonight: boolean | null;
 }
 
+/** Saison d'un Messier depuis le site (voir season.py) : heures noires
+ * observables la nuit du 15 de chaque mois, janvier a decembre. */
+export interface MessierSeason {
+  id: string | null;
+  designation: string;
+  culminationDeg: number;
+  minAltDeg: number;
+  reachable: boolean;
+  monthHours: number[];
+  bestMonth: number | null;
+}
+
 export interface TargetSuggestion {
   designation: string;
   isMessier: boolean;
@@ -142,6 +154,7 @@ export interface ExposureEntry {
 }
 
 export interface TargetDetail extends TargetRow {
+  minAltDeg: number;
   altitudeSeries: AltitudePoint[];
   peakSector: string;
   peakAz: number;

@@ -31,10 +31,11 @@ cours + historique). Cote tests JS, la logique sans DOM est couverte
 le rendu des ecrans est verifie a la main
 via Playwright.
 
-"Cibles" et "Catalogue Messier" ont un filtre magnitude (curseur a deux poignees, mini et
-maxi independants -- `RangeSlider` cote mobile, `st.slider` en mode plage cote Streamlit)
-en plus du filtre par type -- calcule cote client sur les lignes deja chargees, pas
-d'appel API supplementaire.
+"Cibles" a un filtre magnitude (curseur a deux poignees, mini et maxi independants --
+`RangeSlider` cote mobile, `st.slider` en mode plage cote Streamlit) en plus du filtre par
+type -- calcule cote client sur les lignes deja chargees, pas d'appel API supplementaire.
+Cote mobile, "Messier" n'a plus ces filtres : c'est la page de l'objectif des 110 (voir
+"Objectif Messier").
 
 L'onglet/ecran "Ce soir" affiche une carte Temperature (temperature exterieure actuelle
 et plage mini/maxi de la nuit -- pour savoir d'un coup d'oeil s'il faut un manteau, sans
@@ -471,6 +472,26 @@ avec la separation, et une cible en emission photographiee avec le filtre LP (co
 `filter` du catalogue) n'en subit qu'environ la moitie ; elle tolere aussi une Lune a
 15 deg au lieu de 30. Sous une pleine Lune claire, la nuit tombe vers 48 et les galaxies
 disparaissent de la liste, pas les nebuleuses. Les reglages sont dans `config.SCORE_MODEL`.
+
+### Objectif Messier (le « Pokedex »)
+
+"Cibles" repond a « quoi photographier ce soir », sur tout le catalogue. "Messier" suit
+l'objectif des 110 (`messierDex.ts`, pur et teste) :
+
+- progression, captures du mois et de l'annee, et rythme (a partir de trois captures
+  datees) ; les dates viennent du journal, premiere sortie ou l'objet est coche fait ;
+- a chasser ce soir : les manquants faisables cette nuit, ceux qui s'en vont en tete ;
+- derniere chance : visibles le soir ce mois-ci, plus dans un ou deux mois ;
+- visibles ce mois-ci, a venir mois par mois, masques par l'horizon, hors de portee ;
+- la grille des 110 : vignette pour un objet capture, case rayee sinon.
+
+Les saisons viennent de `GET /api/messier/season` (`season.py`) : pour chaque mois, les
+heures noires de la nuit du 15 ou l'objet est assez haut dans un secteur degage. Depuis
+le nord de la France, 21 Messier ne depassent jamais 20 deg : pour un Messier qui culmine
+sous 25 deg, le seuil descend a 12 deg (`config.SEESTAR`, `scoring.min_alt_for`), ce qui en
+rend 13 atteignables avec un horizon sud degage ; les 8 restants (M6, M7, M54, M55, M62,
+M69, M70, M83) demandent une sortie plus au sud. Cocher un Messier fait dans le journal
+propose de le marquer capture.
 
 ### Alertes push
 

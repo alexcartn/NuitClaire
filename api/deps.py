@@ -42,6 +42,9 @@ _rows_lock = threading.Lock()
 # Contenu quasi statique (meme rationale que `_cached_wiki_summary` dans
 # app.py) : pas besoin de re-interroger Wikipedia a chaque ouverture de fiche.
 _wiki_cache: TTLCache = TTLCache(maxsize=256, ttl=86400)
+# Saisons Messier : pure geometrie, ne change qu'avec le site et l'horizon.
+_season_cache: TTLCache = TTLCache(maxsize=8, ttl=86400)
+_season_lock = threading.Lock()
 _wiki_lock = threading.Lock()
 
 
@@ -189,3 +192,13 @@ def cached_wiki_summary(candidates: list[str]) -> dict | None:
         result = target_summary(list(key))
         _wiki_cache[key] = result
         return result
+
+
+def cached_messier_season(site: dict, horizon: dict) -> list[dict]:
+    from season import messier_season
+
+    key = (_site_key(site), tuple(sorted(horizon.items())), date.today().year)
+    with _season_lock:
+        if key not in _season_cache:
+            _season_cache[key] = messier_season(load_messier(), site, horizon)
+        return _season_cache[key]

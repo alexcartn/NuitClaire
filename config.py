@@ -16,6 +16,14 @@ SEESTAR = {
     "fov_h_deg": 0.73,
     "min_alt_deg": 20,      # en dessous, turbulence + extinction trop fortes
     "max_alt_deg": 85,      # zenith : le suivi alt-az decroche
+    # Messier bas : depuis le nord de la France, 21 objets (Sagittaire,
+    # Scorpion...) ne depassent jamais 20 deg, et l'objectif des 110 serait
+    # impossible. Pour un Messier qui culmine sous `low_messier_culmination_deg`,
+    # le seuil descend a `low_messier_min_alt_deg` : rendu degrade (plus
+    # d'atmosphere traversee), mais photographiable par ciel sec et horizon
+    # sud degage. En dessous, il faut aller plus au sud.
+    "low_messier_min_alt_deg": 12,
+    "low_messier_culmination_deg": 25,
 }
 
 # Modele du score astro horaire (voir `scoring.hourly_score`). Les facteurs se

@@ -452,3 +452,27 @@ def test_target_windows_uses_site_timezone_not_frozen_module_tz(monkeypatch):
 
     assert captured_tzinfos
     assert all(str(tz) == "Asia/Tokyo" for tz in captured_tzinfos)
+
+
+def test_low_messier_gets_a_lower_altitude_floor():
+    from scoring import min_alt_for
+
+    marson = {"lat": 48.91, "lon": 4.53}
+    # M8 (dec -24.4) culmine a ~16.7 deg depuis Marson : seuil abaisse.
+    assert min_alt_for({"messier": "8", "dec": -24.38}, marson) == 12
+    # M31 monte haut : seuil normal.
+    assert min_alt_for({"messier": "31", "dec": 41.27}, marson) == 20
+    # Un objet bas hors Messier garde le seuil normal.
+    assert min_alt_for({"messier": None, "dec": -24.38}, marson) == 20
+
+
+def test_low_messier_is_feasible_between_12_and_20_degrees(monkeypatch):
+    import scoring
+
+    monkeypatch.setattr(scoring, "target_altaz", lambda *a, **k: (15.0, 180.0))
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: 90.0)
+    df = _make_night_df()
+    low_messier = {"name": "M8", "messier": "8", "ra": 18.06, "dec": -24.38, "w": 10, "h": 10}
+    other = {"name": "NGC6523", "messier": None, "ra": 18.06, "dec": -24.38, "w": 10, "h": 10}
+    assert target_windows(df, low_messier)["hours"] == 4
+    assert target_windows(df, other)["hours"] == 0

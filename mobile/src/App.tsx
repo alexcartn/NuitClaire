@@ -241,9 +241,9 @@ export default function App() {
           />
         )}
         {screen === "messier" && (
-          <Messier captured={captured} onOpenTarget={openTarget} onCaptureChange={reloadState} />
+          <Messier captured={captured} onOpenTarget={openTarget} />
         )}
-        {screen === "journal" && <Journal onOpenTarget={openTarget} />}
+        {screen === "journal" && <Journal onOpenTarget={openTarget} onCaptureChange={reloadState} />}
         {screen === "recherche" && <Recherche onOpenTarget={openTarget} onCancel={back} />}
         {screen === "reglages" && <Reglages />}
       </div>

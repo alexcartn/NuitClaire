@@ -178,6 +178,17 @@ class TargetRowOut(BaseModel):
     feasibleTonight: bool | None = None
 
 
+class MessierSeasonOut(BaseModel):
+    id: str | None
+    designation: str
+    culminationDeg: float
+    minAltDeg: float
+    reachable: bool
+    # Heures noires observables la nuit du 15 de chaque mois, janvier -> decembre.
+    monthHours: list[int]
+    bestMonth: int | None
+
+
 class TargetSuggestionOut(BaseModel):
     designation: str
     isMessier: bool
@@ -196,6 +207,9 @@ class AltitudePoint(BaseModel):
 
 class TargetDetailOut(TargetRowOut):
     altitudeSeries: list[AltitudePoint]
+    # Hauteur minimale exigee pour cet objet (voir scoring.min_alt_for) : le
+    # graphe d'altitude du mobile s'en sert pour sa bande « pointable ».
+    minAltDeg: float
     peakSector: str
     peakAz: float
     peakTime: str

@@ -10,15 +10,15 @@ from fastapi import APIRouter, HTTPException, Query
 import progress as progress_store
 import sessions as sessions_store
 import settings as settings_store
-from api.deps import cached_wiki_summary, current_night, feasible_rows, get_horizon, get_site, \
+from api.deps import cached_messier_season, cached_wiki_summary, current_night, feasible_rows, get_horizon, get_site, \
     site_from_settings
-from api.schemas import TargetDetailOut, TargetRowOut, TargetSuggestionOut
+from api.schemas import MessierSeasonOut, TargetDetailOut, TargetRowOut, TargetSuggestionOut
 from api.translate import row_to_target_out
 from astro import fits_in_fov
 from catalog import find_target, load_messier, search_prefix
 from imagery import dss_image_url
 from rows import day_frame, filter_label, row_from_search
-from scoring import discovery_sort_key, recommended_exposure_minutes, target_altitude_series
+from scoring import discovery_sort_key, min_alt_for, recommended_exposure_minutes, target_altitude_series
 from wiki import wiki_title_candidates
 
 router = APIRouter()
@@ -88,6 +88,15 @@ def list_messier(onlyFeasible: bool = False) -> list[dict]:
     return [row_to_target_out(r) for r in rows]
 
 
+@router.get("/api/messier/season", response_model=list[MessierSeasonOut])
+def messier_season() -> list[dict]:
+    """Mois ou chaque Messier est photographiable depuis le site, sans meteo
+    (voir season.py). Pour la page Messier : ce soir, bientot, plus tard,
+    jamais d'ici."""
+    s = settings_store.load()
+    return cached_messier_season(site_from_settings(s), get_horizon())
+
+
 @router.get("/api/search", response_model=list[TargetRowOut])
 def search(q: str = Query(min_length=1)) -> list[dict]:
     site, horizon = get_site(), get_horizon()
@@ -155,6 +164,7 @@ def target_detail(designation: str) -> dict:
              "moonSep": a["moon_sep"]}
             for t, a in series.iterrows()
         ],
+        "minAltDeg": min_alt_for(target, site),
         "peakSector": peak["sector"], "peakAz": peak["az"], "peakTime": peak_t.isoformat(),
         "exposureLowMin": low, "exposureHighMin": high,
         "wiki": wiki,
