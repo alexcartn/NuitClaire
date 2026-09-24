@@ -476,3 +476,32 @@ def test_low_messier_is_feasible_between_12_and_20_degrees(monkeypatch):
     other = {"name": "NGC6523", "messier": None, "ra": 18.06, "dec": -24.38, "w": 10, "h": 10}
     assert target_windows(df, low_messier)["hours"] == 4
     assert target_windows(df, other)["hours"] == 0
+
+
+def test_sector_height_blocks_a_target_below_the_trees(monkeypatch):
+    import scoring
+
+    # Cible plein sud a 30 deg toute la nuit.
+    monkeypatch.setattr(scoring, "target_altaz", lambda *a, **k: (30.0, 180.0))
+    monkeypatch.setattr(scoring, "moon_separation", lambda *a, **k: 90.0)
+    df = _make_night_df()
+    target = {"name": "T", "ra": 0.0, "dec": 0.0, "w": 10, "h": 10}
+    all_open = {s: 0.0 for s in ("N", "NE", "E", "SE", "S", "SW", "W", "NW")}
+    assert target_windows(df, target, horizon=all_open)["hours"] == 4
+    # Arbres au sud jusqu'a 35 deg : la cible passe dessous.
+    assert target_windows(df, target, horizon={**all_open, "S": 35.0})["hours"] == 0
+    reasons = scoring.target_feasibility_reasons(df, target, horizon={**all_open, "S": 35.0})
+    assert any("au-dessus de ce qui" in r for r in reasons)
+    # Secteur bouche (None) : pareil qu'un booleen faux.
+    assert target_windows(df, target, horizon={**all_open, "S": None})["hours"] == 0
+
+
+def test_sector_floor_accepts_booleans_and_heights():
+    from scoring import sector_floor
+
+    assert sector_floor({"S": True}, "S") == 0.0
+    assert sector_floor({"S": False}, "S") is None
+    assert sector_floor({"S": 25}, "S") == 25.0
+    assert sector_floor({"S": 0}, "S") == 0.0  # 0 deg n'est pas « bouche »
+    assert sector_floor({"S": None}, "S") is None
+    assert sector_floor({}, "S") is None

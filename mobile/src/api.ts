@@ -94,8 +94,9 @@ export const api = {
   geocode: (address: string) => request<GeocodeResult>("POST", "/api/geocode", { body: { address } }),
   reverseGeocode: (lat: number, lon: number) =>
     request<{ name: string }>("POST", "/api/geocode/reverse", { body: { lat, lon } }),
-  updateHorizon: (sector: string, open: boolean) =>
-    request<Record<string, boolean>>("PUT", "/api/horizon", { body: { sector, open } }),
+  updateHorizon: (sector: string, open: boolean, minAlt?: number) =>
+    request<Record<string, boolean>>("PUT", "/api/horizon", { body: { sector, open, minAlt } }),
+  deletePlace: (name: string) => request<Settings>("DELETE", `/api/places/${encodeURIComponent(name)}`),
   updateMessierCapture: (id: string, captured: boolean) =>
     request<string[]>("PUT", `/api/messier/${encodeURIComponent(id)}`, { body: { captured } }),
 

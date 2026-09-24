@@ -1056,3 +1056,42 @@ a {
   cursor: pointer;
   text-align: left;
 }
+
+.nc-section-summary {
+  max-width: 55vw;
+  font: 400 var(--text-xs)/1.2 var(--font-text);
+  color: var(--ink2);
+}
+
+/* Editeur d'horizon (components/HorizonEditor.tsx). Un secteur ouvert est
+   plein ; celui qu'on regle (ou que vise la boussole) est entoure. */
+.nc-horizon-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-xs);
+}
+
+.nc-horizon-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink3);
+  cursor: pointer;
+}
+
+.nc-horizon-open {
+  background: var(--surf2);
+  border-color: var(--ink3);
+  color: var(--ink);
+}
+
+.nc-horizon-current {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

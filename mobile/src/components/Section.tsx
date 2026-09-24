@@ -9,12 +9,16 @@ export function Section({
   id,
   title,
   count,
+  summary,
   defaultOpen = true,
   children,
 }: {
   id: string;
   title: string;
   count?: number;
+  /** Resume du reglage en place (« Marson », « Nuit complete »), visible
+   * section fermee. */
+  summary?: string;
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
@@ -29,6 +33,7 @@ export function Section({
       >
         <span className="nc-eyebrow">{title}</span>
         <span className="nc-row nc-none">
+          {summary && <span className="nc-section-summary nc-ellipsis">{summary}</span>}
           {count != null && <span className="nc-num nc-section-count">{count}</span>}
           <span className={`nc-section-chevron ${open ? "nc-section-chevron-open" : ""}`}>
             <TabIcon name="chevron" />

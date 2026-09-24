@@ -326,6 +326,26 @@ def min_alt_for(target: dict, site: dict = SITE) -> float:
     return SEESTAR["min_alt_deg"]
 
 
+def sector_floor(horizon: dict, sector: str) -> float | None:
+    """Hauteur minimale pour ce secteur, ou None s'il est bouche. Accepte les
+    deux formes d'horizon : booleens (ouvert = libre jusqu'a 0 deg, forme de
+    l'appli Streamlit et des anciens reglages) ou profil avec hauteurs (voir
+    `progress.horizon_profile`)."""
+    value = horizon.get(sector, False)
+    if value is None or value is False:
+        return None
+    if value is True:
+        return 0.0
+    return float(value)
+
+
+def _sector_ok(d: pd.DataFrame, horizon: dict) -> pd.Series:
+    """Heures ou la cible est dans un secteur degage, au-dessus de ce qui
+    bouche ce secteur (arbres, toits)."""
+    floors = pd.Series([sector_floor(horizon, s) for s in d["sector"]], index=d.index, dtype=float)
+    return floors.notna() & (d["alt"] >= floors.fillna(0))
+
+
 def _uses_lp(target: dict) -> bool:
     """Cible en emission, photographiee avec le filtre LP du S50 (colonne
     `filter` du catalogue : nebuleuses, regions HII, planetaires, remanents)."""
@@ -356,10 +376,9 @@ def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
     OK -- le score propre a la cible (voir `target_score`), pas celui de la nuit."""
     horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
     d = _target_sky_frame(df, target, site=site)
-    open_sectors = {s for s, is_open in horizon.items() if is_open}
     min_alt = min_alt_for(target, site)
     ok = d[(d["alt"] >= min_alt) & (d["alt"] <= SEESTAR["max_alt_deg"])
-           & (target_score(d, target) >= 0.6) & (d["sector"].isin(open_sectors))
+           & (target_score(d, target) >= 0.6) & _sector_ok(d, horizon)
            & ~_moon_veto(d, target)]
     return {
         "name": target["name"], "type": target.get("type_fr", target.get("type", "")),
@@ -385,11 +404,10 @@ def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | N
     Renvoie une liste vide si la cible est en fait faisable."""
     horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
     d = _target_sky_frame(df, target, site=site)
-    open_sectors = {s for s, is_open in horizon.items() if is_open}
 
     min_alt = min_alt_for(target, site)
     alt_ok = (d["alt"] >= min_alt) & (d["alt"] <= SEESTAR["max_alt_deg"])
-    sector_ok = d["sector"].isin(open_sectors)
+    sector_ok = _sector_ok(d, horizon)
     score_ok = target_score(d, target) >= 0.6  # meme seuil que target_windows
     moon_ok = ~_moon_veto(d, target)
 
@@ -399,8 +417,8 @@ def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | N
             f"Ne monte jamais entre {min_alt:.0f}° et {SEESTAR['max_alt_deg']:.0f}° "
             f"d'altitude cette nuit (maximum atteint : {d['alt'].max():.0f}°).")
     elif not (alt_ok & sector_ok).any():
-        reasons.append("Ne passe dans un secteur d'horizon degage que hors de sa "
-                        "fenetre d'altitude exploitable.")
+        reasons.append("Ne passe dans un secteur d'horizon degage (au-dessus de ce qui "
+                        "le bouche) que hors de sa fenetre d'altitude exploitable.")
     if not score_ok.any():
         reasons.append("Aucune heure de la nuit n'atteint le score minimum pour cette "
                         "cible (nuages, Lune, vent, seeing...).")

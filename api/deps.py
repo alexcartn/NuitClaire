@@ -73,7 +73,9 @@ def get_site() -> dict:
 
 
 def get_horizon() -> dict:
-    return progress_store.load()["horizon"]
+    """Profil d'horizon (secteur -> hauteur minimale, ou None si bouche),
+    voir `progress.horizon_profile`."""
+    return progress_store.horizon_profile(progress_store.load())
 
 
 def get_window_mode() -> str:

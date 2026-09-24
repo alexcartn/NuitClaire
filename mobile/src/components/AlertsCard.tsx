@@ -19,9 +19,11 @@ const STATE_TEXT: Record<PushState, string> = {
  * tous les appareils) et si ce telephone-ci la recoit (abonnement propre a
  * l'appareil). Evaluees une fois par jour vers 18 h (17 h l'hiver, la tache
  * planifiee tourne en heure UTC), pour la nuit qui vient. */
-export function AlertsCard({ alerts, onToggle }: {
+export function AlertsCard({ alerts, onToggle, bare = false }: {
   alerts: Record<string, boolean>;
   onToggle: (key: string) => void;
+  /** Sans carte ni intitule, pour prendre place dans une Section. */
+  bare?: boolean;
 }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,8 +60,8 @@ export function AlertsCard({ alerts, onToggle }: {
   };
 
   return (
-    <div className="nc-card nc-stack">
-      <div className="nc-eyebrow">Alertes</div>
+    <div className={bare ? "nc-stack" : "nc-card nc-stack"}>
+      {!bare && <div className="nc-eyebrow">Alertes</div>}
       {Object.entries(alerts).map(([key, on]) => (
         <button
           key={key}

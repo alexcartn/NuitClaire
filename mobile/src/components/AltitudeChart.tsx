@@ -23,6 +23,7 @@ function fmtHour(iso: string): string {
 export function AltitudeChart({
   series,
   horizon,
+  horizonAlt,
   windowMode,
   viewWindow,
   minAlt = MIN_ALT,
@@ -32,6 +33,8 @@ export function AltitudeChart({
    * Messier qui ne monte jamais a 20 depuis ce site. */
   minAlt?: number;
   horizon?: Record<string, boolean>;
+  /** Hauteur a partir de laquelle chaque secteur est degage (arbres, toits). */
+  horizonAlt?: Record<string, number>;
   windowMode?: string;
   viewWindow?: ViewWindow;
 }) {
@@ -39,7 +42,7 @@ export function AltitudeChart({
   // pour ne pas dupliquer la regle "pointable" a deux endroits).
   const points = series.map((p) => {
     const inRange = p.alt >= minAlt && p.alt <= MAX_ALT;
-    const sectorOpen = horizon ? !!horizon[p.sector] : true;
+    const sectorOpen = (horizon ? !!horizon[p.sector] : true) && p.alt >= (horizonAlt?.[p.sector] ?? 0);
     const hour = new Date(p.time).getHours() + new Date(p.time).getMinutes() / 60;
     const inWindow =
       windowMode !== "habituelle" || !viewWindow || (hour >= viewWindow.startHour && hour <= viewWindow.endHour);

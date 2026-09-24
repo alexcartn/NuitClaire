@@ -195,7 +195,7 @@ export function CeSoir({
 
       <div className="nc-card nc-stack">
         <div className="nc-eyebrow">Horizon dégagé</div>
-        <SectorChips horizon={state.data.horizon} />
+        <SectorChips horizon={state.data.horizon} horizonAlt={state.data.horizonAlt} />
       </div>
 
       <button onClick={() => setMeteoOpen((v) => !v)} className="nc-btn nc-row nc-between" aria-expanded={meteoOpen}>

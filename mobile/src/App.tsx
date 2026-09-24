@@ -235,6 +235,7 @@ export default function App() {
             designation={selected}
             captured={captured}
             horizon={state?.horizon}
+            horizonAlt={state?.horizonAlt}
             windowMode={state?.windowMode}
             viewWindow={state?.viewWindow}
             onBack={back}
@@ -257,7 +258,7 @@ export default function App() {
             onCancel={back}
           />
         )}
-        {screen === "reglages" && <Reglages />}
+        {screen === "reglages" && <Reglages onChange={reloadState} />}
       </div>
       <TabBar
         active={screen === "detail" || screen === "recherche" ? nav.backTo : screen}

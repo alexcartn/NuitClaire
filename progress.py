@@ -30,6 +30,9 @@ _DEFAULT_FROZEN = MappingProxyType({
                                   "S": False, "SW": False, "W": False, "NW": False}),
     "messier_captured": (),
     "exposure_log": MappingProxyType({}),
+    # Hauteur minimale (deg) au-dessus de laquelle chaque secteur ouvert est
+    # vraiment degage : arbres, toits, collines. 0 = jusqu'a l'horizon.
+    "horizon_alt": MappingProxyType({s: 0 for s in ("N", "NE", "E", "SE", "S", "SW", "W", "NW")}),
 })
 
 
@@ -39,6 +42,7 @@ def default() -> dict:
         "horizon": dict(_DEFAULT_FROZEN["horizon"]),
         "messier_captured": list(_DEFAULT_FROZEN["messier_captured"]),
         "exposure_log": dict(_DEFAULT_FROZEN["exposure_log"]),
+        "horizon_alt": dict(_DEFAULT_FROZEN["horizon_alt"]),
     }
 
 
@@ -68,6 +72,11 @@ def load(path: Path = PROGRESS_PATH) -> dict:
     if not isinstance(horizon_override, dict):
         horizon_override = {}
     merged["horizon"] = {**_DEFAULT_FROZEN["horizon"], **horizon_override}
+
+    alt_override = raw.get("horizon_alt")
+    if not isinstance(alt_override, dict):
+        alt_override = {}
+    merged["horizon_alt"] = {**_DEFAULT_FROZEN["horizon_alt"], **alt_override}
 
     exposure_override = raw.get("exposure_log")
     merged["exposure_log"] = exposure_override if isinstance(exposure_override, dict) else {}
@@ -147,3 +156,12 @@ def exposure_totals(data: dict) -> dict[str, int]:
         if total:
             totals[designation] = total
     return totals
+
+
+def horizon_profile(prog: dict) -> dict:
+    """Profil d'horizon utilise par les calculs : pour chaque secteur, la
+    hauteur minimale (deg) a partir de laquelle le ciel est libre, ou None si
+    le secteur est bouche. Combine les secteurs ouverts/fermes (`horizon`)
+    et leurs hauteurs (`horizon_alt`)."""
+    return {s: (float(prog["horizon_alt"].get(s, 0) or 0) if is_open else None)
+            for s, is_open in prog["horizon"].items()}

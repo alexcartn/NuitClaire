@@ -97,3 +97,26 @@ def test_post_reverse_geocode_returns_422_on_error(api_client, monkeypatch):
     monkeypatch.setattr(settings_router, "reverse_geocode", fail)
     r = api_client.post("/api/geocode/reverse", json={"lat": 0, "lon": 0})
     assert r.status_code == 422
+
+
+def test_changing_site_remembers_both_places_and_can_switch_back(api_client):
+    first = api_client.get("/api/settings").json()
+    home = first["site"]["name"]
+    assert [p["name"] for p in first["places"]] == [home]
+
+    r = api_client.put("/api/settings", json={"site": {"name": "Col", "lat": 45.0, "lon": 6.4}}).json()
+    assert r["site"]["name"] == "Col"
+    assert [p["name"] for p in r["places"]] == ["Col", home]
+
+    back = next(p for p in r["places"] if p["name"] == home)
+    r = api_client.put("/api/settings", json={"site": {"name": home, "lat": back["lat"], "lon": back["lon"]}}).json()
+    assert [p["name"] for p in r["places"]] == [home, "Col"]
+
+
+def test_place_can_be_forgotten_but_not_the_active_one(api_client):
+    api_client.put("/api/settings", json={"site": {"name": "Col", "lat": 45.0, "lon": 6.4}})
+    assert api_client.delete("/api/places/Col").status_code == 409
+    home = api_client.get("/api/settings").json()["places"][1]["name"]
+    r = api_client.delete(f"/api/places/{home}")
+    assert r.status_code == 200
+    assert [p["name"] for p in r.json()["places"]] == ["Col"]

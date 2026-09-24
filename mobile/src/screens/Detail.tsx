@@ -34,6 +34,7 @@ export function Detail({
   designation,
   captured,
   horizon,
+  horizonAlt,
   windowMode,
   viewWindow,
   onBack,
@@ -42,6 +43,7 @@ export function Detail({
   designation: string;
   captured: Set<string>;
   horizon?: Record<string, boolean>;
+  horizonAlt?: Record<string, number>;
   windowMode?: string;
   viewWindow?: ViewWindow;
   onBack: () => void;
@@ -158,7 +160,7 @@ export function Detail({
                 fenêtre pointable
               </div>
             </div>
-            <AltitudeChart series={data.altitudeSeries} horizon={horizon} windowMode={windowMode} viewWindow={viewWindow} minAlt={data.minAltDeg} />
+            <AltitudeChart series={data.altitudeSeries} horizon={horizon} horizonAlt={horizonAlt} windowMode={windowMode} viewWindow={viewWindow} minAlt={data.minAltDeg} />
             <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--ink2)" }}>
               Direction à l'altitude max : {data.peakSector} (azimut{" "}
               <span className="nc-num">{Math.round(data.peakAz)}°</span>) vers{" "}

@@ -15,9 +15,13 @@ router = APIRouter()
 def update_horizon(body: HorizonUpdate) -> dict:
     if body.sector not in COMPASS_SECTORS:
         raise HTTPException(422, f"secteur invalide : {body.sector}")
+    if body.minAlt is not None and not 0 <= body.minAlt <= 60:
+        raise HTTPException(422, "La hauteur minimale doit etre entre 0 et 60 degres.")
     with progress_write_lock:
         prog = progress_store.load()
         prog["horizon"][body.sector] = body.open
+        if body.minAlt is not None:
+            prog["horizon_alt"][body.sector] = body.minAlt
         progress_store.save(prog)
         return prog["horizon"]
 

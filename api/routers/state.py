@@ -18,6 +18,7 @@ def get_state() -> dict:
     return {
         "site": site_to_out(site_from_settings(s)),
         "horizon": prog["horizon"],
+        "horizonAlt": {k: int(v or 0) for k, v in prog["horizon_alt"].items()},
         "windowMode": s["window_mode"],
         "viewWindow": {"startHour": s["view_window"]["start_hour"], "endHour": s["view_window"]["end_hour"]},
         "messierCaptured": prog["messier_captured"],

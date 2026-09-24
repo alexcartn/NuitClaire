@@ -17,7 +17,7 @@ import ephem
 
 from astro import COMPASS_SECTORS, compass_sector
 from config import SEESTAR
-from scoring import culmination_deg, min_alt_for
+from scoring import culmination_deg, min_alt_for, sector_floor
 
 DARK_SUN_ALT = -12.0
 
@@ -44,7 +44,6 @@ def messier_season(targets: list[dict], site: dict, horizon: dict | None = None,
     meilleur mois, hauteur de culmination et hauteur minimale exigee."""
     year = year or date.today().year
     horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
-    open_sectors = {s for s, ok in horizon.items() if ok}
     samples = [_night_samples(year, m, site) for m in range(1, 13)]
 
     out = []
@@ -59,8 +58,8 @@ def messier_season(targets: list[dict], site: dict, horizon: dict | None = None,
             for obs in obs_list:
                 body.compute(obs)
                 alt = math.degrees(body.alt)
-                if min_alt <= alt <= SEESTAR["max_alt_deg"] \
-                        and compass_sector(math.degrees(body.az)) in open_sectors:
+                floor = sector_floor(horizon, compass_sector(math.degrees(body.az)))
+                if floor is not None and max(min_alt, floor) <= alt <= SEESTAR["max_alt_deg"]:
                     hours += 1
             month_hours.append(hours)
         best = max(range(12), key=lambda i: month_hours[i]) if any(month_hours) else None

@@ -17,11 +17,18 @@ def _view_window_out(s: dict) -> dict:
     return {"startHour": s["view_window"]["start_hour"], "endHour": s["view_window"]["end_hour"]}
 
 
+def _settings_out(s: dict) -> dict:
+    site = site_from_settings(s)
+    # Le lieu actif figure toujours dans la liste, meme avant tout changement.
+    places = s["places"] if any(p["name"] == site["name"] for p in s["places"]) else [site] + s["places"]
+    return {"site": site_to_out(site), "windowMode": s["window_mode"],
+            "viewWindow": _view_window_out(s), "alerts": s["alerts"],
+            "places": [site_to_out(p) for p in places]}
+
+
 @router.get("/api/settings", response_model=SettingsOut)
 def get_settings() -> dict:
-    s = settings_store.load()
-    return {"site": site_to_out(site_from_settings(s)), "windowMode": s["window_mode"],
-            "viewWindow": _view_window_out(s), "alerts": s["alerts"]}
+    return _settings_out(settings_store.load())
 
 
 @router.put("/api/settings", response_model=SettingsOut)
@@ -38,7 +45,10 @@ def update_settings(body: SettingsUpdate) -> dict:
             # fuseau horaire : on les conserve du site effectif precedent,
             # meme logique que la barre laterale de app.py.
             current = site_from_settings(s)
+            # Le lieu quitte reste dans la liste, pour y revenir d'un appui.
+            settings_store.remember_place(s, current)
             s["site"] = {**current, "name": body.site.name, "lat": body.site.lat, "lon": body.site.lon}
+            settings_store.remember_place(s, s["site"])
         if body.windowMode is not None:
             s["window_mode"] = body.windowMode
         if body.viewWindow is not None:
@@ -47,8 +57,18 @@ def update_settings(body: SettingsUpdate) -> dict:
             s["alerts"] = {**s["alerts"], **body.alerts}
         settings_store.save(s)
 
-    return {"site": site_to_out(site_from_settings(s)), "windowMode": s["window_mode"],
-            "viewWindow": _view_window_out(s), "alerts": s["alerts"]}
+    return _settings_out(s)
+
+
+@router.delete("/api/places/{name}", response_model=SettingsOut)
+def delete_place(name: str) -> dict:
+    with settings_write_lock:
+        s = settings_store.load()
+        if name == site_from_settings(s)["name"]:
+            raise HTTPException(409, "C'est le lieu actif : choisissez-en un autre avant de le retirer.")
+        settings_store.forget_place(s, name)
+        settings_store.save(s)
+    return _settings_out(s)
 
 
 @router.post("/api/geocode", response_model=GeocodeResult)

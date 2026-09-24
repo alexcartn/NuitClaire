@@ -9,3 +9,15 @@ def test_get_state_returns_default_site_horizon_and_progress(api_client):
     assert data["windowMode"] == "complete"
     assert data["viewWindow"] == {"startHour": 20.0, "endHour": 22.5}
     assert data["messierCaptured"] == []
+
+
+def test_horizon_heights_are_saved_and_returned(api_client):
+    r = api_client.put("/api/horizon", json={"sector": "S", "open": True, "minAlt": 25})
+    assert r.status_code == 200
+    state = api_client.get("/api/state").json()
+    assert state["horizon"]["S"] is True
+    assert state["horizonAlt"]["S"] == 25
+    # Sans minAlt, la hauteur est conservee.
+    api_client.put("/api/horizon", json={"sector": "S", "open": False})
+    assert api_client.get("/api/state").json()["horizonAlt"]["S"] == 25
+    assert api_client.put("/api/horizon", json={"sector": "S", "open": True, "minAlt": 80}).status_code == 422

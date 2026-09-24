@@ -23,6 +23,8 @@ class SettingsOut(BaseModel):
     windowMode: str
     viewWindow: ViewWindowOut
     alerts: dict[str, bool]
+    # Lieux deja utilises, le plus recent d'abord (voir settings.remember_place).
+    places: list[SiteOut] = []
 
 
 class SiteUpdate(BaseModel):
@@ -65,6 +67,9 @@ class GeocodeResult(BaseModel):
 class HorizonUpdate(BaseModel):
     sector: str
     open: bool
+    # Hauteur a partir de laquelle ce secteur est degage (arbres, toits) ;
+    # absente = inchangee.
+    minAlt: int | None = None
 
 
 class MessierCaptureUpdate(BaseModel):
@@ -84,6 +89,7 @@ class AddExposure(BaseModel):
 class StateOut(BaseModel):
     site: SiteOut
     horizon: dict[str, bool]
+    horizonAlt: dict[str, int]
     windowMode: str
     viewWindow: ViewWindowOut
     messierCaptured: list[str]

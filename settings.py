@@ -32,6 +32,7 @@ _DEFAULT_FROZEN = MappingProxyType({
     "view_window": MappingProxyType({"start_hour": VIEW_WINDOW["start_hour"],
                                       "end_hour": VIEW_WINDOW["end_hour"]}),
     "alerts": MappingProxyType({"score": True, "dew": False}),
+    "places": (),
 })
 
 
@@ -42,6 +43,7 @@ def default() -> dict:
         "window_mode": _DEFAULT_FROZEN["window_mode"],
         "view_window": dict(_DEFAULT_FROZEN["view_window"]),
         "alerts": dict(_DEFAULT_FROZEN["alerts"]),
+        "places": [],
     }
 
 
@@ -67,6 +69,10 @@ def load(path: Path = SETTINGS_PATH) -> dict:
     if not isinstance(alerts_override, dict):
         alerts_override = {}
     merged["alerts"] = {**_DEFAULT_FROZEN["alerts"], **alerts_override}
+
+    places = raw.get("places")
+    merged["places"] = [p for p in places if isinstance(p, dict) and p.get("name")] \
+        if isinstance(places, list) else []
 
     view_window_override = raw.get("view_window")
     if not isinstance(view_window_override, dict):
@@ -103,3 +109,20 @@ def save(data: dict, path: Path = SETTINGS_PATH) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
+
+
+PLACES_MAX = 8
+
+
+def remember_place(data: dict, site: dict) -> dict:
+    """Garde `site` en tete des lieux connus (un par nom, `PLACES_MAX` au
+    plus) : on observe depuis une poignee d'endroits, on doit pouvoir passer
+    de l'un a l'autre sans retaper d'adresse."""
+    others = [p for p in data.get("places", []) if p.get("name") != site["name"]]
+    data["places"] = [dict(site)] + others[:PLACES_MAX - 1]
+    return data
+
+
+def forget_place(data: dict, name: str) -> dict:
+    data["places"] = [p for p in data.get("places", []) if p.get("name") != name]
+    return data

@@ -141,3 +141,15 @@ def test_load_falls_back_to_empty_exposure_log_when_malformed(tmp_path):
     path = tmp_path / "progress.json"
     path.write_text(json.dumps({"exposure_log": ["not", "a", "dict"]}), encoding="utf-8")
     assert load(path)["exposure_log"] == {}
+
+
+def test_horizon_profile_combines_open_sectors_and_heights():
+    from progress import default, horizon_profile
+
+    prog = default()
+    prog["horizon"]["S"] = True
+    prog["horizon_alt"]["S"] = 20
+    profile = horizon_profile(prog)
+    assert profile["S"] == 20.0
+    assert profile["N"] == 0.0      # ouvert par defaut, sans hauteur
+    assert profile["E"] is None     # ferme par defaut

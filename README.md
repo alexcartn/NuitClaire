@@ -512,6 +512,23 @@ Organise comme Messier et Cibles (`journalView.ts`, pur et teste) :
   touche, chacune repliee sur son resume (date, score, cibles) ;
 - statistiques en fin de page, repliees par defaut.
 
+### Reglages
+
+Ranges en sections repliables, chacune avec son reglage en place dans l'en-tete : Lieu,
+Horizon, Fenetre d'observation, Alertes, Affichage, Appli (installation, code d'acces).
+Un changement s'affiche tout de suite, revient en arriere en le disant si le serveur ne
+l'a pas pris, et recharge l'etat partage de l'appli.
+
+- Mes lieux : chaque lieu utilise est retenu (`settings.remember_place`, 8 au plus) ;
+  on passe de l'un a l'autre en un appui, « Gerer » permet d'en oublier
+  (`DELETE /api/places/{nom}`).
+- Horizon avec hauteurs : chaque secteur est bouche, ou degage a partir d'une hauteur
+  (libre, 10, 20, 30 ou 45 deg) pour les arbres et les toits. Stocke dans
+  `progress.horizon_alt`, combine en profil par `progress.horizon_profile` ; les creneaux,
+  les raisons d'infaisabilite, les saisons Messier et le graphe d'altitude exigent que la
+  cible passe au-dessus (`scoring.sector_floor`). Les horizons booleens (appli Streamlit,
+  anciens reglages) restent acceptes.
+
 ### Recherche
 
 Par designation (prefixe : « M3 », « NGC70 ») ou par nom, en francais ou en anglais, sans

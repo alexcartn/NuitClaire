@@ -16,11 +16,15 @@ export interface Settings {
   windowMode: "complete" | "habituelle";
   viewWindow: ViewWindow;
   alerts: Record<string, boolean>;
+  /** Lieux deja utilises, le plus recent d'abord (le lieu actif compris). */
+  places: Site[];
 }
 
 export interface AppState {
   site: Site;
   horizon: Record<string, boolean>;
+  /** Hauteur (deg) a partir de laquelle chaque secteur ouvert est degage. */
+  horizonAlt: Record<string, number>;
   windowMode: string;
   viewWindow: ViewWindow;
   messierCaptured: string[];

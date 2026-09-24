@@ -35,3 +35,10 @@ def test_api_season_lists_the_110(api_client):
     rows = api_client.get("/api/messier/season").json()
     assert len(rows) == 110
     assert all(len(r["monthHours"]) == 12 for r in rows)
+
+
+def test_trees_to_the_south_shorten_the_season_of_low_objects():
+    open_all = {s: 0.0 for s in ("N", "NE", "E", "SE", "S", "SW", "W", "NW")}
+    free = sum(_season(open_all)["M8"]["monthHours"])
+    trees = sum(_season({**open_all, "S": 15.0, "SE": 15.0, "SW": 15.0})["M8"]["monthHours"])
+    assert trees < free
