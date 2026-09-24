@@ -9,16 +9,20 @@ Un seul utilisateur, donc un seul secret partage : `NUITCLAIRE_API_TOKEN`.
 Tant qu'il n'est pas defini, rien ne change (dev local, tests, deploiement
 existant) -- le poser suffit a fermer l'API. Le mobile ne l'embarque pas dans
 son bundle (qui est public) : il est saisi une fois sur le telephone et garde
-sur l'appareil (voir mobile/src/TokenGate.tsx)."""
+sur l'appareil (voir mobile/src/components/TokenGate.tsx)."""
 import hmac
 import os
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 
 TOKEN_ENV = "NUITCLAIRE_API_TOKEN"
 
 
-def require_token(authorization: str | None = Header(default=None)) -> None:
+def require_token(request: Request, authorization: str | None = Header(default=None)) -> None:
+    # La tache planifiee a son propre secret (CRON_SECRET, envoye par Vercel
+    # Cron) et fait sa verification elle-meme (voir api/routers/push.py).
+    if request.url.path.startswith("/api/cron/"):
+        return
     expected = os.environ.get(TOKEN_ENV)
     if not expected:
         return

@@ -25,9 +25,8 @@ mobile-native (voir le design `NuitClaire Mobile.dc.html`) ; il parle a une peti
 
 Les 7 ecrans de la maquette sont implementes : "Ce soir", "Cibles", "Detail cible",
 "Catalogue Messier", "Recherche", "Reglages" (position/geocodage, horizon, mode de fenetre,
-alertes -- toutes editables) et "Journal" (session en cours + historique). Connu comme
-incomplet : les alertes sont enregistrees mais rien ne les envoie reellement (pas
-d'infrastructure de notification) ; cote tests JS, la logique sans DOM est couverte
+alertes -- toutes editables, envoyees en notification push) et "Journal" (session en
+cours + historique). Cote tests JS, la logique sans DOM est couverte
 (file du journal, relecture, plan de nuit, vision nocturne automatique, mises en forme),
 le rendu des ecrans est verifie a la main
 via Playwright.
@@ -472,6 +471,30 @@ avec la separation, et une cible en emission photographiee avec le filtre LP (co
 `filter` du catalogue) n'en subit qu'environ la moitie ; elle tolere aussi une Lune a
 15 deg au lieu de 30. Sous une pleine Lune claire, la nuit tombe vers 48 et les galaxies
 disparaissent de la liste, pas les nebuleuses. Les reglages sont dans `config.SCORE_MODEL`.
+
+### Alertes push
+
+Deux alertes (Reglages) : nuit au-dessus de 70, et risque de buee (ecart temperature/rosee
+sous 1,5 °C dans la fenetre d'observation). Une tache planifiee Vercel
+(`vercel.json`, `crons`) appelle `GET /api/cron/alerts` chaque jour a 16:00 UTC (18 h
+l'ete, 17 h l'hiver) : elle evalue la nuit qui vient (`alerts.py`) et envoie une
+notification Web Push a chaque telephone abonne (`notifications.py`, `public/sw.js`),
+une seule fois par nuit meme si la tache est rejouee. Un abonnement que le service push
+declare perime est retire tout seul.
+
+Mise en route :
+
+1. `python scripts/gen_vapid_keys.py`, puis sur le projet API Vercel : `VAPID_PUBLIC_KEY`,
+   `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT=mailto:votre@adresse`, et `CRON_SECRET` (Vercel
+   l'envoie a la tache planifiee ; sans lui, la route accepte le code d'acces de l'API).
+2. Redeployer, puis sur le telephone : Reglages, Alertes, « Recevoir les alertes sur ce
+   telephone », et « Envoyer un test ». Sur iPhone, l'appli doit etre posee sur l'ecran
+   d'accueil (iOS 16.4 et plus) : Safari ne livre pas de notification a un simple onglet.
+
+Les abonnements sont gardes dans le store `push` (Supabase ou `data/push.json`), a part
+des reglages. Le plan gratuit de Vercel limite les taches planifiees a une par jour :
+d'ou une verification en fin d'apres-midi pour la nuit a venir, pas une surveillance
+en direct.
 
 ### Code d'acces de l'API
 

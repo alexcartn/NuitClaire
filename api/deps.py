@@ -36,6 +36,7 @@ _night_lock = threading.Lock()
 progress_write_lock = threading.Lock()
 settings_write_lock = threading.Lock()
 sessions_write_lock = threading.Lock()
+push_write_lock = threading.Lock()
 _rows_cache: TTLCache = TTLCache(maxsize=32, ttl=1800)
 _rows_lock = threading.Lock()
 # Contenu quasi statique (meme rationale que `_cached_wiki_summary` dans

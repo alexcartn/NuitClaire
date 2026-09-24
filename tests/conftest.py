@@ -56,6 +56,7 @@ def api_client(monkeypatch):
     from fastapi.testclient import TestClient
 
     import api.deps as deps
+    import notifications
     import progress
     import sessions
     import settings
@@ -66,6 +67,7 @@ def api_client(monkeypatch):
     _fake_store(progress, monkeypatch, box, "progress")
     _fake_store(settings, monkeypatch, box, "settings")
     _fake_store(sessions, monkeypatch, box, "sessions")
+    _fake_store(notifications, monkeypatch, box, "push")
     deps._night_cache.clear()
     deps._rows_cache.clear()
     deps._wiki_cache.clear()

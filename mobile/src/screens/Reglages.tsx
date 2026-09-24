@@ -7,6 +7,7 @@ import { useCompass } from "../useCompass";
 import { sectorFor } from "../compass";
 import { Compass } from "../components/Compass";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { AlertsCard } from "../components/AlertsCard";
 import { COMPASS_SECTORS } from "../types";
 import { fmtDecimalHour } from "../format";
 
@@ -17,10 +18,6 @@ const WINDOW_MODES: { key: "complete" | "habituelle"; label: string }[] = [
 
 const fmtHour = fmtDecimalHour;
 
-const ALERT_LABEL: Record<string, string> = {
-  score: "Me prévenir à 18h quand la nuit dépasse 70",
-  dew: "Alerte buée quand l'écart tombe sous 1,5 °C",
-};
 
 export function Reglages() {
   const { theme, isSystem, setTheme, auto, setAutoNight } = useTheme();
@@ -305,27 +302,7 @@ export function Reglages() {
         </div>
       )}
 
-      {data && (
-        <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="nc-eyebrow">Alertes (enregistrées, pas encore envoyées)</div>
-          {Object.entries(data.alerts).map(([key, on]) => (
-            <button
-              key={key}
-              onClick={() => toggleAlert(key)}
-              role="switch"
-              aria-checked={on}
-              style={{
-                background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
-                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
-                minHeight: 44, color: "var(--ink)",
-              }}
-            >
-              <span style={{ fontSize: "var(--text-sm)" }}>{ALERT_LABEL[key] ?? key}</span>
-              <span className={`nc-switch ${on ? "nc-switch-on" : ""}`} aria-hidden="true"><span /></span>
-            </button>
-          ))}
-        </div>
-      )}
+      {data && <AlertsCard alerts={data.alerts} onToggle={toggleAlert} />}
 
       {!installed && (
         <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>

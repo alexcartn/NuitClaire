@@ -12,3 +12,4 @@ mobile/dist/
 mobile/*.tsbuildinfo
 mobile/vite.config.js
 mobile/vite.config.d.ts
+data/push.json

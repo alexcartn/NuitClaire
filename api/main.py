@@ -19,7 +19,7 @@ from fastapi import Depends, FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from api.auth import require_token  # noqa: E402
-from api.routers import catalog, night, progress, sessions, settings, state, stats  # noqa: E402
+from api.routers import catalog, night, progress, push, sessions, settings, state, stats  # noqa: E402
 
 # Jeton exige sur toutes les routes des que NUITCLAIRE_API_TOKEN est defini
 # (voir api/auth.py). Les pre-requetes CORS (OPTIONS) sont traitees par le
@@ -47,3 +47,4 @@ app.include_router(state.router)
 app.include_router(progress.router)
 app.include_router(sessions.router)
 app.include_router(stats.router)
+app.include_router(push.router)

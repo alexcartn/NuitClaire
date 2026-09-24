@@ -150,6 +150,13 @@ export const api = {
 
   stats: () => get<Stats>("/api/stats"),
 
+  pushKey: () => get<{ publicKey: string }>("/api/push/key"),
+  pushSubscribe: (subscription: PushSubscriptionJSON) =>
+    request<{ subscriptions: number }>("POST", "/api/push/subscriptions", { body: subscription }),
+  pushUnsubscribe: (endpoint: string) =>
+    request<{ subscriptions: number }>("DELETE", "/api/push/subscriptions", { body: { endpoint } }),
+  pushTest: () => request<{ sent: number; failed: number; removed: number }>("POST", "/api/push/test"),
+
   addTargetExposure: (designation: string, minutes: number) =>
     request<ExposureEntry[]>("POST", `/api/progress/exposure/${encodeURIComponent(designation)}`, {
       body: { minutes },

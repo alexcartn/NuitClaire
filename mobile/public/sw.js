@@ -98,3 +98,39 @@ self.addEventListener("fetch", (event) => {
     }),
   );
 });
+
+/* Notifications push (voir alerts.py et src/push.ts). Le serveur envoie un
+ * JSON {title, body, url, tag} ; `tag` remplace une notification de la meme
+ * nuit au lieu d'en empiler deux. */
+self.addEventListener("push", (event) => {
+  let msg = { title: "NuitClaire", body: "", url: "/", tag: undefined };
+  try {
+    if (event.data) msg = { ...msg, ...event.data.json() };
+  } catch {
+    if (event.data) msg.body = event.data.text();
+  }
+  event.waitUntil(
+    self.registration.showNotification(msg.title, {
+      body: msg.body,
+      tag: msg.tag,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: msg.url || "/" },
+      lang: "fr",
+    }),
+  );
+});
+
+// Toucher la notification ramene l'appli au premier plan si elle est deja
+// ouverte, l'ouvre sinon.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      const open = wins.find((w) => new URL(w.url).origin === self.location.origin);
+      if (open) return open.focus();
+      return self.clients.openWindow(url);
+    }),
+  );
+});
