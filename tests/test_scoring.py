@@ -247,7 +247,7 @@ def test_dew_risk_low_when_spread_comfortable():
 def test_dew_risk_high_when_spread_tiny():
     df = pd.DataFrame({"temperature_2m": [10, 11], "dew_point_2m": [9.5, 10]})
     d = dew_risk(df)
-    assert d["risk"] == "Eleve"
+    assert d["risk"] == "Élevé"
     assert d["advice"] == "Indispensable"
 
 

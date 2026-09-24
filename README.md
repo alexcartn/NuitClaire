@@ -27,9 +27,9 @@ Les 7 ecrans de la maquette sont implementes : "Ce soir", "Cibles", "Detail cibl
 "Catalogue Messier", "Recherche", "Reglages" (position/geocodage, horizon, mode de fenetre,
 alertes -- toutes editables) et "Journal" (session en cours + historique). Connu comme
 incomplet : les alertes sont enregistrees mais rien ne les envoie reellement (pas
-d'infrastructure de notification) ; "Ma position" prend les coordonnees GPS sans geocodage
-inverse (pas de nom d'adresse) ; cote tests JS, seule la logique hors ligne du journal est
-couverte (`mobile/src/sessionQueue.test.ts`), le reste des ecrans est verifie a la main
+d'infrastructure de notification) ; cote tests JS, la logique sans DOM est couverte
+(file du journal, relecture, plan de nuit, vision nocturne automatique, mises en forme),
+le rendu des ecrans est verifie a la main
 via Playwright.
 
 "Cibles" et "Catalogue Messier" ont un filtre magnitude (curseur a deux poignees, mini et
@@ -434,6 +434,33 @@ Des que ces deux variables sont presentes, `db.py` bascule automatiquement les t
 stores sur Supabase (voir `db.enabled()`) ; absentes, comportement inchange (fichiers
 locaux). `pip install -r api/requirements-api.txt` installe le client `supabase`.
 
+### Navigation, prochaines nuits, plan de nuit
+
+- Le bouton retour d'Android (et le geste retour d'iOS) suit l'appli : chaque ecran est
+  pose dans l'historique du navigateur (`App.tsx`), au lieu de fermer l'appli depuis une
+  fiche. Revenir d'une fiche retrouve la liste a la meme position, filtres compris
+  (`useRemembered`). Toucher l'onglet courant remonte en haut.
+- "Ce soir" montre ce soir et les deux nuits suivantes (`GET /api/nights`,
+  `config.NB_FORECAST_NIGHTS = 3`, l'horizon de 7Timer) ; une nuit que la prevision ne
+  couvre pas assez s'affiche sans score plutot qu'avec un chiffre calcule sur des trous.
+- "Plan de la nuit" enchaine les cibles pointables par blocs d'une heure dans l'ordre de
+  la liste (`nightPlan.ts`), avec un bouton pour tout poser dans le journal.
+- La bascule "Nuit" est en haut de chaque ecran ; Reglages propose aussi le passage
+  automatique en vision nocturne entre les crepuscules nautiques (`autoNight.ts`), une
+  fois par nuit, sans reprendre la main si on en sort.
+- "Ma position" enregistre le nom de la commune (`POST /api/geocode/reverse`).
+- Si la meteo est injoignable, "Catalogue Messier" affiche quand meme les 110 objets,
+  faisabilite inconnue. Les ecrans en erreur proposent "Reessayer".
+
+### Code d'acces de l'API
+
+Sans authentification, n'importe qui connaissant l'URL de l'API pouvait lire et modifier
+le journal (le CORS ne bloque que les navigateurs). Definir `NUITCLAIRE_API_TOKEN` sur le
+projet API suffit a exiger `Authorization: Bearer <code>` sur toutes les routes
+(`api/auth.py`). Le mobile demande le code au premier refus et le garde sur l'appareil
+(il n'est pas dans le bundle, qui est public) ; il se change dans Reglages. Sans la
+variable, l'API reste ouverte comme avant.
+
 ### Deploiement : Vercel (frontend + API) + Supabase (persistance)
 
 Aucun hebergeur a disque persistant necessaire (Railway/Fly.io) une fois Supabase
@@ -446,7 +473,7 @@ Vercel separes sur le meme repo GitHub :
    `scoring.py`, etc. importes par `api/main.py` doivent etre inclus dans le build).
    Variables d'environnement : `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
    `ALLOWED_ORIGIN` (l'URL du projet mobile ci-dessous, pour le CORS -- voir
-   `api/main.py`).
+   `api/main.py`), et `NUITCLAIRE_API_TOKEN` (conseille, voir "Code d'acces de l'API").
 2. Projet mobile -- Root Directory : `mobile/` (config deja dans `mobile/vercel.json`).
    Variable d'environnement : `VITE_API_BASE` = URL du projet API ci-dessus.
 

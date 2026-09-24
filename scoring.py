@@ -196,7 +196,7 @@ def dew_risk(df: pd.DataFrame) -> dict:
     spread = (df["temperature_2m"] - df["dew_point_2m"]).min()
     if pd.isna(spread):
         return {"spread": None, "risk": "Inconnu", "advice": "donnees manquantes"}
-    risk = "Faible" if spread >= 3 else "Moyen" if spread >= 1.5 else "Eleve"
+    risk = "Faible" if spread >= 3 else "Moyen" if spread >= 1.5 else "Élevé"
     advice = "Pas necessaire" if spread >= 3 else "Recommande" if spread >= 1.5 else "Indispensable"
     return {"spread": round(float(spread), 1), "risk": risk, "advice": advice}
 

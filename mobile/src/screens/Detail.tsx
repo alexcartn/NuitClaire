@@ -5,6 +5,11 @@ import { mutate, useSessions } from "../useSessions";
 import { targetHistory } from "../journalRead";
 import { newOp } from "../sessionQueue";
 import { AltitudeChart } from "../components/AltitudeChart";
+import { ErrorNotice } from "../components/ErrorNotice";
+import { NightToggle } from "../components/NightToggle";
+import { TabIcon } from "../components/TabIcon";
+import { fmtH, fmtHM, plural } from "../format";
+import { tap } from "../haptics";
 import type { ViewWindow } from "../types";
 
 /** '90' -> "1 h 30" ; en-dessous de l'heure, "45 min". */
@@ -76,6 +81,7 @@ export function Detail({
     setCapturing(true);
     try {
       await api.updateMessierCapture(data.messierId, !captured.has(data.messierId));
+      tap();
       onCaptureChange();
     } finally {
       setCapturing(false);
@@ -87,22 +93,35 @@ export function Detail({
     // appel direct : ce geste se fait aussi dehors, reseau incertain, et il
     // doit etre pris en compte immediatement meme hors ligne.
     mutate(newOp({ kind: "addItem", designation }));
+    tap();
     setAddedToJournal(true);
   };
 
   return (
     <div className="nc-screen">
-      <button onClick={onBack} className="nc-caption" style={{ alignSelf: "flex-start", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", padding: "4px 0" }}>
-        ← Retour
-      </button>
+      <div className="nc-row nc-between">
+        {/* Surface tactile de 44 px (voir .nc-link) : ce lien en faisait
+            vingt-quatre. Le geste retour du telephone marche aussi, desormais
+            (voir App.tsx). */}
+        <button onClick={onBack} className="nc-link nc-link-accent">
+          <TabIcon name="back" />
+          Retour
+        </button>
+        <NightToggle />
+      </div>
 
-      {loading && <p className="nc-caption">Chargement...</p>}
-      {error && <p className="nc-caption">Objet introuvable.</p>}
+      {loading && !data && <p className="nc-caption">Chargement…</p>}
+      {error && !data && (
+        <ErrorNotice
+          message={error.includes("404") || error.startsWith("Aucun") ? "Objet introuvable." : "Impossible de charger cette fiche."}
+          onRetry={reload}
+        />
+      )}
 
       {data && (
         <>
           <div>
-            <div className="nc-num" style={{ fontSize: 30, fontWeight: 500, letterSpacing: "-.02em" }}>
+            <div className="nc-num" style={{ fontSize: "var(--text-xl)", fontWeight: 500, letterSpacing: "-.02em" }}>
               {data.designation}
             </div>
             {(data.commonName || (data.ngc && data.ngc !== data.designation)) && (
@@ -116,6 +135,11 @@ export function Detail({
             <img
               src={data.imageUrl}
               alt=""
+              // Meme repli que les vignettes des listes : l'aplat raye plutot
+              // que l'icone d'image cassee quand le CDS ne repond pas.
+              onError={(e) => {
+                e.currentTarget.style.visibility = "hidden";
+              }}
               className="nc-strip"
               style={{ width: "100%", height: 200, borderRadius: 16, border: "1px solid var(--line)", objectFit: "cover", background: "var(--surf2)" }}
             />
@@ -123,27 +147,34 @@ export function Detail({
 
           <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <div className="nc-eyebrow">Hauteur 19h → 06h</div>
+              {/* Bornes lues dans la serie elle-meme : l'intitule annoncait
+                  « 19h → 06h » en dur, quelle que soit la serie recue. */}
+              <div className="nc-eyebrow">
+                Hauteur{" "}
+                {data.altitudeSeries.length > 0 &&
+                  `${fmtH(data.altitudeSeries[0].time)} → ${fmtH(data.altitudeSeries[data.altitudeSeries.length - 1].time)}`}
+              </div>
               <div style={{ fontSize: "var(--text-xs)", color: "var(--accent)" }}>
-                fenetre pointable
+                fenêtre pointable
               </div>
             </div>
             <AltitudeChart series={data.altitudeSeries} horizon={horizon} windowMode={windowMode} viewWindow={viewWindow} />
-            <p style={{ margin: 0, fontSize: 11, color: "var(--ink2)" }}>
-              Direction a l'altitude max : {data.peakSector} (azimut {Math.round(data.peakAz)}°) vers{" "}
-              {new Date(data.peakTime).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.
+            <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--ink2)" }}>
+              Direction à l'altitude max : {data.peakSector} (azimut{" "}
+              <span className="nc-num">{Math.round(data.peakAz)}°</span>) vers{" "}
+              <span className="nc-num">{fmtHM(data.peakTime)}</span>.
             </p>
           </div>
 
           <div className="nc-card" style={{ padding: 0, overflow: "hidden" }}>
             {[
-              ["Coordonnees", `${data.ra.toFixed(3)}h / ${data.dec.toFixed(3)}°`],
+              ["Coordonnées", `${data.ra.toFixed(3)}h / ${data.dec.toFixed(3)}°`],
               ["Magnitude", data.mag != null ? data.mag.toFixed(1) : "inconnue"],
               ["Taille", data.sizeW && data.sizeH ? `${data.sizeW.toFixed(1)}' x ${data.sizeH.toFixed(1)}'` : "inconnue"],
               ["Cadrage Seestar", data.cadrage],
-              ["Fenetre exploitable", data.start ? `${data.start}–${data.end} (${data.hours} h)` : "Aucune ce soir"],
-              ["Filtre conseille", data.filter],
-              ["Separation lunaire mini", `${Math.round(data.moonSepDeg)}°`],
+              ["Fenêtre exploitable", data.start ? `${data.start}–${data.end} (${data.hours} h)` : "Aucune ce soir"],
+              ["Filtre conseillé", data.filter],
+              ["Séparation lunaire mini", `${Math.round(data.moonSepDeg)}°`],
               ["Temps de pose", `${data.exposureLowMin}–${data.exposureHighMin} min`],
             ].map(([k, v], i, arr) => (
               <div
@@ -153,8 +184,8 @@ export function Detail({
                   borderBottom: i < arr.length - 1 ? "1px solid var(--line)" : "none",
                 }}
               >
-                <div style={{ fontSize: 13, color: "var(--ink2)" }}>{k}</div>
-                <div className="nc-num" style={{ fontSize: 12, textAlign: "right" }}>
+                <div style={{ fontSize: "var(--text-sm)", color: "var(--ink2)" }}>{k}</div>
+                <div className="nc-num" style={{ fontSize: "var(--text-sm)", textAlign: "right" }}>
                   {v}
                 </div>
               </div>
@@ -165,7 +196,7 @@ export function Detail({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div className="nc-eyebrow">Temps d'expo</div>
               {data.exposureTotalMin > 0 && (
-                <div className="nc-num" style={{ fontSize: 13, color: "var(--ink)" }}>
+                <div className="nc-num" style={{ fontSize: "var(--text-sm)", color: "var(--ink)" }}>
                   {fmtMinutes(data.exposureTotalMin)} au total
                 </div>
               )}
@@ -177,14 +208,14 @@ export function Detail({
                 a tape ci-dessous. */}
             {data.exposureSessionMin > 0 && (
               <div className="nc-caption" style={{ margin: 0 }}>
-                dont {fmtMinutes(data.exposureSessionMin)} saisi(s) dans le journal de session
+                dont {fmtMinutes(data.exposureSessionMin)} saisies dans le journal de session
                 {data.exposureFreeMin > 0 && ` et ${fmtMinutes(data.exposureFreeMin)} ici`}.
               </div>
             )}
 
             <p className="nc-caption" style={{ margin: 0 }}>
-              Ajoute directement ici, sans passer par le journal -- pratique pour rattraper des prises
-              anterieures a l'usage de l'appli.
+              Ajouté directement ici, sans passer par le journal : pratique pour rattraper des prises
+              antérieures à l'usage de l'appli.
             </p>
 
             <div style={{ display: "flex", gap: 8 }}>
@@ -196,16 +227,13 @@ export function Detail({
                 onChange={(e) => setExposureDraft(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addExposure()}
                 placeholder="Minutes"
-                style={{
-                  flex: 1, background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
-                  padding: "7px 9px", fontSize: 12, color: "var(--ink)",
-                }}
+                aria-label="Minutes de pose à ajouter"
+                className="nc-input"
               />
               <button
                 onClick={addExposure}
                 disabled={addingExposure || !exposureDraft.trim()}
-                className="nc-btn"
-                style={{ flex: "none", padding: "5px 14px", fontSize: 12 }}
+                className="nc-btn nc-btn-sm"
               >
                 Ajouter
               </button>
@@ -215,16 +243,17 @@ export function Detail({
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {data.exposureLog.map((e) => (
                   <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className="nc-num" style={{ fontSize: 11, color: "var(--ink3)", width: 48, flex: "none" }}>
+                    <span className="nc-num" style={{ fontSize: "var(--text-xs)", color: "var(--ink3)", width: 56, flex: "none" }}>
                       {fmtExposureDate(e.at)}
                     </span>
-                    <span className="nc-num" style={{ fontSize: 12, flex: 1 }}>
+                    <span className="nc-num" style={{ fontSize: "var(--text-sm)", flex: 1 }}>
                       {e.minutes} min
                     </span>
                     <button
                       onClick={() => deleteExposure(e.id)}
-                      style={{ background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", fontSize: 15, padding: "0 4px" }}
-                      title="Supprimer cette entree"
+                      className="nc-icon-btn"
+                      title="Supprimer cette entrée"
+                      aria-label={`Supprimer ${e.minutes} min du ${fmtExposureDate(e.at)}`}
                     >
                       ×
                     </button>
@@ -238,7 +267,7 @@ export function Detail({
             <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div className="nc-eyebrow">Pourquoi infaisable ce soir</div>
               {data.reasons.map((r) => (
-                <p key={r} style={{ margin: 0, fontSize: 13, color: "var(--ink2)" }}>
+                <p key={r} style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--ink2)" }}>
                   · {r}
                 </p>
               ))}
@@ -248,7 +277,7 @@ export function Detail({
           {data.wiki && (
             <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               <div className="nc-eyebrow">En savoir plus</div>
-              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: "var(--ink2)" }}>{data.wiki.extract}</p>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", lineHeight: 1.55, color: "var(--ink2)" }}>{data.wiki.extract}</p>
               <a href={data.wiki.url} target="_blank" rel="noreferrer" className="nc-caption">
                 Source : Wikipedia
               </a>
@@ -259,7 +288,7 @@ export function Detail({
             <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div className="nc-eyebrow">Dans ton journal</div>
               <div className="nc-caption" style={{ margin: 0 }}>
-                {history.nightCount} nuit(s)
+                {plural(history.nightCount, "nuit", "nuits")}
                 {history.totalExposureMin > 0 && ` · ${fmtMinutes(history.totalExposureMin)} de pose`}
                 {history.avgRating != null && ` · satisfaction ${history.avgRating}/5`}
               </div>
@@ -268,11 +297,11 @@ export function Detail({
                   key={n.closedAt ?? `courante-${i}`}
                   style={{ display: "flex", flexDirection: "column", gap: 3 }}
                 >
-                  <div style={{ fontSize: 12, color: "var(--ink)" }}>
+                  <div style={{ fontSize: "var(--text-sm)", color: "var(--ink)" }}>
                     {n.date ? fmtNightDate(n.date) : "Session en cours"}
                     {n.exposureMin ? ` · ${fmtMinutes(n.exposureMin)}` : ""}
                     {n.rating != null ? ` · ${n.rating}/5` : ""}
-                    {n.done ? " · capturee" : ""}
+                    {n.done ? " · capturée" : ""}
                   </div>
                   {n.notes.map((note) => (
                     <div key={note.at} className="nc-caption" style={{ margin: 0 }}>
@@ -296,11 +325,11 @@ export function Detail({
                   color: captured.has(data.messierId) ? "var(--onaccent)" : "var(--ink)",
                 }}
               >
-                {captured.has(data.messierId) ? "Capturee ✓" : "Marquer comme capturee"}
+                {captured.has(data.messierId) ? "Capturé ✓" : "Marquer comme capturé"}
               </button>
             )}
             <button onClick={addToJournal} disabled={addedToJournal} className="nc-btn" style={{ flex: "none" }}>
-              {addedToJournal ? "Ajoutee ✓" : "Journal"}
+              {addedToJournal ? "Ajoutée ✓" : "Ajouter au journal"}
             </button>
           </div>
         </>

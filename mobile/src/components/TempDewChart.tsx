@@ -48,7 +48,7 @@ export function TempDewChart({ hourly, buckets = 24 }: { hourly: HourlyPoint[]; 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-      <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--ink2)" }}>
+      <div style={{ display: "flex", gap: "var(--space-sm)", fontSize: "var(--text-xs)", color: "var(--ink2)" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 8, height: 8, borderRadius: 4, background: TEMP_COLOR, display: "inline-block" }} />
           Temperature
@@ -64,7 +64,7 @@ export function TempDewChart({ hourly, buckets = 24 }: { hourly: HourlyPoint[]; 
       </svg>
       <div
         className="nc-num"
-        style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ink3)" }}
+        style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--ink3)" }}
       >
         <span>{formatHour(points[0].time)}</span>
         <span>{formatHour(mid.time)}</span>

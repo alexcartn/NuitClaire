@@ -8,18 +8,6 @@ import { staleLabel } from "../useFetch";
 
 export function StaleNotice({ when }: { when: string | null }) {
   return (
-    <div
-      className="nc-caption"
-      style={{
-        margin: 0,
-        background: "var(--surf2)",
-        border: "1px solid var(--line)",
-        borderRadius: 9,
-        padding: "8px 10px",
-        color: "var(--ink2)",
-      }}
-    >
-      {staleLabel(when)}
-    </div>
+    <div className="nc-notice">{staleLabel(when)}</div>
   );
 }

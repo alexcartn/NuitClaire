@@ -1,25 +1,35 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { useRemembered } from "../useRemembered";
+import { plural } from "../format";
 import { StaleNotice } from "../components/StaleNotice";
-import { RangeSlider } from "../components/RangeSlider";
+import { ErrorNotice } from "../components/ErrorNotice";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { TargetRowCard } from "../components/TargetRow";
+import { MagnitudeFilter, TypeChips, distinctTypes, magnitudeBounds } from "../components/CatalogFilters";
 
 const PAGE_SIZE = 24;
 
 export function Cibles({
   captured,
+  windowLabel,
   onOpenTarget,
 }: {
   captured: Set<string>;
+  /** "nuit complète" ou "20:00–22:30" : le titre annoncait « nuit complete »
+   * en dur, meme en fenetre habituelle. */
+  windowLabel: string;
   onOpenTarget: (designation: string) => void;
 }) {
-  const [types, setTypes] = useState<string[]>([]);
-  const [magRange, setMagRange] = useState<[number, number] | null>(null);
-  const [showAll, setShowAll] = useState(false);
+  // Memorises (voir useRemembered) : ouvrir une fiche puis revenir ne remet
+  // plus les filtres a zero.
+  const [types, setTypes] = useRemembered<string[]>("cibles:types", []);
+  const [magRange, setMagRange] = useRemembered<[number, number] | null>("cibles:mag", null);
+  const [showAll, setShowAll] = useRemembered("cibles:all", false);
 
   const fetchTargets = useCallback(() => api.targets(types.length ? types : undefined), [types]);
-  const { data: rows, loading, error, fetchedAt } = useFetch(
+  const { data: rows, loading, error, fetchedAt, reload } = useFetch(
     fetchTargets,
     [types],
     // Meme cle que "Ce soir" quand aucun filtre n'est pose : c'est la meme
@@ -27,25 +37,13 @@ export function Cibles({
     types.length ? `targets:${[...types].sort().join(",")}` : "targets",
   );
 
-  const allTypes = useMemo(() => {
-    const seen = new Set<string>();
-    (rows ?? []).forEach((r) => seen.add(r.type));
-    return [...seen].sort();
-  }, [rows]);
-
-  // Bornes de magnitude derivees des cibles chargees (pas fixes) : la plage
-  // varie selon le catalogue (targets vs types selectionnes), donc le
-  // curseur doit toujours couvrir tout ce qui est effectivement affichable.
-  const magBounds = useMemo(() => {
-    const values = (rows ?? []).map((r) => r.mag).filter((m): m is number => m != null);
-    if (!values.length) return null;
-    return { min: Math.floor(Math.min(...values)), max: Math.ceil(Math.max(...values)) };
-  }, [rows]);
+  const allTypes = useMemo(() => distinctTypes(rows), [rows]);
+  const magBounds = useMemo(() => magnitudeBounds(rows), [rows]);
 
   const toggleType = (t: string) =>
     setTypes((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]));
 
-  // Filtre magnitude cote client : les cibles sont deja chargees (feasibles
+  // Filtre magnitude cote client : les cibles sont deja chargees (faisables
   // ce soir), pas besoin d'un aller-retour API pour affiner sur une colonne
   // deja presente dans les lignes recues.
   const filtered = useMemo(() => {
@@ -59,45 +57,22 @@ export function Cibles({
 
   return (
     <div className="nc-screen">
-      <div>
-        <div className="nc-eyebrow">Cibles faisables</div>
-        <div className="nc-title">{rows ? `${filtered.length} cibles · nuit complete` : "Chargement..."}</div>
-        <div className="nc-sub">Triees par Messier manquants, puis cadrage simple, puis heures disponibles.</div>
-      </div>
+      <ScreenHeader
+        eyebrow="Cibles faisables"
+        title={rows ? `${plural(filtered.length, "cible", "cibles")} · ${windowLabel}` : "Chargement…"}
+        sub="Triées par Messier manquants, puis cadrage simple, puis heures disponibles."
+      />
 
-      {magBounds && magBounds.max > magBounds.min && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span className="nc-caption" style={{ margin: 0 }}>
-            Magnitude {(magRange ?? [magBounds.min, magBounds.max])[0].toFixed(1)} →{" "}
-            {(magRange ?? [magBounds.min, magBounds.max])[1].toFixed(1)}
-          </span>
-          <RangeSlider
-            min={magBounds.min}
-            max={magBounds.max}
-            step={0.5}
-            value={magRange ?? [magBounds.min, magBounds.max]}
-            onChange={setMagRange}
-          />
-        </div>
-      )}
+      <MagnitudeFilter bounds={magBounds} value={magRange} onChange={setMagRange} />
+      <TypeChips types={allTypes} selected={types} onToggle={toggleType} />
 
-      {allTypes.length > 0 && (
-        <div style={{ display: "flex", gap: 7, overflow: "auto", margin: "0 -18px", padding: "0 18px 2px" }}>
-          {allTypes.map((t) => (
-            <button
-              key={t}
-              onClick={() => toggleType(t)}
-              className={`nc-chip ${types.includes(t) ? "nc-chip-active" : ""}`}
-              style={{ flex: "none" }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {loading && <p className="nc-caption">Chargement...</p>}
-      {error && (rows ? <StaleNotice when={fetchedAt} /> : <p className="nc-caption">Erreur de chargement des cibles.</p>)}
+      {loading && !rows && <p className="nc-caption">Chargement…</p>}
+      {error &&
+        (rows ? (
+          <StaleNotice when={fetchedAt} />
+        ) : (
+          <ErrorNotice message="Impossible de charger les cibles de la nuit." onRetry={reload} />
+        ))}
 
       {shown.map((row) => (
         <TargetRowCard
@@ -109,15 +84,15 @@ export function Cibles({
       ))}
 
       {!showAll && rest > 0 && (
-        <button onClick={() => setShowAll(true)} className="nc-caption" style={{ background: "none", border: "none", cursor: "pointer", padding: "var(--space-sm) 0", minHeight: 44 }}>
-          Voir {rest} cible(s) de plus
+        <button onClick={() => setShowAll(true)} className="nc-link" style={{ alignSelf: "center" }}>
+          Voir {plural(rest, "cible de plus", "cibles de plus")}
         </button>
       )}
       {rows && rows.length === 0 && (
-        <p className="nc-caption">Aucune cible exploitable cette nuit (meteo, Lune ou horizon degage).</p>
+        <p className="nc-caption">Aucune cible exploitable cette nuit (météo, Lune ou horizon dégagé).</p>
       )}
       {rows && rows.length > 0 && filtered.length === 0 && (
-        <p className="nc-caption">Aucune cible ne correspond a ces filtres.</p>
+        <p className="nc-caption">Aucune cible ne correspond à ces filtres.</p>
       )}
     </div>
   );

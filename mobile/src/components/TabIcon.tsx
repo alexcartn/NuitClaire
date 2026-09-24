@@ -9,10 +9,14 @@
  * Toujours pas de bibliotheque d'icones : cinq dessins de quelques lignes,
  * sur la meme grille de 24 et le meme trait que le croissant de l'icone de
  * l'appli (voir scripts/build_icons.py). `currentColor` laisse la couleur
- * active/inactive au CSS (voir `.nc-tab-icon` dans theme.css). */
+ * active/inactive au CSS (voir `.nc-tab-icon` dans theme.css).
+ *
+ * Les memes dessins servent aux quelques boutons d'icone hors de la barre
+ * (recherche, retour, actualiser) : le « ⌕ » Unicode de la recherche avait
+ * exactement les defauts qui ont fait abandonner les glyphes ici. */
 import type { ReactNode } from "react";
 
-export type TabIconName = "moon" | "target" | "grid" | "notebook" | "sliders";
+export type TabIconName = "moon" | "target" | "grid" | "notebook" | "sliders" | "search" | "back" | "refresh";
 
 const PATHS: Record<TabIconName, ReactNode> = {
   // Croissant, comme l'icone de l'appli : la nuit en cours.
@@ -53,6 +57,22 @@ const PATHS: Record<TabIconName, ReactNode> = {
       <circle cx="9" cy="7" r="2.1" />
       <circle cx="15.5" cy="12" r="2.1" />
       <circle cx="7.5" cy="17" r="2.1" />
+    </>
+  ),
+  // Loupe : la recherche par designation.
+  search: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6" />
+      <path d="M15 15l5.5 5.5" />
+    </>
+  ),
+  // Chevron : revenir a l'ecran d'avant.
+  back: <path d="M14.5 5.5 8 12l6.5 6.5" />,
+  // Fleche circulaire : recharger la prevision.
+  refresh: (
+    <>
+      <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+      <path d="M19.8 4.2v4.3h-4.3" />
     </>
   ),
 };

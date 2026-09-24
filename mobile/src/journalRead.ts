@@ -6,6 +6,7 @@
  * Le journal est deja sur l'appareil, y compris hors ligne, et ces vues ne
  * sont que des facons de le lire. Par consequent, rien ici n'invente non
  * plus : ce qui n'a pas ete saisi reste absent. */
+import { plural } from "./format.ts";
 import type { Feeling, NightConditions, Sessions, SessionItem, Site, TimelineEntry } from "./types";
 
 // --- Historique d'une cible ------------------------------------------
@@ -124,11 +125,11 @@ export function siteLine(site: Site | null): string | null {
 function conditionsLine(c: NightConditions | null): string | null {
   if (!c) return null;
   const parts = [
-    c.tempMinC != null && c.tempMaxC != null ? `${num(c.tempMinC)} a ${num(c.tempMaxC)} °C` : null,
+    c.tempMinC != null && c.tempMaxC != null ? `${num(c.tempMinC)} à ${num(c.tempMaxC)} °C` : null,
     c.cloudAvgPct != null ? `${Math.round(c.cloudAvgPct)} % de nuages` : null,
     c.seeingAvg != null ? `seeing ${num(c.seeingAvg)}` : null,
     c.transparencyAvg != null ? `transparence ${num(c.transparencyAvg)}` : null,
-    c.dewSpreadC != null ? `ecart au point de rosee ${num(c.dewSpreadC)} °` : null,
+    c.dewSpreadC != null ? `écart au point de rosée ${num(c.dewSpreadC)} °` : null,
     c.moonIllum != null ? `Lune ${Math.round(c.moonIllum)} %` : null,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
@@ -138,11 +139,11 @@ function feelingLines(feeling: Feeling): string[] {
   const lines: string[] = [];
   const scores = [
     feeling.rating != null ? `satisfaction ${feeling.rating}/5` : null,
-    feeling.skyQuality != null ? `ciel percu ${feeling.skyQuality}/5` : null,
+    feeling.skyQuality != null ? `ciel perçu ${feeling.skyQuality}/5` : null,
   ].filter(Boolean);
   if (scores.length) lines.push(`_${scores.join(" · ")}_`);
   if (feeling.highlight) lines.push(`**Ce que je retiens.** ${feeling.highlight}`);
-  if (feeling.nextTime) lines.push(`**A refaire autrement.** ${feeling.nextTime}`);
+  if (feeling.nextTime) lines.push(`**À refaire autrement.** ${feeling.nextTime}`);
   return lines;
 }
 
@@ -201,7 +202,7 @@ export function journalToMarkdown(data: Sessions, siteName?: string): string {
   const head = [
     "# Carnet d'observation",
     "",
-    `_${data.past.length} sortie(s)${siteName ? ` · ${siteName}` : ""} · exporte le ${longDate(
+    `_${plural(data.past.length, "sortie", "sorties")}${siteName ? ` · ${siteName}` : ""} · exporté le ${longDate(
       new Date().toISOString().slice(0, 10),
     )}_`,
     "",

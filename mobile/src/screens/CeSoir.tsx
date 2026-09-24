@@ -1,26 +1,37 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { fmtLatLon, plural } from "../format";
 import { StaleNotice } from "../components/StaleNotice";
+import { ErrorNotice } from "../components/ErrorNotice";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { TabIcon } from "../components/TabIcon";
 import { ScoreCard } from "../components/ScoreCard";
 import { StatCard } from "../components/StatCard";
 import { SectorChips } from "../components/SectorChips";
+import { NightStrip } from "../components/NightStrip";
+import { NightPlan } from "../components/NightPlan";
 import { CloudChart } from "../components/CloudChart";
 import { WindChart } from "../components/WindChart";
 import { TempDewChart } from "../components/TempDewChart";
+import type { CloudTrend } from "../types";
 
-const CLOUD_TREND_ICON: Record<string, string> = {
-  amelioration: "🟢",
-  stable: "🟡",
-  degradation: "🔴",
+/** Tendance nuages : un mot et une fleche, dans la couleur de l'echelle de
+ * qualite. Les pastilles emoji d'avant (vert, jaune, rouge) s'affichaient en
+ * couleur jusque dans le mode vision nocturne, ou tout doit etre rouge. */
+const CLOUD_TREND: Record<CloudTrend["direction"], { arrow: string; color: string }> = {
+  amelioration: { arrow: "↘", color: "var(--good)" },
+  stable: { arrow: "→", color: "var(--mid)" },
+  degradation: { arrow: "↗", color: "var(--bad)" },
 };
 
+const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const MONTHS = [
+  "janvier", "février", "mars", "avril", "mai", "juin",
+  "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+];
+
 function todayLabel(): string {
-  const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
-  const MONTHS = [
-    "janvier", "fevrier", "mars", "avril", "mai", "juin",
-    "juillet", "aout", "septembre", "octobre", "novembre", "decembre",
-  ];
   const d = new Date();
   return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
@@ -28,13 +39,16 @@ function todayLabel(): string {
 export function CeSoir({
   onGoTargets,
   onSearch,
+  onOpenTarget,
 }: {
   onGoTargets: () => void;
   onSearch: () => void;
+  onOpenTarget: (designation: string) => void;
 }) {
   const [meteoOpen, setMeteoOpen] = useState(false);
 
   const fetchNight = useCallback(() => api.night(), []);
+  const fetchNights = useCallback(() => api.nights(), []);
   const fetchState = useCallback(() => api.state(), []);
   const fetchTargets = useCallback(() => api.targets(), []);
   const fetchMessier = useCallback(() => api.messier(true), []);
@@ -43,62 +57,87 @@ export function CeSoir({
   // avant meme la requete, pour que l'appli installee montre quelque chose
   // sans reseau (voir useFetch).
   const night = useFetch(fetchNight, [], "night");
+  const nights = useFetch(fetchNights, [], "nights");
   const state = useFetch(fetchState, [], "state");
   const targets = useFetch(fetchTargets, [], "targets");
   const messier = useFetch(fetchMessier, [], "messier:true");
   const stale = (night.error || state.error) && night.data && state.data;
 
+  const reloadAll = () => {
+    night.reload();
+    nights.reload();
+    state.reload();
+    targets.reload();
+    messier.reload();
+  };
+  const refreshing = night.loading || targets.loading;
+
   if ((night.loading && !night.data) || (state.loading && !state.data)) {
     return (
       <div className="nc-screen">
-        <p className="nc-caption">Chargement meteo + ephemerides...</p>
+        <p className="nc-caption">Chargement météo et éphémérides…</p>
       </div>
     );
   }
   if (!night.data || !state.data) {
     return (
       <div className="nc-screen">
-        <p className="nc-caption">Impossible de recuperer les donnees. Reessayez dans quelques instants.</p>
+        <ErrorNotice message="Impossible de récupérer la prévision de la nuit." onRetry={reloadAll} />
       </div>
     );
   }
 
   const n = night.data;
+  const site = state.data.site;
   const captured = new Set(state.data.messierCaptured);
   const uncapturedMessier =
     messier.data?.filter((r) => r.messierId && !captured.has(r.messierId)).length ?? 0;
-  const targetCount = targets.data?.length ?? 0;
+  // Rien tant que la liste n'est pas la : « 0 cible » pendant le
+  // chargement affirmait une nuit vide.
+  const targetCount = targets.data?.length ?? null;
+  const trend = n.cloudTrend ? CLOUD_TREND[n.cloudTrend.direction] : null;
 
   return (
     <div className="nc-screen">
       {stale && <StaleNotice when={night.fetchedAt} />}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-        <div>
-          <div className="nc-eyebrow">Ce soir</div>
-          <div className="nc-title">{todayLabel()}</div>
-          <div className="nc-sub">
-            {state.data.site.name} · {state.data.site.lat.toFixed(2)}°N {state.data.site.lon.toFixed(2)}°E
-          </div>
-        </div>
-        <button
-          onClick={onSearch}
-          className="nc-btn"
-          style={{ width: 44, height: 44, flex: "none", borderRadius: 22, padding: 0, fontSize: "var(--text-md)" }}
-        >
-          ⌕
-        </button>
-      </div>
+      <ScreenHeader
+        eyebrow="Ce soir"
+        title={todayLabel()}
+        sub={
+          <>
+            {site.name} · <span className="nc-num">{fmtLatLon(site.lat, site.lon)}</span>
+          </>
+        }
+        actions={
+          <>
+            <button
+              onClick={reloadAll}
+              disabled={refreshing}
+              className="nc-round-btn"
+              aria-label="Actualiser la prévision"
+              title="Actualiser la prévision"
+            >
+              <TabIcon name="refresh" />
+            </button>
+            <button onClick={onSearch} className="nc-round-btn" aria-label="Rechercher un objet" title="Rechercher un objet">
+              <TabIcon name="search" />
+            </button>
+          </>
+        }
+      />
 
       <ScoreCard night={n} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 9 }}>
+      {nights.data && <NightStrip nights={nights.data} />}
+
+      <div className="nc-grid-2">
         <StatCard
-          label="Temperature"
+          label="Température"
           value={
             n.tempNowC != null ? (
               <>
                 {Math.round(n.tempNowC)}
-                <span style={{ fontSize: 13, color: "var(--ink3)" }}>°C</span>
+                <span className="nc-unit">°C</span>
               </>
             ) : (
               "n/d"
@@ -115,24 +154,19 @@ export function CeSoir({
           value={
             <>
               {Math.round(n.moonIllum)}
-              <span style={{ fontSize: 13, color: "var(--ink3)" }}>%</span>
+              <span className="nc-unit">%</span>
             </>
           }
-          sub={`${n.moonWaxing ? "Croissante" : "Decroissante"} · ${n.moonSizeArcmin.toFixed(1)}'`}
+          sub={`${n.moonWaxing ? "Croissante" : "Décroissante"} · ${n.moonSizeArcmin.toFixed(1)}'`}
         />
-        <StatCard
-          label="Buee"
-          valueIsWord
-          value={n.dewRisk}
-          sub={`Anti-buee : ${n.dewAdvice}`}
-        />
+        <StatCard label="Buée" valueIsWord value={n.dewRisk} sub={`Anti-buée : ${n.dewAdvice}`} />
         <StatCard
           label="Rafales"
           value={
             n.windGustsKmh != null ? (
               <>
                 {Math.round(n.windGustsKmh)}
-                <span style={{ fontSize: 11, color: "var(--ink3)" }}> km/h</span>
+                <span className="nc-unit"> km/h</span>
               </>
             ) : (
               "n/d"
@@ -141,64 +175,72 @@ export function CeSoir({
         />
       </div>
 
-      <button
-        onClick={onGoTargets}
-        className="nc-btn nc-btn-primary"
-        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left", padding: "17px 18px", borderRadius: 16 }}
-      >
-        <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <span style={{ fontSize: 16 }}>{targetCount} cibles pointables ce soir</span>
-          <span style={{ fontSize: 12, opacity: 0.7 }}>dont {uncapturedMessier} Messier pas encore captures</span>
+      <button onClick={onGoTargets} className="nc-btn nc-btn-primary nc-cta">
+        <span className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
+          <span style={{ fontSize: "var(--text-md)" }}>
+            {targetCount != null
+              ? `${plural(targetCount, "cible pointable", "cibles pointables")} ce soir`
+              : "Cibles de ce soir"}
+          </span>
+          <span style={{ fontSize: "var(--text-xs)", opacity: 0.75 }}>
+            {targetCount != null && messier.data
+              ? `dont ${plural(uncapturedMessier, "Messier pas encore capturé", "Messier pas encore capturés")}`
+              : "calcul des créneaux…"}
+          </span>
         </span>
-        <span style={{ fontSize: 16 }}>→</span>
+        <span style={{ fontSize: "var(--text-md)" }} aria-hidden="true">→</span>
       </button>
 
-      <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div className="nc-eyebrow">Horizon degage</div>
-        </div>
+      {targets.data && <NightPlan rows={targets.data} onOpenTarget={onOpenTarget} />}
+
+      <div className="nc-card nc-stack">
+        <div className="nc-eyebrow">Horizon dégagé</div>
         <SectorChips horizon={state.data.horizon} />
       </div>
 
-      <button onClick={() => setMeteoOpen((v) => !v)} className="nc-btn" style={{ display: "flex", justifyContent: "space-between" }}>
-        <span>Details meteo</span>
-        <span style={{ fontSize: 12, color: "var(--ink3)" }}>{meteoOpen ? "masquer" : "nuages · rosee · vent"}</span>
+      <button onClick={() => setMeteoOpen((v) => !v)} className="nc-btn nc-row nc-between" aria-expanded={meteoOpen}>
+        <span>Détails météo</span>
+        <span className="nc-caption">{meteoOpen ? "masquer" : "nuages · rosée · vent"}</span>
       </button>
 
       {meteoOpen && (
-        <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="nc-card nc-stack" style={{ gap: "var(--space-md)" }}>
+          <div className="nc-stack-xs">
             <div className="nc-eyebrow">Nuages</div>
-            {n.cloudTrend ? (
-              <p style={{ margin: 0, fontSize: 13 }}>
-                {CLOUD_TREND_ICON[n.cloudTrend.direction]} {n.cloudTrend.label} attendue : nuages{" "}
-                {Math.round(n.cloudTrend.nowPct)}% → {Math.round(n.cloudTrend.futurePct)}% dans les prochaines
-                heures.
+            {n.cloudTrend && trend ? (
+              <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>
+                <span style={{ color: trend.color }} aria-hidden="true">{trend.arrow}</span>{" "}
+                {n.cloudTrend.label} attendue : nuages{" "}
+                <span className="nc-num">
+                  {Math.round(n.cloudTrend.nowPct)} % → {Math.round(n.cloudTrend.futurePct)} %
+                </span>{" "}
+                dans les prochaines heures.
               </p>
             ) : (
               <p className="nc-caption" style={{ margin: 0 }}>
-                Tendance nuages indisponible (nuit differente d'aujourd'hui, ou pas assez d'heures a venir).
+                Tendance nuages indisponible (nuit différente d'aujourd'hui, ou pas assez d'heures à venir).
               </p>
             )}
             <CloudChart hourly={n.hourly} />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div className="nc-eyebrow">Point de rosee</div>
-            <p style={{ margin: 0, fontSize: 13 }}>
-              Ecart temperature/point de rosee : {n.dewSpread != null ? `${n.dewSpread.toFixed(1)}°` : "n/d"} (
+          <div className="nc-stack-xs">
+            <div className="nc-eyebrow">Point de rosée</div>
+            <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>
+              Écart température/point de rosée :{" "}
+              <span className="nc-num">{n.dewSpread != null ? `${n.dewSpread.toFixed(1)}°` : "n/d"}</span> (
               {n.dewRisk.toLowerCase()}).
             </p>
             <TempDewChart hourly={n.hourly} />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="nc-stack-xs">
             <div className="nc-eyebrow">Vent</div>
             <WindChart hourly={n.hourly} />
           </div>
 
           <p className="nc-caption" style={{ margin: 0 }}>
-            Open-Meteo AROME 1.3 km · seeing et transparence 7Timer ASTRO.
+            Open-Meteo AROME 1,3 km · seeing et transparence 7Timer ASTRO.
           </p>
         </div>
       )}

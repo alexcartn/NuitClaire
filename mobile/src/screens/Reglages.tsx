@@ -1,33 +1,31 @@
 import { useCallback, useState } from "react";
-import { api } from "../api";
+import { api, getApiToken, setApiToken } from "../api";
 import { useFetch } from "../useFetch";
 import { useTheme } from "../useTheme";
 import { isIOS, promptInstall, usePwa } from "../pwa";
 import { useCompass } from "../useCompass";
 import { sectorFor } from "../compass";
 import { Compass } from "../components/Compass";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { COMPASS_SECTORS } from "../types";
+import { fmtDecimalHour } from "../format";
 
 const WINDOW_MODES: { key: "complete" | "habituelle"; label: string }[] = [
-  { key: "complete", label: "Nuit complete" },
+  { key: "complete", label: "Nuit complète" },
   { key: "habituelle", label: "Habituelle" },
 ];
 
-/** '20.5' -> "20:30" (les horaires sont stockes en heures decimales, voir
- * settings.view_window). */
-function fmtHour(h: number): string {
-  const hh = Math.floor(h);
-  const mm = Math.round((h - hh) * 60);
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-}
+const fmtHour = fmtDecimalHour;
 
 const ALERT_LABEL: Record<string, string> = {
-  score: "Me prevenir a 18h quand la nuit depasse 70",
-  dew: "Alerte buee quand l'ecart tombe sous 1.5 °C",
+  score: "Me prévenir à 18h quand la nuit dépasse 70",
+  dew: "Alerte buée quand l'écart tombe sous 1,5 °C",
 };
 
 export function Reglages() {
-  const { theme, isSystem, setTheme } = useTheme();
+  const { theme, isSystem, setTheme, auto, setAutoNight } = useTheme();
+  const [tokenSaved, setTokenSaved] = useState(() => getApiToken() !== null);
+  const [tokenDraft, setTokenDraft] = useState("");
   const { canPromptInstall, installed } = usePwa();
   const compass = useCompass();
   // Secteur vise, pour le designer dans la grille d'horizon juste en dessous.
@@ -61,24 +59,35 @@ export function Reglages() {
 
   const useMyPosition = () => {
     if (!navigator.geolocation) {
-      setGeoError("Geolocalisation indisponible sur cet appareil.");
+      setGeoError("Géolocalisation indisponible sur cet appareil.");
       return;
     }
     setGeocoding(true);
     setGeoError(null);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        // Un vrai nom de commune plutot que « Ma position » : c'est ce nom
+        // que le journal retient pour chaque sortie, et « Ma position »
+        // repete d'une nuit a l'autre ne disait plus ou l'on etait. Sans
+        // reseau ou sans nom connu, on retombe sur l'ancien intitule.
+        let name = "Ma position";
         try {
-          await api.updateSettings({
-            site: { name: "Ma position", lat: pos.coords.latitude, lon: pos.coords.longitude },
-          });
+          name = (await api.reverseGeocode(lat, lon)).name;
+        } catch {
+          /* nom generique conserve */
+        }
+        try {
+          await api.updateSettings({ site: { name, lat, lon } });
           reloadSettings();
+        } catch {
+          setGeoError("Position trouvée, mais non enregistrée : pas de réseau ?");
         } finally {
           setGeocoding(false);
         }
       },
       () => {
-        setGeoError("Position refusee ou indisponible.");
+        setGeoError("Position refusée ou indisponible.");
         setGeocoding(false);
       },
     );
@@ -101,7 +110,7 @@ export function Reglages() {
   const saveViewWindow = async (startHour: number, endHour: number) => {
     setWindowError(null);
     if (!(startHour < endHour)) {
-      setWindowError("L'heure de debut doit etre avant l'heure de fin.");
+      setWindowError("L'heure de début doit être avant l'heure de fin.");
       return;
     }
     await api.updateSettings({ viewWindow: { startHour, endHour } });
@@ -117,10 +126,7 @@ export function Reglages() {
 
   return (
     <div className="nc-screen">
-      <div>
-        <div className="nc-eyebrow">Poste d'observation</div>
-        <div className="nc-title">Position et horizon</div>
-      </div>
+      <ScreenHeader eyebrow="Poste d'observation" title="Position et horizon" />
 
       <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
         <div className="nc-eyebrow">Adresse</div>
@@ -137,15 +143,15 @@ export function Reglages() {
         <input
           value={address}
           onChange={(e) => setAddress(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && runGeocode()}
           placeholder="7 rue Saint Jean, 51240 Marson"
-          style={{
-            background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 11,
-            padding: 13, fontSize: 13, color: "var(--ink)",
-          }}
+          aria-label="Adresse du poste d'observation"
+          className="nc-input"
+          style={{ background: "var(--surf2)", borderRadius: 11, padding: 13 }}
         />
         <div style={{ display: "flex", gap: 9 }}>
           <button onClick={runGeocode} disabled={geocoding} className="nc-btn nc-btn-primary" style={{ flex: 1 }}>
-            {geocoding ? "..." : "Geocoder"}
+            {geocoding ? "…" : "Trouver l'adresse"}
           </button>
           <button onClick={useMyPosition} disabled={geocoding} className="nc-btn" style={{ flex: "none" }}>
             Ma position
@@ -153,7 +159,7 @@ export function Reglages() {
         </div>
         {geoError && <p className="nc-caption" style={{ color: "var(--bad)", margin: 0 }}>{geoError}</p>}
         <p className="nc-caption" style={{ margin: 0 }}>
-          Nominatim ne renvoie ni altitude ni fuseau : ceux du site precedent sont conserves.
+          Le service d'adresses (Nominatim) ne donne ni altitude ni fuseau : ceux du lieu précédent sont conservés.
         </p>
       </div>
 
@@ -165,20 +171,20 @@ export function Reglages() {
           <>
             <Compass heading={compass.heading} facing={facing} />
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span className="nc-num" style={{ fontSize: 26, color: "var(--accent)" }}>{facing}</span>
-              <span className="nc-num" style={{ fontSize: 13, color: "var(--ink2)" }}>
+              <span className="nc-num" style={{ fontSize: "var(--text-xl)", color: "var(--accent)" }}>{facing}</span>
+              <span className="nc-num" style={{ fontSize: "var(--text-sm)", color: "var(--ink2)" }}>
                 {Math.round(compass.heading)}°
               </span>
             </div>
             <p className="nc-caption" style={{ margin: 0, textAlign: "center" }}>
-              Direction regardee, d'apres la boussole du telephone.
+              Direction regardée, d'après la boussole du téléphone.
             </p>
           </>
         ) : compass.state === "unsupported" || compass.state === "denied" ? (
           <p className="nc-caption" style={{ margin: 0, textAlign: "center" }}>
             {compass.state === "denied"
-              ? "Acces a la boussole refuse. Vous pouvez l'autoriser dans les reglages du navigateur."
-              : "Ce navigateur ne donne pas acces a la boussole du telephone."}
+              ? "Accès à la boussole refusé. Vous pouvez l'autoriser dans les réglages du navigateur."
+              : "Ce navigateur ne donne pas accès à la boussole du téléphone."}
           </p>
         ) : compass.needsPermission ? (
           <>
@@ -187,24 +193,24 @@ export function Reglages() {
               disabled={compass.state === "asking"}
               className="nc-btn"
             >
-              {compass.state === "asking" ? "..." : "Activer la boussole"}
+              {compass.state === "asking" ? "…" : "Activer la boussole"}
             </button>
             <p className="nc-caption" style={{ margin: 0, textAlign: "center" }}>
-              Pour savoir quelles directions vous cochez ci-dessous, sans repere dans le noir.
+              Pour savoir quelles directions vous cochez ci-dessous, sans repère dans le noir.
             </p>
           </>
         ) : (
           <p className="nc-caption" style={{ margin: 0, textAlign: "center" }}>
-            En attente d'une mesure...
+            En attente d'une mesure…
           </p>
         )}
       </div>
 
       {state && (
         <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-          <div className="nc-eyebrow">Horizon degage</div>
+          <div className="nc-eyebrow">Horizon dégagé</div>
           <p className="nc-caption" style={{ margin: 0 }}>
-            Touchez les directions ou le ciel est libre depuis votre poste.
+            Touchez les directions où le ciel est libre depuis votre poste.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
             {COMPASS_SECTORS.map((s) => (
@@ -212,8 +218,9 @@ export function Reglages() {
                 key={s}
                 onClick={() => toggleSector(s)}
                 className="nc-num"
+                aria-pressed={!!state.horizon[s]}
                 style={{
-                  textAlign: "center", padding: "14px 0", borderRadius: 11, fontSize: 13, cursor: "pointer",
+                  textAlign: "center", padding: "14px 0", borderRadius: 11, fontSize: "var(--text-sm)", cursor: "pointer",
                   background: state.horizon[s] ? "var(--accent)" : "transparent",
                   color: state.horizon[s] ? "var(--onaccent)" : "var(--ink2)",
                   border: `1px solid ${state.horizon[s] ? "var(--accent)" : "var(--line)"}`,
@@ -232,12 +239,13 @@ export function Reglages() {
 
       {data && (
         <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div className="nc-eyebrow">Fenetre d'observation</div>
+          <div className="nc-eyebrow">Fenêtre d'observation</div>
           {WINDOW_MODES.map((w) => (
             <button
               key={w.key}
               onClick={() => pickWindowMode(w.key)}
               className="nc-btn"
+              aria-pressed={data.windowMode === w.key}
               style={{
                 textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center",
                 background: data.windowMode === w.key ? "var(--surf2)" : "transparent",
@@ -247,12 +255,12 @@ export function Reglages() {
               <span>
                 {w.label}
                 {w.key === "habituelle" && (
-                  <span className="nc-num" style={{ color: "var(--ink3)", marginLeft: 6, fontSize: 12 }}>
+                  <span className="nc-num" style={{ color: "var(--ink3)", marginLeft: 6, fontSize: "var(--text-xs)" }}>
                     ({fmtHour(data.viewWindow.startHour)}–{fmtHour(data.viewWindow.endHour)})
                   </span>
                 )}
               </span>
-              {data.windowMode === w.key && <span>●</span>}
+              {data.windowMode === w.key && <span style={{ color: "var(--accent)" }} aria-hidden="true">●</span>}
             </button>
           ))}
 
@@ -266,13 +274,9 @@ export function Reglages() {
                     start: e.target.value,
                     end: windowDraft?.end ?? fmtHour(data.viewWindow.endHour),
                   })}
-                  className="nc-num"
-                  style={{
-                    flex: 1, background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
-                    padding: "7px 9px", fontSize: 13, color: "var(--ink)",
-                  }}
+                  className="nc-input nc-num"
                 />
-                <span className="nc-caption" style={{ margin: 0 }}>a</span>
+                <span className="nc-caption" style={{ margin: 0 }}>à</span>
                 <input
                   type="time"
                   value={windowDraft?.end ?? fmtHour(data.viewWindow.endHour)}
@@ -280,11 +284,7 @@ export function Reglages() {
                     start: windowDraft?.start ?? fmtHour(data.viewWindow.startHour),
                     end: e.target.value,
                   })}
-                  className="nc-num"
-                  style={{
-                    flex: 1, background: "var(--surf2)", border: "1px solid var(--line)", borderRadius: 8,
-                    padding: "7px 9px", fontSize: 13, color: "var(--ink)",
-                  }}
+                  className="nc-input nc-num"
                 />
               </div>
               {windowError && <p className="nc-caption" style={{ color: "var(--bad)", margin: 0 }}>{windowError}</p>}
@@ -307,11 +307,13 @@ export function Reglages() {
 
       {data && (
         <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="nc-eyebrow">Alertes (enregistrees, pas encore envoyees)</div>
+          <div className="nc-eyebrow">Alertes (enregistrées, pas encore envoyées)</div>
           {Object.entries(data.alerts).map(([key, on]) => (
             <button
               key={key}
               onClick={() => toggleAlert(key)}
+              role="switch"
+              aria-checked={on}
               style={{
                 background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
@@ -319,16 +321,7 @@ export function Reglages() {
               }}
             >
               <span style={{ fontSize: "var(--text-sm)" }}>{ALERT_LABEL[key] ?? key}</span>
-              <span
-                style={{
-                  width: 46, height: 28, borderRadius: 14, flex: "none",
-                  background: on ? "var(--accent)" : "var(--bar)",
-                  display: "flex", alignItems: "center", justifyContent: on ? "flex-end" : "flex-start",
-                  padding: 3, boxSizing: "border-box",
-                }}
-              >
-                <span style={{ width: 22, height: 22, borderRadius: 11, background: "var(--surf)" }} />
-              </span>
+              <span className={`nc-switch ${on ? "nc-switch-on" : ""}`} aria-hidden="true"><span /></span>
             </button>
           ))}
         </div>
@@ -338,13 +331,13 @@ export function Reglages() {
         <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div className="nc-eyebrow">Installer l'appli</div>
           <p className="nc-caption" style={{ margin: 0 }}>
-            Posee sur l'ecran d'accueil, NuitClaire s'ouvre en plein ecran et demarre meme
-            sans reseau : utile en pleine campagne, ou le journal continue de se remplir
+            Posée sur l'écran d'accueil, NuitClaire s'ouvre en plein écran et démarre même
+            sans réseau : utile en pleine campagne, où le journal continue de se remplir
             hors ligne.
           </p>
           {canPromptInstall ? (
             <button onClick={() => void promptInstall()} className="nc-btn nc-btn-primary">
-              Ajouter a l'ecran d'accueil
+              Ajouter à l'écran d'accueil
             </button>
           ) : (
             // iOS n'expose pas d'API d'installation, et Chrome ne rejoue pas
@@ -352,31 +345,88 @@ export function Reglages() {
             // reste que la marche a suivre manuelle.
             <p className="nc-caption" style={{ margin: 0 }}>
               {isIOS()
-                ? "Sur iPhone et iPad : bouton Partager, puis « Sur l'ecran d'accueil »."
-                : "Depuis le menu du navigateur : « Installer l'application » ou « Ajouter a l'ecran d'accueil »."}
+                ? "Sur iPhone et iPad : bouton Partager, puis « Sur l'écran d'accueil »."
+                : "Depuis le menu du navigateur : « Installer l'application » ou « Ajouter à l'écran d'accueil »."}
             </p>
           )}
         </div>
       )}
 
       <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div className="nc-eyebrow">Theme</div>
+        <div className="nc-eyebrow">Thème</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {(["system", "light", "dark", "night"] as const).map((t) => {
             const active = t === "system" ? isSystem : !isSystem && theme === t;
-            const label = { system: "Systeme", light: "Clair", dark: "Sombre", night: "Vision nocturne" }[t];
+            const label = { system: "Système", light: "Clair", dark: "Sombre", night: "Vision nocturne" }[t];
             return (
-              <button key={t} onClick={() => setTheme(t)} className={`nc-chip ${active ? "nc-chip-active" : ""}`}>
+              <button key={t} onClick={() => setTheme(t)} className={`nc-chip ${active ? "nc-chip-active" : ""}`} aria-pressed={active}>
                 {label}
               </button>
             );
           })}
         </div>
         <p className="nc-caption" style={{ margin: 0 }}>
-          Vision nocturne : rouge sur noir et tailles augmentees, pour ne pas reperdre son
-          adaptation a l'obscurite en consultant l'appli dehors. Aussi accessible d'un appui
-          depuis le Journal.
+          Vision nocturne : rouge sur noir et tailles augmentées, pour ne pas reperdre son
+          adaptation à l'obscurité en consultant l'appli dehors. Accessible d'un appui en haut
+          de chaque écran (bouton « Nuit »).
         </p>
+        <button
+          onClick={() => setAutoNight(!auto)}
+          role="switch"
+          aria-checked={auto}
+          className="nc-row nc-between"
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", minHeight: 44, color: "var(--ink)", textAlign: "left", gap: "var(--space-md)" }}
+        >
+          <span style={{ fontSize: "var(--text-sm)" }}>Passer seul en vision nocturne à la nuit tombée</span>
+          <span className={`nc-switch ${auto ? "nc-switch-on" : ""}`} aria-hidden="true"><span /></span>
+        </button>
+        <p className="nc-caption" style={{ margin: 0 }}>
+          Entre les crépuscules nautiques de la nuit chargée, une fois par nuit ; retour au thème
+          d'avant au matin. Si vous en sortez à la main, l'appli ne vous y renvoie pas.
+        </p>
+      </div>
+
+      <div className="nc-card nc-stack">
+        <div className="nc-eyebrow">Code d'accès</div>
+        <p className="nc-caption" style={{ margin: 0 }}>
+          {tokenSaved
+            ? "Un code est enregistré sur ce téléphone."
+            : "Aucun code enregistré. Nécessaire seulement si le serveur en exige un (NUITCLAIRE_API_TOKEN)."}
+        </p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!tokenDraft.trim()) return;
+            setApiToken(tokenDraft);
+            setTokenDraft("");
+            setTokenSaved(true);
+          }}
+          className="nc-row"
+        >
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={tokenDraft}
+            onChange={(e) => setTokenDraft(e.target.value)}
+            placeholder={tokenSaved ? "Nouveau code" : "Code d'accès"}
+            aria-label="Code d'accès"
+            className="nc-input"
+          />
+          <button type="submit" className="nc-btn nc-none" disabled={!tokenDraft.trim()}>
+            Enregistrer
+          </button>
+        </form>
+        {tokenSaved && (
+          <button
+            onClick={() => {
+              setApiToken(null);
+              setTokenSaved(false);
+            }}
+            className="nc-link"
+          >
+            Oublier le code
+          </button>
+        )}
       </div>
     </div>
   );

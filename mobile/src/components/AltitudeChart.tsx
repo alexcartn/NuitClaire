@@ -49,7 +49,7 @@ export function AltitudeChart({
           <span
             key={i}
             style={{
-              flex: 1, textAlign: "center", fontSize: 9,
+              flex: 1, textAlign: "center", fontSize: "var(--text-xs)",
               color: p.pointable ? "var(--accent)" : "var(--ink3)",
             }}
           >
@@ -73,7 +73,7 @@ export function AltitudeChart({
       </div>
       <div
         className="nc-num"
-        style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ink3)" }}
+        style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--ink3)" }}
       >
         {series
           .filter((_, i) => i % 3 === 0 || i === series.length - 1)

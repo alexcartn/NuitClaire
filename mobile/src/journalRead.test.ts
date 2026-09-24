@@ -109,12 +109,12 @@ test("l'export d'une nuit reprend conditions, cibles, fil et ressenti", () => {
 
   assert.match(md, /## lundi 21 septembre 2026/);
   assert.match(md, /score 80\/100/);
-  assert.match(md, /6,1 a 9,4 °C/);
+  assert.match(md, /6,1 à 9,4 °C/);
   assert.match(md, /Lune 77 %/);
   assert.match(md, /\*\*Temps de pose\.\*\* M31 30 min/);
   assert.match(md, /22:40 · \*\*M31\*\* : ca bave un peu/);
   assert.match(md, /8,2 °C · 5 % nuages · seeing 3/);
-  assert.match(md, /satisfaction 4\/5 · ciel percu 2\/5/);
+  assert.match(md, /satisfaction 4\/5 · ciel perçu 2\/5/);
   assert.match(md, /premiere lumiere/);
   assert.match(md, /> belle soiree/);
 });
@@ -136,7 +136,7 @@ test("l'export complet garde l'ordre du journal et ignore la session en cours", 
   const md = journalToMarkdown(data, "Marson");
 
   assert.match(md, /# Carnet d'observation/);
-  assert.match(md, /2 sortie\(s\) · Marson/);
+  assert.match(md, /2 sorties · Marson/);
   // `toLocaleDateString("fr-FR")` accentue les mois : « août », pas « aout ».
   assert.ok(md.indexOf("20 septembre") < md.indexOf("12 août"), "la plus recente en tete");
   assert.doesNotMatch(md, /Session en cours/);

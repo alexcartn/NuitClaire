@@ -9,17 +9,17 @@ export function ScoreCard({ night }: { night: Night }) {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
         <div
           className="nc-num"
-          style={{ fontSize: 62, lineHeight: 0.82, letterSpacing: "-.045em", fontWeight: 500, color: qualityColor(night.score) }}
+          style={{ fontSize: "var(--text-display)", lineHeight: 0.82, letterSpacing: "-.045em", fontWeight: 500, color: qualityColor(night.score) }}
         >
           {night.scorePct}
         </div>
-        <div className="nc-num" style={{ fontSize: 14, color: "var(--ink3)", marginBottom: 6 }}>
+        <div className="nc-num" style={{ fontSize: "var(--text-sm)", color: "var(--ink3)", marginBottom: 6 }}>
           /100
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ textAlign: "right", marginBottom: 4 }}>
-          <div style={{ fontSize: 17 }}>{night.scoreLabel}</div>
-          <div style={{ fontSize: 12, color: "var(--ink3)", marginTop: 4 }}>score astro de la nuit</div>
+          <div style={{ fontSize: "var(--text-md)" }}>{night.scoreLabel}</div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--ink3)", marginTop: 4 }}>score astro de la nuit</div>
         </div>
       </div>
       <MiniScoreBars hourly={night.hourly} />

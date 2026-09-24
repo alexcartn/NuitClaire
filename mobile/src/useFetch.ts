@@ -83,11 +83,11 @@ export function useFetch<T>(
 /** "Donnees du 21/09 a 21:04" : ce que l'appelant affiche quand la requete a
  * echoue mais qu'une copie locale reste a l'ecran. */
 export function staleLabel(fetchedAt: string | null): string {
-  if (!fetchedAt) return "Donnees indisponibles";
+  if (!fetchedAt) return "Données indisponibles";
   const d = new Date(fetchedAt);
   const date = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
   const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `Hors ligne : donnees du ${date} a ${time}`;
+  return `Hors ligne : données du ${date} à ${time}`;
 }
 
 export { readCache };

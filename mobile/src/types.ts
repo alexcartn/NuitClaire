@@ -74,6 +74,19 @@ export interface Night {
   hourly: HourlyPoint[];
 }
 
+/** Une nuit du bandeau « prochaines nuits ». `scorePct` a null : la
+ * prevision ne couvre pas cette nuit, elle n'est pas notee. */
+export interface NightBrief {
+  date: string;
+  scorePct: number | null;
+  scoreLabel: string | null;
+  goHours: number | null;
+  bestWindow: string | null;
+  moonIllum: number;
+  astroDusk: string;
+  astroDawn: string;
+}
+
 export interface TargetRow {
   designation: string;
   isMessier: boolean;

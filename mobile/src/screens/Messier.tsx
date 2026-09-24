@@ -1,8 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
+import { useRemembered } from "../useRemembered";
+import { plural } from "../format";
+import { tap } from "../haptics";
 import { StaleNotice } from "../components/StaleNotice";
-import { RangeSlider } from "../components/RangeSlider";
+import { ErrorNotice } from "../components/ErrorNotice";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { MagnitudeFilter, TypeChips, distinctTypes, magnitudeBounds } from "../components/CatalogFilters";
 
 const MESSIER_TOTAL = 110;
 const PAGE_SIZE = 24;
@@ -16,29 +21,38 @@ export function Messier({
   onOpenTarget: (designation: string) => void;
   onCaptureChange: () => void;
 }) {
-  const [onlyFeasible, setOnlyFeasible] = useState(false);
-  const [types, setTypes] = useState<string[]>([]);
-  const [magRange, setMagRange] = useState<[number, number] | null>(null);
-  const [showAll, setShowAll] = useState(false);
+  // Memorises (voir useRemembered) : revenir d'une fiche retrouve l'ecran
+  // tel qu'on l'avait laisse.
+  const [onlyFeasible, setOnlyFeasible] = useRemembered("messier:feasible", false);
+  const [types, setTypes] = useRemembered<string[]>("messier:types", []);
+  const [magRange, setMagRange] = useRemembered<[number, number] | null>("messier:mag", null);
+  const [showAll, setShowAll] = useRemembered("messier:all", false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
 
   const fetchMessier = useCallback(() => api.messier(onlyFeasible), [onlyFeasible]);
-  const { data: rows, loading, error, fetchedAt } = useFetch(
+  const { data: rows, loading, error, fetchedAt, reload } = useFetch(
     fetchMessier,
     [onlyFeasible],
     `messier:${onlyFeasible}`,
   );
 
-  const allTypes = useMemo(() => {
-    const seen = new Set<string>();
-    (rows ?? []).forEach((r) => seen.add(r.type));
-    return [...seen].sort();
-  }, [rows]);
+  const allTypes = useMemo(() => distinctTypes(rows), [rows]);
+  const magBounds = useMemo(() => magnitudeBounds(rows), [rows]);
+  // Meteo injoignable cote serveur : le catalogue arrive sans la faisabilite
+  // du soir (voir api/routers/catalog.py). On le dit, plutot que de laisser
+  // croire que rien n'est visible.
+  const feasibilityUnknown = !!rows?.length && rows.every((r) => r.feasibleTonight == null);
 
-  const magBounds = useMemo(() => {
-    const values = (rows ?? []).map((r) => r.mag).filter((m): m is number => m != null);
-    if (!values.length) return null;
-    return { min: Math.floor(Math.min(...values)), max: Math.ceil(Math.max(...values)) };
-  }, [rows]);
+  const toggleCapture = async (messierId: string, isCaptured: boolean) => {
+    setCaptureError(null);
+    try {
+      await api.updateMessierCapture(messierId, !isCaptured);
+      tap();
+      onCaptureChange();
+    } catch {
+      setCaptureError("Capture non enregistrée : pas de réseau ? Réessayez dans un instant.");
+    }
+  };
 
   const toggleType = (t: string) =>
     setTypes((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]));
@@ -57,68 +71,51 @@ export function Messier({
 
   return (
     <div className="nc-screen">
-      <div>
-        <div className="nc-eyebrow">Catalogue Messier</div>
-        <div className="nc-title">
-          {captured.size} sur {MESSIER_TOTAL} captures
-        </div>
-      </div>
+      <ScreenHeader
+        eyebrow="Catalogue Messier"
+        title={`${captured.size} sur ${MESSIER_TOTAL} capturés`}
+      />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="nc-stack-xs">
         <div style={{ height: 8, borderRadius: 4, background: "var(--bar)", overflow: "hidden" }}>
           <div style={{ width: `${capturedPct}%`, height: "100%", background: "var(--accent)" }} />
         </div>
-        <div className="nc-num" style={{ fontSize: 11, color: "var(--ink3)" }}>
-          {capturedPct}% du catalogue
-        </div>
+        <div className="nc-num nc-caption">{capturedPct} % du catalogue</div>
       </div>
 
       <button
         onClick={() => setOnlyFeasible((v) => !v)}
         className={`nc-chip ${onlyFeasible ? "nc-chip-active" : ""}`}
         style={{ alignSelf: "flex-start" }}
+        aria-pressed={onlyFeasible}
       >
         Faisable ce soir uniquement
       </button>
 
-      {allTypes.length > 0 && (
-        <div style={{ display: "flex", gap: 7, overflow: "auto", margin: "0 -18px", padding: "0 18px 2px" }}>
-          {allTypes.map((t) => (
-            <button
-              key={t}
-              onClick={() => toggleType(t)}
-              className={`nc-chip ${types.includes(t) ? "nc-chip-active" : ""}`}
-              style={{ flex: "none" }}
-            >
-              {t}
-            </button>
-          ))}
+      <TypeChips types={allTypes} selected={types} onToggle={toggleType} />
+      <MagnitudeFilter bounds={magBounds} value={magRange} onChange={setMagRange} />
+
+      {loading && !rows && <p className="nc-caption">Chargement…</p>}
+      {error &&
+        (rows ? (
+          <StaleNotice when={fetchedAt} />
+        ) : (
+          <ErrorNotice message="Impossible de charger le catalogue." onRetry={reload} />
+        ))}
+      {feasibilityUnknown && (
+        <div className="nc-notice">
+          Prévision météo injoignable : le catalogue s'affiche, mais la visibilité de ce soir n'est pas connue.
         </div>
       )}
-
-      {magBounds && magBounds.max > magBounds.min && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span className="nc-caption" style={{ margin: 0 }}>
-            Magnitude {(magRange ?? [magBounds.min, magBounds.max])[0].toFixed(1)} →{" "}
-            {(magRange ?? [magBounds.min, magBounds.max])[1].toFixed(1)}
-          </span>
-          <RangeSlider
-            min={magBounds.min}
-            max={magBounds.max}
-            step={0.5}
-            value={magRange ?? [magBounds.min, magBounds.max]}
-            onChange={setMagRange}
-          />
-        </div>
+      {onlyFeasible && rows && rows.length === 0 && !error && (
+        <p className="nc-caption">Aucun Messier faisable ce soir, ou prévision indisponible.</p>
       )}
-
-      {loading && !rows && <p className="nc-caption">Chargement...</p>}
-      {error && (rows ? <StaleNotice when={fetchedAt} /> : <p className="nc-caption">Erreur de chargement du catalogue.</p>)}
-      {rows && filtered.length === 0 && (
-        <p className="nc-caption">Aucun objet ne correspond a ces filtres.</p>
+      {rows && rows.length > 0 && filtered.length === 0 && (
+        <p className="nc-caption">Aucun objet ne correspond à ces filtres.</p>
       )}
+      {captureError && <div className="nc-notice">{captureError}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+      <div className="nc-grid-2" style={{ gap: "var(--space-sm)" }}>
         {shown.map((row) => {
           const isCaptured = !!row.messierId && captured.has(row.messierId);
           return (
@@ -145,7 +142,7 @@ export function Messier({
                   />
                 )}
                 <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: 8 }}>
-                  <span className="nc-num" style={{ fontSize: 13, color: "var(--ink)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}>
+                  <span className="nc-num" style={{ fontSize: "var(--text-sm)", color: "var(--ink)", background: "var(--surf)", padding: "2px 5px", borderRadius: 4 }}>
                     {row.designation}
                   </span>
                   {/* « CE SOIR » est un mot, la designation au-dessus est un
@@ -173,16 +170,14 @@ export function Messier({
                   )}
                 </div>
               </button>
-              <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 11, color: "var(--ink2)", minHeight: 30 }}>
+              <div className="nc-stack-xs" style={{ padding: "var(--space-xs)" }}>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--ink2)", minHeight: 30 }}>
                   {row.commonName || row.type}
                 </div>
                 <button
-                  onClick={async () => {
-                    if (!row.messierId) return;
-                    await api.updateMessierCapture(row.messierId, !isCaptured);
-                    onCaptureChange();
-                  }}
+                  onClick={() => row.messierId && toggleCapture(row.messierId, isCaptured)}
+                  aria-pressed={isCaptured}
+                  aria-label={`${row.designation} capturé`}
                   className="nc-btn"
                   style={{
                     background: isCaptured ? "var(--accent)" : "var(--surf2)",
@@ -195,7 +190,7 @@ export function Messier({
                     // ces boutons tombaient a 34 px.
                   }}
                 >
-                  {isCaptured ? "Capturee ✓" : "Marquer capturee"}
+                  {isCaptured ? "Capturé ✓" : "Marquer capturé"}
                 </button>
               </div>
             </div>
@@ -204,8 +199,8 @@ export function Messier({
       </div>
 
       {!showAll && rest > 0 && (
-        <button onClick={() => setShowAll(true)} className="nc-caption" style={{ background: "none", border: "none", cursor: "pointer", padding: "var(--space-sm) 0", minHeight: 44 }}>
-          Voir {rest} objet(s) de plus
+        <button onClick={() => setShowAll(true)} className="nc-link" style={{ alignSelf: "center" }}>
+          Voir {plural(rest, "objet de plus", "objets de plus")}
         </button>
       )}
     </div>

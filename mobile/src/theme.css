@@ -140,6 +140,10 @@
   --text-md: 18px;
   --text-lg: 23px;
   --text-xl: 29px;
+  /* Un seul chiffre a cette taille : le score de la nuit. Sixieme marche
+     plutot qu'un 62 px ecrit en dur dans le composant, pour qu'il suive lui
+     aussi le mode vision nocturne. */
+  --text-display: 62px;
 
   --space-2xs: 4px;
   --space-xs: 8px;
@@ -169,6 +173,7 @@
   --text-md: 20px;
   --text-lg: 25px;
   --text-xl: 31px;
+  --text-display: 64px;
 
   --bg: #000000;
   --surf: #0d0302;
@@ -202,6 +207,15 @@ body {
   color: var(--ink);
   font-family: var(--font-text);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Les navigateurs ne font pas heriter la police aux boutons et champs : les
+   interrupteurs de Reglages s'affichaient dans la police du systeme. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 a {
@@ -559,4 +573,303 @@ a {
 [data-theme="night"] .nc-chip svg {
   width: 16px;
   height: 16px;
+}
+
+/* Utilitaires de mise en page. Les memes trois ou quatre combinaisons de
+   flex revenaient en style en ligne dans chaque ecran (pres de 300 blocs
+   `style={{...}}`), avec des ecarts tires au hasard hors de l'echelle. Ces
+   classes n'en couvrent que les cas courants, sur l'echelle d'espacement. */
+.nc-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.nc-between {
+  justify-content: space-between;
+}
+
+.nc-top {
+  align-items: flex-start;
+}
+
+.nc-baseline {
+  align-items: baseline;
+}
+
+.nc-wrap {
+  flex-wrap: wrap;
+}
+
+.nc-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.nc-none {
+  flex: none;
+}
+
+.nc-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.nc-stack-xs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.nc-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+}
+
+.nc-divider {
+  height: 1px;
+  background: var(--line);
+}
+
+.nc-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Unite accolee a une valeur (°C, %, km/h) : elle qualifie le chiffre, elle
+   ne doit pas lui disputer le regard. */
+.nc-unit {
+  font-size: var(--text-xs);
+  color: var(--ink3);
+}
+
+/* Encadre d'information (hors ligne, synchronisation, erreur). */
+.nc-notice {
+  font: 400 var(--text-xs)/1.45 var(--font-text);
+  background: var(--surf2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--ink2);
+}
+
+/* Lien d'action en texte (Retour, Voir plus, Rouvrir...). Le texte reste
+   discret, la surface tactile atteint 44 px : plusieurs de ces liens
+   tombaient a une vingtaine de pixels de haut. */
+.nc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: 400 var(--text-xs)/1.3 var(--font-text);
+  color: var(--ink2);
+}
+
+.nc-link-accent {
+  color: var(--accent);
+}
+
+.nc-link:disabled {
+  color: var(--ink3);
+  cursor: default;
+}
+
+.nc-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Bouton rond d'icone (recherche, actualiser) dans un en-tete. */
+.nc-round-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--surf);
+  color: var(--ink2);
+  cursor: pointer;
+}
+
+.nc-round-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+[data-theme="night"] .nc-round-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+}
+
+
+.nc-night-toggle {
+  flex: none;
+  gap: 6px;
+}
+
+/* Bandeau des prochaines nuits (voir components/NightStrip.tsx). */
+.nc-night-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xs);
+}
+
+.nc-night-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surf);
+}
+
+.nc-night-day-today {
+  border-color: var(--accent);
+}
+
+/* Demande du code d'acces : recouvre l'ecran, le reste ne peut rien
+   charger tant que le serveur refuse. */
+.nc-token-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  padding: var(--space-md);
+  background: var(--bg);
+}
+
+.nc-token-gate > .nc-card {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+/* Une ligne du plan de la nuit : heure d'abord (principe « les chiffres
+   d'abord »), puis la cible, puis ce qu'elle est. */
+.nc-plan-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: var(--space-xs) 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.nc-plan-row:last-child {
+  border-bottom: none;
+}
+
+/* Bouton d'appel vers les cibles : texte a gauche, fleche a droite. */
+.nc-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  padding: var(--space-md) 18px;
+  border-radius: 16px;
+}
+
+/* Rangee de puces qui defile a l'horizontale jusqu'aux bords de l'ecran. */
+.nc-hscroll {
+  overflow-x: auto;
+  margin: 0 -18px;
+  padding: 0 18px 2px;
+}
+
+/* Une cible de la session en cours. */
+.nc-session-item {
+  background: var(--surf2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: var(--space-sm);
+}
+
+/* Case « capturee » : la case reste petite, sa surface tactile fait 44 px
+   (rembourrage positif, marge negative, rien ne bouge). */
+.nc-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: -11px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.nc-check-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--ink3);
+  color: transparent;
+  font-size: var(--text-xs);
+}
+
+.nc-check-box-on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--onaccent);
+}
+
+.nc-session-target {
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* Interrupteur (alertes, passage automatique en vision nocturne). */
+.nc-switch {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: none;
+  width: 46px;
+  height: 28px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--bar);
+}
+
+.nc-switch > span {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--surf);
+}
+
+.nc-switch-on {
+  justify-content: flex-end;
+  background: var(--accent);
 }

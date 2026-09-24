@@ -28,7 +28,7 @@ export function Compass({ heading, facing }: { heading: number; facing: CompassS
       height={SIZE}
       viewBox={`0 0 ${SIZE} ${SIZE}`}
       role="img"
-      aria-label={`Vous regardez vers ${facing}, cap ${Math.round(heading)} degres`}
+      aria-label={`Vous regardez vers ${facing}, cap ${Math.round(heading)} degrés`}
     >
       <circle cx={CENTER} cy={CENTER} r={RING} fill="none" stroke="var(--line)" strokeWidth={1} />
 
@@ -61,7 +61,7 @@ export function Compass({ heading, facing }: { heading: number; facing: CompassS
                 textAnchor="middle"
                 dominantBaseline="central"
                 fontSize={cardinal ? 12 : 9}
-                fontFamily="'JetBrains Mono', monospace"
+                style={{ fontFamily: "var(--font-num)" }}
                 fill={isNorth ? "var(--accent)" : "var(--ink2)"}
                 fontWeight={isNorth ? 700 : 400}
               >

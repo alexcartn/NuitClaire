@@ -66,6 +66,10 @@ export function sendOp(op: SessionOp): Promise<Sessions> {
  * le reste (fetch qui rejette faute de reseau, 5xx, timeout) est temporaire
  * et se rejoue. */
 export function isPermanentFailure(err: unknown): boolean {
+  // Sauf 401/403 : un code d'acces absent ou perime ne dit rien de
+  // l'operation elle-meme. Elle repartira telle quelle une fois le bon code
+  // saisi -- l'abandonner effacerait la saisie.
+  if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return false;
   return err instanceof ApiError && err.status >= 400 && err.status < 500;
 }
 

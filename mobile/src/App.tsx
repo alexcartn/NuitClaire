@@ -1,9 +1,14 @@
-import { useCallback, useState } from "react";
-import { api } from "./api";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { api, UNAUTHORIZED_EVENT } from "./api";
 import { useFetch } from "./useFetch";
 import { applyUpdate, usePwa } from "./pwa";
-import type { Screen } from "./types";
+import { readCache, readText, writeText } from "./storage";
+import { windowLabel } from "./format";
+import { autoNightAction } from "./autoNight";
+import { autoEnterNight, autoLeaveNight, useTheme } from "./useTheme";
+import type { Night, Screen } from "./types";
 import { TabBar } from "./components/TabBar";
+import { TokenGate } from "./components/TokenGate";
 import { CeSoir } from "./screens/CeSoir";
 import { Cibles } from "./screens/Cibles";
 import { Detail } from "./screens/Detail";
@@ -14,33 +19,191 @@ import { Journal } from "./screens/Journal";
 
 const SCREENS: Screen[] = ["soir", "cibles", "messier", "journal", "reglages"];
 
+/** Ou l'on est, et comment on y est arrive. Pose tel quel dans
+ * `history.state` : le bouton retour d'Android (ou le geste retour d'iOS)
+ * rejoue ces etats au lieu de fermer l'appli.
+ *
+ * `depth` compte les entrees d'historique empilees par l'appli au-dessus de
+ * la premiere : 0 sur "Ce soir", 1 sur un autre onglet, +1 par fiche ou
+ * recherche ouverte. C'est ce qui permet de revenir a "Ce soir" depuis
+ * n'importe ou sans empiler des onglets a l'infini. */
+interface Nav {
+  screen: Screen;
+  selected: string | null;
+  backTo: Screen;
+  depth: number;
+}
+
 /** Ecran d'ouverture : "soir" par defaut, ou celui demande par l'URL. Sert
  * au raccourci "Journal" du manifeste (appui long sur l'icone de l'appli
  * installee) : la nuit commence en general par une note, pas par la meteo. */
-function initialScreen(): Screen {
+function initialNav(): Nav {
+  let screen: Screen = "soir";
   try {
     const asked = new URLSearchParams(window.location.search).get("ecran");
-    return SCREENS.includes(asked as Screen) ? (asked as Screen) : "soir";
+    if (SCREENS.includes(asked as Screen)) screen = asked as Screen;
   } catch {
-    return "soir";
+    /* URL illisible : ecran par defaut */
   }
+  return { screen, selected: null, backTo: screen, depth: 0 };
+}
+
+function isNav(value: unknown): value is Nav {
+  return typeof value === "object" && value !== null && "screen" in value && "depth" in value;
+}
+
+/** Cle de position de defilement : une par onglet, une par fiche. */
+function scrollKey(nav: Nav): string {
+  return nav.screen === "detail" ? `detail:${nav.selected}` : nav.screen;
+}
+
+const AUTO_DONE_KEY = "nc-night-auto-done";
+
+/** Passage automatique en vision nocturne a la nuit tombee (voir
+ * autoNight.ts), verifie chaque minute et au retour au premier plan. */
+function useAutoNight(enabled: boolean): void {
+  useEffect(() => {
+    if (!enabled) return;
+    const check = () => {
+      const action = autoNightAction(readCache<Night>("night"), new Date(), readText(AUTO_DONE_KEY));
+      if (action === "enter") {
+        autoEnterNight();
+        writeText(AUTO_DONE_KEY, readCache<Night>("night")?.date ?? null);
+      } else if (action === "leave") {
+        autoLeaveNight();
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 60_000);
+    const onVisible = () => document.visibilityState === "visible" && check();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [enabled]);
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>(initialScreen);
+  const [nav, setNav] = useState<Nav>(initialNav);
+  const navRef = useRef(nav);
+  navRef.current = nav;
   const { updateReady } = usePwa();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [backTo, setBackTo] = useState<Screen>("cibles");
+  const { auto } = useTheme();
+  useAutoNight(auto);
+
+  const [needToken, setNeedToken] = useState(false);
+  useEffect(() => {
+    const onUnauthorized = () => setNeedToken(true);
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, []);
+
+  // Position de defilement par ecran. Revenir d'une fiche ramenait en haut
+  // d'une liste de cinquante cibles.
+  const scroller = useRef<HTMLDivElement>(null);
+  /** Onglet a appliquer une fois l'historique rembobine (voir changeTab). */
+  const pendingTab = useRef<Nav | null>(null);
+  const positions = useRef(new Map<string, number>());
+  const saveScroll = () => {
+    if (scroller.current) positions.current.set(scrollKey(navRef.current), scroller.current.scrollTop);
+  };
+
+  useEffect(() => {
+    window.history.replaceState(navRef.current, "");
+    const onPop = (e: PopStateEvent) => {
+      if (!isNav(e.state)) return;
+      saveScroll();
+      const pending = pendingTab.current;
+      pendingTab.current = null;
+      if (pending) {
+        window.history.replaceState(pending, "");
+        setNav(pending);
+      } else {
+        setNav(e.state);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // Le contenu arrive parfois un instant apres l'ecran (copie locale lue dans
+  // un effet) : tant que la page n'est pas assez haute, on retente a
+  // l'image suivante, sans insister au-dela d'une demi-seconde.
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const target = positions.current.get(scrollKey(nav)) ?? 0;
+    let frames = 0;
+    let raf = 0;
+    const apply = () => {
+      el.scrollTop = target;
+      if (Math.abs(el.scrollTop - target) > 2 && frames++ < 30) raf = requestAnimationFrame(apply);
+    };
+    apply();
+    return () => cancelAnimationFrame(raf);
+  }, [nav]);
+
+  const push = (next: Nav) => {
+    saveScroll();
+    positions.current.delete(scrollKey(next));
+    window.history.pushState(next, "");
+    setNav(next);
+  };
+  const replace = (next: Nav) => {
+    saveScroll();
+    window.history.replaceState(next, "");
+    setNav(next);
+  };
+
+  const changeTab = (tab: Screen) => {
+    const current = navRef.current;
+    if (tab === current.screen) {
+      // Toucher l'onglet courant remonte en haut, comme ailleurs sur mobile.
+      scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const next: Nav = { screen: tab, selected: null, backTo: tab, depth: tab === "soir" ? 0 : 1 };
+    if (current.depth > next.depth) {
+      // Depuis une fiche ou un autre onglet : on rembobine l'historique
+      // jusqu'au bon niveau, pour que « retour » ne fasse pas revisiter
+      // chaque ecran traverse.
+      saveScroll();
+      pendingTab.current = next;
+      window.history.go(next.depth - current.depth);
+    } else if (current.depth === next.depth) {
+      replace(next);
+    } else {
+      push(next);
+    }
+  };
+
+  const openTarget = (designation: string) => {
+    const current = navRef.current;
+    push({
+      screen: "detail",
+      selected: designation,
+      backTo: current.screen === "detail" || current.screen === "recherche" ? current.backTo : current.screen,
+      depth: current.depth + 1,
+    });
+  };
+
+  const openSearch = () => {
+    const current = navRef.current;
+    push({ screen: "recherche", selected: null, backTo: current.screen, depth: current.depth + 1 });
+  };
+
+  const back = () => {
+    const current = navRef.current;
+    if (current.depth > 0) window.history.back();
+    else replace({ screen: "soir", selected: null, backTo: "soir", depth: 0 });
+  };
 
   const fetchState = useCallback(() => api.state(), []);
   const { data: state, reload: reloadState } = useFetch(fetchState, [], "state");
   const captured = new Set(state?.messierCaptured ?? []);
 
-  const openTarget = (designation: string, from: Screen = screen) => {
-    setSelected(designation);
-    setBackTo(from === "detail" ? backTo : from);
-    setScreen("detail");
-  };
+  const { screen, selected } = nav;
 
   return (
     <div className="nc-app">
@@ -54,12 +217,17 @@ export default function App() {
           </button>
         </div>
       )}
-      <div className="nc-scroll" style={{ flex: 1, overflow: "auto" }}>
+      {needToken && <TokenGate />}
+      <div ref={scroller} className="nc-scroll" style={{ flex: 1, overflow: "auto" }}>
         {screen === "soir" && (
-          <CeSoir onGoTargets={() => setScreen("cibles")} onSearch={() => setScreen("recherche")} />
+          <CeSoir onGoTargets={() => changeTab("cibles")} onSearch={openSearch} onOpenTarget={openTarget} />
         )}
         {screen === "cibles" && (
-          <Cibles captured={captured} onOpenTarget={(d) => openTarget(d, "cibles")} />
+          <Cibles
+            captured={captured}
+            windowLabel={windowLabel(state?.windowMode, state?.viewWindow)}
+            onOpenTarget={openTarget}
+          />
         )}
         {screen === "detail" && selected && (
           <Detail
@@ -68,22 +236,20 @@ export default function App() {
             horizon={state?.horizon}
             windowMode={state?.windowMode}
             viewWindow={state?.viewWindow}
-            onBack={() => setScreen(backTo)}
+            onBack={back}
             onCaptureChange={reloadState}
           />
         )}
         {screen === "messier" && (
-          <Messier captured={captured} onOpenTarget={(d) => openTarget(d, "messier")} onCaptureChange={reloadState} />
+          <Messier captured={captured} onOpenTarget={openTarget} onCaptureChange={reloadState} />
         )}
-        {screen === "journal" && <Journal onOpenTarget={(d) => openTarget(d, "journal")} />}
-        {screen === "recherche" && (
-          <Recherche onOpenTarget={(d) => openTarget(d, "recherche")} onCancel={() => setScreen("soir")} />
-        )}
+        {screen === "journal" && <Journal onOpenTarget={openTarget} />}
+        {screen === "recherche" && <Recherche onOpenTarget={openTarget} onCancel={back} />}
         {screen === "reglages" && <Reglages />}
       </div>
       <TabBar
-        active={screen === "detail" ? backTo : screen === "recherche" ? "soir" : screen}
-        onChange={setScreen}
+        active={screen === "detail" || screen === "recherche" ? nav.backTo : screen}
+        onChange={changeTab}
       />
     </div>
   );

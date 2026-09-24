@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { readJson, writeJson } from "../storage";
 import type { TargetSuggestion } from "../types";
 
 const RECENT_KEY = "nc-recent-searches";
@@ -8,16 +9,12 @@ const DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
 
 function loadRecent(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
+  return readJson<string[]>(RECENT_KEY) ?? [];
 }
 
 function pushRecent(designation: string) {
   const next = [designation, ...loadRecent().filter((d) => d !== designation)].slice(0, RECENT_MAX);
-  localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  writeJson(RECENT_KEY, next);
   return next;
 }
 
@@ -31,6 +28,7 @@ export function Recherche({
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<TargetSuggestion[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
 
   useEffect(() => {
@@ -51,9 +49,13 @@ export function Recherche({
     }
     setSearching(true);
     const timer = setTimeout(() => {
+      setSearchError(false);
       api
         .searchSuggest(q)
         .then(setSuggestions)
+        // Hors ligne, la requete echouait sans rien dire : « Recherche… »
+        // disparaissait et l'ecran restait vide.
+        .catch(() => setSearchError(true))
         .finally(() => setSearching(false));
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -71,30 +73,30 @@ export function Recherche({
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="M31, NGC7380, IC434..."
-          className="nc-num"
-          style={{
-            flex: 1, boxSizing: "border-box", background: "var(--surf)",
-            border: "1px solid var(--accent)", borderRadius: 13, padding: "13px 14px",
-            fontSize: 15, color: "var(--ink)",
-          }}
+          placeholder="M31, NGC7380, IC434…"
+          aria-label="Désignation de l'objet"
+          className="nc-input nc-num"
+          style={{ borderColor: "var(--accent)", borderRadius: 13, padding: "13px 14px", fontSize: "var(--text-md)" }}
         />
-        <button onClick={onCancel} className="nc-btn" style={{ border: "none", background: "none", color: "var(--accent)" }}>
+        <button onClick={onCancel} className="nc-link nc-link-accent" style={{ alignSelf: "center", padding: "0 var(--space-xs)" }}>
           Annuler
         </button>
       </div>
 
       <p className="nc-caption">
-        Les resultats s'affichent au fur et a mesure de la frappe -- designation uniquement (M31,
-        NGC7380, IC434), pas de recherche par nom courant.
+        Les résultats s'affichent au fil de la frappe. Désignation uniquement (M31, NGC7380, IC434) :
+        pas de recherche par nom courant.
       </p>
 
-      {searching && <p className="nc-caption">Recherche...</p>}
+      {searching && <p className="nc-caption">Recherche…</p>}
+      {searchError && !searching && (
+        <div className="nc-notice">Recherche impossible pour l'instant (pas de réseau ?).</div>
+      )}
 
       {suggestions && (
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          <div className="nc-eyebrow">Resultats</div>
-          {suggestions.length === 0 && <p className="nc-caption">Aucun objet trouve pour « {query.trim()} ».</p>}
+          <div className="nc-eyebrow">Résultats</div>
+          {suggestions.length === 0 && <p className="nc-caption">Aucun objet trouvé pour « {query.trim()} ».</p>}
           {suggestions.map((s) => (
             <button
               key={s.designation}
@@ -102,10 +104,10 @@ export function Recherche({
               className="nc-card"
               style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "left", cursor: "pointer", color: "var(--ink)" }}
             >
-              <span className="nc-num" style={{ fontSize: 15, width: 70, flex: "none" }}>
+              <span className="nc-num" style={{ fontSize: "var(--text-md)", width: 80, flex: "none" }}>
                 {s.designation}
               </span>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--ink2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span className="nc-grow nc-ellipsis" style={{ fontSize: "var(--text-sm)", color: "var(--ink2)" }}>
                 {s.commonName || s.type}
               </span>
             </button>
@@ -115,7 +117,7 @@ export function Recherche({
 
       {!suggestions && recent.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 4 }}>
-          <div className="nc-eyebrow">Recemment cherche</div>
+          <div className="nc-eyebrow">Récemment cherché</div>
           <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
             {recent.map((d) => (
               <button key={d} onClick={() => selectTarget(d)} className="nc-chip">

@@ -4,6 +4,7 @@ import type {
   ExposureEntry,
   GeocodeResult,
   Night,
+  NightBrief,
   NightConditions,
   NoteContext,
   Sessions,
@@ -16,7 +17,25 @@ import type {
   TargetSuggestion,
 } from "./types";
 
+import { readText, writeText } from "./storage";
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+
+/** Code d'acces de l'API (voir api/auth.py), saisi une fois sur l'appareil.
+ * Pas dans le bundle : celui-ci est public, n'importe qui l'ouvre. */
+const TOKEN_KEY = "nc-api-token";
+
+export function getApiToken(): string | null {
+  return readText(TOKEN_KEY);
+}
+
+export function setApiToken(token: string | null): void {
+  writeText(TOKEN_KEY, token && token.trim() ? token.trim() : null);
+}
+
+/** Emis quand le serveur refuse le code d'acces : App.tsx affiche alors la
+ * demande de code, quel que soit l'ecran qui a fait la requete. */
+export const UNAUTHORIZED_EVENT = "nc-unauthorized";
 
 /** Erreur HTTP portant son code : la file d'attente du journal (voir
  * sessionQueue.ts) doit distinguer un refus du serveur (4xx, definitif --
@@ -45,11 +64,18 @@ async function request<T>(
       else url.searchParams.set(key, value);
     }
   }
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const token = getApiToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(url, {
     method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  }
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
     throw new ApiError(detail?.detail ?? `${path} -> ${res.status}`, res.status);
@@ -65,12 +91,15 @@ export const api = {
   settings: () => get<Settings>("/api/settings"),
   updateSettings: (update: SettingsUpdate) => request<Settings>("PUT", "/api/settings", { body: update }),
   geocode: (address: string) => request<GeocodeResult>("POST", "/api/geocode", { body: { address } }),
+  reverseGeocode: (lat: number, lon: number) =>
+    request<{ name: string }>("POST", "/api/geocode/reverse", { body: { lat, lon } }),
   updateHorizon: (sector: string, open: boolean) =>
     request<Record<string, boolean>>("PUT", "/api/horizon", { body: { sector, open } }),
   updateMessierCapture: (id: string, captured: boolean) =>
     request<string[]>("PUT", `/api/messier/${encodeURIComponent(id)}`, { body: { captured } }),
 
   night: () => get<Night>("/api/night"),
+  nights: () => get<NightBrief[]>("/api/nights"),
   targets: (types?: string[]) => get<TargetRow[]>("/api/targets", types?.length ? { types } : undefined),
   messier: (onlyFeasible?: boolean) =>
     get<TargetRow[]>("/api/messier", onlyFeasible ? { onlyFeasible: "true" } : undefined),
