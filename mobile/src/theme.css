@@ -942,3 +942,103 @@ a {
 [data-theme="night"] .nc-dex-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+
+/* Section repliable (components/Section.tsx). */
+.nc-section {
+  background: var(--surf);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.nc-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-md);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink2);
+}
+
+.nc-section-count {
+  font-size: var(--text-sm);
+  color: var(--ink2);
+}
+
+.nc-section-chevron {
+  display: flex;
+  color: var(--ink3);
+  transition: transform 0.15s ease;
+}
+
+.nc-section-chevron svg {
+  width: 18px;
+  height: 18px;
+}
+
+.nc-section-chevron-open {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nc-section-chevron {
+    transition: none;
+  }
+}
+
+.nc-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md) var(--space-md);
+}
+
+/* Calendrier de chasse : douze mois, deux rangees. */
+.nc-month-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2xs);
+}
+
+.nc-month {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: var(--space-2xs) 0;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+  font: 400 var(--text-xs)/1.1 var(--font-text);
+}
+
+.nc-month-count {
+  font-family: var(--font-num);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.nc-month-empty .nc-month-count {
+  color: var(--ink3);
+}
+
+.nc-month-now {
+  border-color: var(--ink3);
+}
+
+.nc-month-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--onaccent);
+}
+
+.nc-month-active .nc-month-count {
+  color: var(--onaccent);
+}

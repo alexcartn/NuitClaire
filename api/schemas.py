@@ -194,6 +194,7 @@ class TargetSuggestionOut(BaseModel):
     isMessier: bool
     messierId: str | None
     commonName: str
+    frenchName: str | None = None
     type: str
 
 

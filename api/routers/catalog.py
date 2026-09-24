@@ -15,7 +15,7 @@ from api.deps import cached_messier_season, cached_wiki_summary, current_night, 
 from api.schemas import MessierSeasonOut, TargetDetailOut, TargetRowOut, TargetSuggestionOut
 from api.translate import row_to_target_out
 from astro import fits_in_fov
-from catalog import find_target, load_messier, search_prefix
+from catalog import find_target, french_name, load_messier, search_by_name, search_prefix
 from imagery import dss_image_url
 from rows import day_frame, filter_label, row_from_search
 from scoring import discovery_sort_key, min_alt_for, recommended_exposure_minutes, target_altitude_series
@@ -111,19 +111,23 @@ def search(q: str = Query(min_length=1)) -> list[dict]:
 
 @router.get("/api/search/suggest", response_model=list[TargetSuggestionOut])
 def search_suggest(q: str = Query(min_length=1), limit: int = Query(default=8, ge=1, le=20)) -> list[dict]:
-    """Suggestions par prefixe pendant la frappe -- volontairement legeres
+    """Suggestions pendant la frappe (designation par prefixe, puis nom
+    francais ou anglais) -- volontairement legeres
     (pas de fenetre de visibilite/score, qui demanderaient de calculer
     `target_windows` pour chaque candidat a chaque frappe) : juste de quoi
     distinguer les resultats et naviguer vers la fiche detail, qui elle
     calcule tout pour la cible choisie."""
+    # Designation d'abord (« M3 » doit donner M3), puis les noms : « orion »,
+    # « andromede », « whirlpool ».
     found = search_prefix(q, limit=limit)
+    names = [t for t in search_by_name(q, limit=limit) if t["name"] not in {f["name"] for f in found}]
     return [
         {
             "designation": tgt["name"], "isMessier": bool(tgt.get("messier")),
             "messierId": tgt.get("messier"), "commonName": tgt.get("common_name") or "",
-            "type": tgt.get("type_fr") or "",
+            "frenchName": french_name(tgt), "type": tgt.get("type_fr") or "",
         }
-        for tgt in found
+        for tgt in (found + names)[:limit]
     ]
 
 

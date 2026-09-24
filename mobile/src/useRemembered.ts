@@ -19,3 +19,9 @@ export function useRemembered<T>(key: string, initial: T): [T, Dispatch<SetState
   };
   return [value, set];
 }
+
+/** Pose une valeur depuis un autre ecran, avant qu'il ne s'ouvre (ex. la
+ * recherche qui ouvre « Cibles » deja filtree sur un type). */
+export function remember<T>(key: string, value: T): void {
+  memory.set(key, value);
+}

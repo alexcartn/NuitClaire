@@ -76,3 +76,11 @@ test("pas de rythme annonce sans assez de captures datees", () => {
   assert.equal(p.lastYear, 4);
   assert.equal(p.monthsToGo, Math.ceil(106 / (4 / 12)));
 });
+
+test("le calendrier range les manquants par mois, les mieux places d'abord", () => {
+  const long = { ...season("2", [3]), monthHours: Array.from({ length: 12 }, (_, i) => (i === 2 ? 8 : 0)) };
+  const dex = buildDex([], [season("1", [3, 4]), long, season("3", [3], true)], new Set(["3"]), new Map(), 9);
+  assert.deepEqual(dex.calendar[2].map((e) => e.id), ["2", "1"]); // mars ; M3 deja capture
+  assert.deepEqual(dex.calendar[3].map((e) => e.id), ["1"]);
+  assert.equal(dex.calendar[6].length, 0);
+});

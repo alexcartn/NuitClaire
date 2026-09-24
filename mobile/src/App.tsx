@@ -4,6 +4,7 @@ import { useFetch } from "./useFetch";
 import { applyUpdate, usePwa } from "./pwa";
 import { readCache, readText, writeText } from "./storage";
 import { windowLabel } from "./format";
+import { remember } from "./useRemembered";
 import { autoNightAction } from "./autoNight";
 import { autoEnterNight, autoLeaveNight, useTheme } from "./useTheme";
 import type { Night, Screen } from "./types";
@@ -244,7 +245,18 @@ export default function App() {
           <Messier captured={captured} onOpenTarget={openTarget} />
         )}
         {screen === "journal" && <Journal onOpenTarget={openTarget} onCaptureChange={reloadState} />}
-        {screen === "recherche" && <Recherche onOpenTarget={openTarget} onCancel={back} />}
+        {screen === "recherche" && (
+          <Recherche
+            onOpenTarget={openTarget}
+            onBrowseType={(type) => {
+              // « Cibles » s'ouvre deja filtree (voir useRemembered).
+              remember("cibles:types", [type]);
+              remember("cibles:all", false);
+              changeTab("cibles");
+            }}
+            onCancel={back}
+          />
+        )}
         {screen === "reglages" && <Reglages />}
       </div>
       <TabBar

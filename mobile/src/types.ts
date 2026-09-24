@@ -129,6 +129,8 @@ export interface TargetSuggestion {
   isMessier: boolean;
   messierId: string | null;
   commonName: string;
+  /** Nom francais usuel quand il est connu (catalog.FRENCH_NAMES). */
+  frenchName?: string | null;
   type: string;
 }
 

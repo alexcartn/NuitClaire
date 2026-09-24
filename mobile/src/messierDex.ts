@@ -66,6 +66,9 @@ export interface DexPlan {
   upcoming: { month: number; entries: DexEntry[] }[];
   hiddenByHorizon: DexEntry[];
   outOfReach: DexEntry[];
+  /** Pour chaque mois (janvier = 0) : les manquants observables ce mois-la,
+   * les mieux places (plus d'heures par nuit) d'abord. */
+  calendar: DexEntry[][];
   capturedCount: number;
 }
 
@@ -135,8 +138,14 @@ export function buildDex(
     .sort(([a], [b]) => ((a - month + 12) % 12) - ((b - month + 12) % 12))
     .map(([m, list]) => ({ month: m, entries: list }));
 
+  const calendar = Array.from({ length: 12 }, (_, m) =>
+    missing
+      .filter((e) => visibleIn(e.season, m))
+      .sort((a, b) => b.season!.monthHours[m] - a.season!.monthHours[m] || a.number - b.number),
+  );
+
   return {
-    entries, tonight, lastChance, thisMonth, upcoming, hiddenByHorizon, outOfReach,
+    entries, tonight, lastChance, thisMonth, upcoming, hiddenByHorizon, outOfReach, calendar,
     capturedCount: entries.filter((e) => e.captured).length,
   };
 }

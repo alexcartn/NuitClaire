@@ -9,6 +9,8 @@ import { buildDex, captureDates, MESSIER_TOTAL, MONTHS_FR, pace, type DexEntry }
 import { StaleNotice } from "../components/StaleNotice";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { Section } from "../components/Section";
+import { useRemembered } from "../useRemembered";
 
 /** Dernier mois de la periode de visibilite en cours (pour « visible
  * jusqu'en novembre »). */
@@ -24,6 +26,10 @@ function visibleUntil(e: DexEntry, month0: number): string | null {
 }
 
 const LIST_MAX = 6;
+/** Au-dela, les puces du calendrier font un mur : les mieux places d'abord,
+ * le reste sur demande. */
+const CAL_MAX = 15;
+const MONTHS_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 
 /** "environ 8 mois", "environ 2 ans et demi". */
 function remainingLabel(months: number): string {
@@ -67,13 +73,15 @@ export function Messier({
   const fetchSeason = useCallback(() => api.messierSeason(), []);
   const season = useFetch(fetchSeason, [], "messier-season");
   const sessions = useSessions();
-  const [showAllGrid, setShowAllGrid] = useState(true);
+  const [showAllGrid, setShowAllGrid] = useRemembered("messier:grid-all", true);
   const [addedTonight, setAddedTonight] = useState(false);
   const [openTonight, setOpenTonight] = useState(false);
   const [openLast, setOpenLast] = useState(false);
+  const [openCal, setOpenCal] = useState(false);
 
   const today = new Date();
   const month = today.getMonth() + 1;
+  const [calMonth, setCalMonth] = useRemembered("messier:calendar-month", month);
 
   const ngcToId = useMemo(
     () => new Map((rows.data ?? []).filter((r) => r.ngc && r.messierId).map((r) => [r.ngc!.toUpperCase(), r.messierId!])),
@@ -188,8 +196,7 @@ export function Messier({
       )}
 
       {dex.lastChance.length > 0 && (
-        <div className="nc-card nc-stack">
-          <div className="nc-eyebrow">Dernière chance</div>
+        <Section id="messier-last" title="Dernière chance" count={dex.lastChance.length}>
           <p className="nc-caption" style={{ margin: 0 }}>
             Encore visibles le soir, plus dans un ou deux mois : sinon, rendez-vous l'an prochain.
           </p>
@@ -211,62 +218,90 @@ export function Messier({
               {openLast ? "Réduire" : `Voir les ${dex.lastChance.length - LIST_MAX} autres`}
             </button>
           )}
-        </div>
+        </Section>
       )}
 
-      {dex.thisMonth.length > 0 && (
-        <div className="nc-stack-xs">
-          <div className="nc-eyebrow">Visibles ce mois-ci, pas ce soir</div>
-          <DexChips entries={dex.thisMonth} onOpen={onOpenTarget} />
-        </div>
+      {season.data && (
+        <Section id="messier-calendar" title="Calendrier de chasse">
+          {/* Un mois = une case : combien de manquants y sont observables.
+              Remplace les listes « ce mois-ci » et « a venir » : on voit
+              d'un coup d'oeil ou sont les creux et les pics de l'annee. */}
+          <div className="nc-month-grid" role="tablist" aria-label="Mois">
+            {dex.calendar.map((list, m) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={m + 1 === calMonth}
+                onClick={() => {
+                  setCalMonth(m + 1);
+                  setOpenCal(false);
+                }}
+                className={[
+                  "nc-month",
+                  m + 1 === calMonth ? "nc-month-active" : "",
+                  m + 1 === month ? "nc-month-now" : "",
+                  list.length === 0 ? "nc-month-empty" : "",
+                ].join(" ")}
+              >
+                <span>{MONTHS_SHORT[m]}</span>
+                <span className="nc-month-count">{list.length}</span>
+              </button>
+            ))}
+          </div>
+          <p className="nc-caption" style={{ margin: 0 }}>
+            {dex.calendar[calMonth - 1].length === 0
+              ? `Aucun Messier manquant observable en ${MONTHS_FR[calMonth - 1]}.`
+              : `${plural(dex.calendar[calMonth - 1].length, "manquant observable", "manquants observables")} en ${MONTHS_FR[calMonth - 1]}${calMonth === month ? " (ce mois-ci)" : ""}, les mieux placés d'abord.`}
+          </p>
+          <DexChips
+            entries={openCal ? dex.calendar[calMonth - 1] : dex.calendar[calMonth - 1].slice(0, CAL_MAX)}
+            onOpen={onOpenTarget}
+          />
+          {dex.calendar[calMonth - 1].length > CAL_MAX && (
+            <button onClick={() => setOpenCal((v) => !v)} className="nc-link" aria-expanded={openCal}>
+              {openCal ? "Réduire" : `Voir les ${dex.calendar[calMonth - 1].length - CAL_MAX} autres`}
+            </button>
+          )}
+        </Section>
       )}
 
-      {dex.upcoming.length > 0 && (
-        <div className="nc-stack">
-          <div className="nc-eyebrow">À venir</div>
-          {dex.upcoming.map((g) => (
-            <div key={g.month} className="nc-stack-xs">
-              <span className="nc-caption" style={{ textTransform: "capitalize" }}>
-                {MONTHS_FR[g.month - 1]}
+      {dex.hiddenByHorizon.length + dex.outOfReach.length > 0 && (
+        <Section
+          id="messier-unreachable"
+          title="Pas visibles d'ici"
+          count={dex.hiddenByHorizon.length + dex.outOfReach.length}
+          defaultOpen={false}
+        >
+          {dex.hiddenByHorizon.length > 0 && (
+            <div className="nc-stack-xs">
+              <span className="nc-caption" style={{ color: "var(--ink2)" }}>
+                Masqués par ton horizon : assez hauts, mais seulement dans des directions non cochées dans
+                Réglages.
               </span>
-              <DexChips entries={g.entries} onOpen={onOpenTarget} />
+              <DexChips entries={dex.hiddenByHorizon} onOpen={onOpenTarget} />
             </div>
-          ))}
-        </div>
+          )}
+          {dex.outOfReach.length > 0 && (
+            <div className="nc-stack-xs">
+              <span className="nc-caption" style={{ color: "var(--ink2)" }}>
+                Hors de portée : culminent sous {dex.outOfReach[0].season?.minAltDeg ?? 12}° depuis ce site, il
+                faudra une sortie plus au sud.
+              </span>
+              <DexChips entries={dex.outOfReach} onOpen={onOpenTarget} />
+            </div>
+          )}
+        </Section>
       )}
 
-      {dex.hiddenByHorizon.length > 0 && (
-        <div className="nc-stack-xs">
-          <div className="nc-eyebrow">Masqués par ton horizon</div>
-          <p className="nc-caption" style={{ margin: 0 }}>
-            Assez hauts depuis ici, mais seulement dans des directions non cochées dans Réglages.
-          </p>
-          <DexChips entries={dex.hiddenByHorizon} onOpen={onOpenTarget} />
-        </div>
-      )}
-
-      {dex.outOfReach.length > 0 && (
-        <div className="nc-stack-xs">
-          <div className="nc-eyebrow">Hors de portée d'ici</div>
-          <p className="nc-caption" style={{ margin: 0 }}>
-            Culminent sous {dex.outOfReach[0].season?.minAltDeg ?? 12}° depuis ce site : il faudra une sortie
-            plus au sud.
-          </p>
-          <DexChips entries={dex.outOfReach} onOpen={onOpenTarget} />
-        </div>
-      )}
-
-      <div className="nc-stack">
-        <div className="nc-row nc-between">
-          <div className="nc-eyebrow">Le catalogue</div>
-          <button
-            onClick={() => setShowAllGrid((v) => !v)}
-            className={`nc-chip ${showAllGrid ? "" : "nc-chip-active"}`}
-            aria-pressed={!showAllGrid}
-          >
-            Manquants seulement
-          </button>
-        </div>
+      <Section id="messier-grid" title="Le catalogue" count={dex.capturedCount}>
+        <button
+          onClick={() => setShowAllGrid((v) => !v)}
+          className={`nc-chip ${showAllGrid ? "" : "nc-chip-active"}`}
+          style={{ alignSelf: "flex-start" }}
+          aria-pressed={!showAllGrid}
+        >
+          Manquants seulement
+        </button>
         <div className="nc-dex-grid">
           {shownGrid.map((e) => (
             <button
@@ -292,7 +327,7 @@ export function Messier({
             </button>
           ))}
         </div>
-      </div>
+      </Section>
     </div>
   );
 }

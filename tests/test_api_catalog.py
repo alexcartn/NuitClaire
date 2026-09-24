@@ -128,7 +128,7 @@ def test_search_suggest_returns_multiple_lightweight_matches(api_client):
     assert "M31" in designations
     # Legeres : pas de fenetre de visibilite, contrairement a /api/search.
     assert "hours" not in data[0]
-    assert set(data[0].keys()) == {"designation", "isMessier", "messierId", "commonName", "type"}
+    assert set(data[0].keys()) == {"designation", "isMessier", "messierId", "commonName", "frenchName", "type"}
 
 
 def test_search_suggest_respects_limit(api_client):
@@ -193,3 +193,10 @@ def test_list_messier_falls_back_to_the_static_catalog_when_weather_fails(api_cl
     assert m31["imageUrl"]
     # Rien de faisable a affirmer sans prevision.
     assert api_client.get("/api/messier", params={"onlyFeasible": "true"}).json() == []
+
+
+def test_search_suggest_matches_names_after_designations(api_client):
+    rows = api_client.get("/api/search/suggest", params={"q": "andromede"}).json()
+    assert "M31" in [r["designation"] for r in rows]
+    m31 = next(r for r in rows if r["designation"] == "M31")
+    assert m31["frenchName"] == "Galaxie d'Andromède"

@@ -16,7 +16,7 @@
  * exactement les defauts qui ont fait abandonner les glyphes ici. */
 import type { ReactNode } from "react";
 
-export type TabIconName = "moon" | "target" | "grid" | "notebook" | "sliders" | "search" | "back" | "refresh";
+export type TabIconName = "moon" | "target" | "grid" | "notebook" | "sliders" | "search" | "back" | "refresh" | "chevron" | "close";
 
 const PATHS: Record<TabIconName, ReactNode> = {
   // Croissant, comme l'icone de l'appli : la nuit en cours.
@@ -66,6 +66,10 @@ const PATHS: Record<TabIconName, ReactNode> = {
       <path d="M15 15l5.5 5.5" />
     </>
   ),
+  // Chevron vers le bas : section repliable (tourne quand elle s'ouvre).
+  chevron: <path d="M6 9.5l6 6 6-6" />,
+  // Croix : vider un champ.
+  close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   // Chevron : revenir a l'ecran d'avant.
   back: <path d="M14.5 5.5 8 12l6.5 6.5" />,
   // Fleche circulaire : recharger la prevision.

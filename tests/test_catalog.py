@@ -101,3 +101,19 @@ def test_search_prefix_never_returns_duplicate_names():
     results = search_prefix("M31")
     names = [tgt["name"] for tgt in results]
     assert len(names) == len(set(names))
+
+
+def test_search_by_name_finds_french_and_english_names_without_accents():
+    from catalog import search_by_name
+
+    assert [t["name"] for t in search_by_name("orion")] == ["M42"]
+    assert [t["name"] for t in search_by_name("pleiades")] == ["M45"]
+    assert "M51" in [t["name"] for t in search_by_name("whirlpool")]
+    assert "M51" in [t["name"] for t in search_by_name("Tourbillon")]
+    assert search_by_name("or") == []  # trop court
+
+
+def test_every_french_name_points_to_a_catalogued_object():
+    from catalog import FRENCH_NAMES, find_target
+
+    assert [k for k in FRENCH_NAMES if not find_target(k)] == []
