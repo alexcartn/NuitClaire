@@ -20,7 +20,7 @@ import progress as progress_store
 import settings as settings_store
 from astro import night_hours, sky_frame, twilight_times
 from catalog import load_targets, load_messier
-from config import SITE, NB_NIGHTS, VIEW_WINDOW
+from config import SITE, NB_FORECAST_NIGHTS, VIEW_WINDOW
 from rows import common_row_fields
 from scoring import night_summary, score_frame, score_label_fr, target_windows, view_window_df
 from weather import fetch_all
@@ -89,15 +89,17 @@ def _site_key(site: dict) -> tuple:
 
 
 def load_night(site: dict):
-    """Equivalent de `app.load()` (meme logique, meme duree de cache TTL)."""
+    """Equivalent de `app.load()` (meme logique, meme duree de cache TTL),
+    sur `NB_FORECAST_NIGHTS` nuits plutot qu'une : les suivantes ne servent
+    qu'au bandeau des prochaines nuits (voir GET /api/nights)."""
     key = _site_key(site)
     with _night_lock:
         cached = _night_cache.get(key)
         if cached is not None:
             return cached
-        wx = fetch_all(days=NB_NIGHTS + 1, site=site)
+        wx = fetch_all(days=NB_FORECAST_NIGHTS + 1, site=site)
         nights, twilights = {}, {}
-        for i in range(NB_NIGHTS):
+        for i in range(NB_FORECAST_NIGHTS):
             d = date.today() + timedelta(days=i)
             hrs = night_hours(d, site=site)
             if not hrs:

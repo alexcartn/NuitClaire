@@ -1,11 +1,12 @@
-"""GET/PUT /api/settings, POST /api/geocode."""
+"""GET/PUT /api/settings, POST /api/geocode, POST /api/geocode/reverse."""
 from fastapi import APIRouter, HTTPException
 
 import settings as settings_store
 from api.deps import settings_write_lock, site_from_settings
-from api.schemas import GeocodeRequest, GeocodeResult, SettingsOut, SettingsUpdate
+from api.schemas import GeocodeRequest, GeocodeResult, ReverseGeocodeRequest, ReverseGeocodeResult, \
+    SettingsOut, SettingsUpdate
 from api.translate import site_to_out
-from geocode import GeocodeError, geocode
+from geocode import GeocodeError, geocode, reverse_geocode
 
 router = APIRouter()
 
@@ -57,3 +58,11 @@ def do_geocode(body: GeocodeRequest) -> dict:
     except GeocodeError as e:
         raise HTTPException(422, str(e))
     return {"lat": result["lat"], "lon": result["lon"], "displayName": result["display_name"]}
+
+
+@router.post("/api/geocode/reverse", response_model=ReverseGeocodeResult)
+def do_reverse_geocode(body: ReverseGeocodeRequest) -> dict:
+    try:
+        return {"name": reverse_geocode(body.lat, body.lon)}
+    except GeocodeError as e:
+        raise HTTPException(422, str(e))

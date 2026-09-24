@@ -76,3 +76,24 @@ def test_post_geocode_returns_422_on_geocode_error(api_client, monkeypatch):
     monkeypatch.setattr(settings_router, "geocode", raise_error)
     r = api_client.post("/api/geocode", json={"address": "???"})
     assert r.status_code == 422
+
+
+def test_post_reverse_geocode_returns_place_name(api_client, monkeypatch):
+    import api.routers.settings as settings_router
+
+    monkeypatch.setattr(settings_router, "reverse_geocode", lambda lat, lon: "Marson")
+    r = api_client.post("/api/geocode/reverse", json={"lat": 48.91, "lon": 4.53})
+    assert r.status_code == 200
+    assert r.json() == {"name": "Marson"}
+
+
+def test_post_reverse_geocode_returns_422_on_error(api_client, monkeypatch):
+    import api.routers.settings as settings_router
+    from geocode import GeocodeError
+
+    def fail(lat, lon):
+        raise GeocodeError("Aucun nom de lieu connu a cette position.")
+
+    monkeypatch.setattr(settings_router, "reverse_geocode", fail)
+    r = api_client.post("/api/geocode/reverse", json={"lat": 0, "lon": 0})
+    assert r.status_code == 422

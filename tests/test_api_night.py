@@ -32,3 +32,27 @@ def test_get_night_twilight_times_are_ordered(api_client):
     data = r.json()
     assert data["civilDusk"] < data["nauticalDusk"] < data["astroDusk"]
     assert data["astroDusk"] < data["astroDawn"]
+
+
+def test_get_nights_lists_tonight_first_with_a_score(api_client):
+    from datetime import date
+
+    r = api_client.get("/api/nights")
+    assert r.status_code == 200
+    nights = r.json()
+    assert nights[0]["date"] == date.today().isoformat()
+    assert 0 <= nights[0]["scorePct"] <= 100
+    assert nights[0]["astroDusk"] < nights[0]["astroDawn"]
+    assert [n["date"] for n in nights] == sorted(n["date"] for n in nights)
+
+
+def test_get_nights_leaves_unforecast_nights_unscored(api_client):
+    # La meteo du fixture couvre hier, aujourd'hui et demain : la troisieme
+    # nuit (apres-demain soir -> matin suivant) tombe hors prevision. Elle
+    # doit etre listee sans score, pas notee sur des trous.
+    nights = api_client.get("/api/nights").json()
+    assert len(nights) == 3
+    last = nights[-1]
+    assert last["scorePct"] is None
+    assert last["scoreLabel"] is None
+    assert last["moonIllum"] >= 0

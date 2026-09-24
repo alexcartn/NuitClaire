@@ -14,8 +14,10 @@ from api.deps import cached_wiki_summary, current_night, feasible_rows, get_hori
     site_from_settings
 from api.schemas import TargetDetailOut, TargetRowOut, TargetSuggestionOut
 from api.translate import row_to_target_out
-from catalog import find_target, search_prefix
-from rows import day_frame, row_from_search
+from astro import fits_in_fov
+from catalog import find_target, load_messier, search_prefix
+from imagery import dss_image_url
+from rows import day_frame, filter_label, row_from_search
 from scoring import discovery_sort_key, recommended_exposure_minutes, target_altitude_series
 from wiki import wiki_title_candidates
 
@@ -46,13 +48,37 @@ def list_targets(types: list[str] | None = Query(default=None)) -> list[dict]:
     return [row_to_target_out(r) for r in rows]
 
 
+def _static_messier_row(tgt: dict) -> dict:
+    """Ligne Messier sans nuit calculee : ce que le catalogue sait de l'objet,
+    et rien sur ce soir (creneau et angles absents, `feasibleTonight` a None)."""
+    return {
+        "designation": tgt["name"], "isMessier": True, "messierId": tgt["messier"],
+        "commonName": tgt.get("common_name", ""), "ngc": tgt.get("ngc_name"),
+        "type": tgt.get("type_fr", ""), "typeCode": tgt.get("type", ""),
+        "filter": filter_label(tgt.get("filter", "sans")),
+        "start": None, "end": None, "hours": 0, "altMaxDeg": 0.0, "moonSepDeg": 0.0,
+        "cadrage": fits_in_fov(tgt["w"], tgt["h"]) if tgt.get("w") and tgt.get("h") else "taille inconnue",
+        "imageUrl": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
+        "ra": tgt["ra"], "dec": tgt["dec"], "mag": tgt.get("mag"),
+        "sizeW": tgt.get("w"), "sizeH": tgt.get("h"), "reasons": [], "feasibleTonight": None,
+    }
+
+
 @router.get("/api/messier", response_model=list[TargetRowOut])
 def list_messier(onlyFeasible: bool = False) -> list[dict]:
     s = settings_store.load()
     site, horizon = site_from_settings(s), get_horizon()
-    sel, df, _ = current_night(site)
+    try:
+        sel, df, _ = current_night(site)
+    except Exception:
+        # Meteo injoignable (Open-Meteo en panne, pas de reseau cote
+        # serveur) : les 110 objets sont fixes, seule la faisabilite du soir
+        # depend de la prevision. L'ecran garde donc sa liste et sa
+        # progression, avec une faisabilite inconnue (None) plutot qu'une
+        # erreur qui vidait tout l'ecran.
+        sel = None
     if sel is None:
-        return []
+        return [] if onlyFeasible else [_static_messier_row(tgt) for tgt in load_messier()]
     # Respecte desormais le mode de fenetre comme le catalogue "targets"
     # (voir `api.deps.feasible_rows`) : coherent avec la liste de cibles et
     # le graphe d'altitude de la fiche detail plutot qu'une exception.

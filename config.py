@@ -33,6 +33,14 @@ WEIGHTS = {
 # pas a la semaine).
 NB_NIGHTS = 1
 
+# Exception cote API mobile : un bandeau "prochaines nuits" en tete de
+# "Ce soir", pour repondre a « quelle est la prochaine bonne nuit ? » avant
+# de sortir. Limite a trois nuits (ce soir + 2) : c'est l'horizon de 7Timer
+# (~72 h) et celui ou AROME/ARPEGE restent utilisables ; au-dela, le score ne
+# serait plus qu'un chiffre plausible. La nuit affichee partout ailleurs
+# reste celle du jour.
+NB_FORECAST_NIGHTS = 3
+
 # Fenetre d'observation habituelle (heure locale, 24h), utilisee comme filtre par defaut.
 VIEW_WINDOW = {"start_hour": 20, "end_hour": 22.5}
 

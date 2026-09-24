@@ -15,12 +15,16 @@ from pathlib import Path
 # --app-dir, etc.) -- meme filet de securite que tests/conftest.py.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import Depends, FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
+from api.auth import require_token  # noqa: E402
 from api.routers import catalog, night, progress, sessions, settings, state, stats  # noqa: E402
 
-app = FastAPI(title="NuitClaire API")
+# Jeton exige sur toutes les routes des que NUITCLAIRE_API_TOKEN est defini
+# (voir api/auth.py). Les pre-requetes CORS (OPTIONS) sont traitees par le
+# middleware avant d'atteindre les routes : elles passent sans jeton.
+app = FastAPI(title="NuitClaire API", dependencies=[Depends(require_token)])
 
 # Origines de dev Vite habituelles (localhost + IP LAN, pour tester depuis un
 # telephone sur le meme Wi-Fi) toujours autorisees, plus l'origine de

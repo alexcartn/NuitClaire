@@ -47,6 +47,15 @@ class GeocodeRequest(BaseModel):
     address: str
 
 
+class ReverseGeocodeRequest(BaseModel):
+    lat: float
+    lon: float
+
+
+class ReverseGeocodeResult(BaseModel):
+    name: str
+
+
 class GeocodeResult(BaseModel):
     lat: float
     lon: float
@@ -128,6 +137,20 @@ class NightOut(BaseModel):
     windQuality: float
     cloudTrend: CloudTrendOut | None
     hourly: list[HourlyPoint]
+
+
+class NightBriefOut(BaseModel):
+    """Une nuit du bandeau « prochaines nuits ». `scorePct` est None quand la
+    prevision ne couvre pas assez la nuit pour la noter : on le dit plutot
+    que d'afficher un score calcule sur des trous."""
+    date: str
+    scorePct: int | None
+    scoreLabel: str | None
+    goHours: int | None
+    bestWindow: str | None
+    moonIllum: float
+    astroDusk: str
+    astroDawn: str
 
 
 class TargetRowOut(BaseModel):

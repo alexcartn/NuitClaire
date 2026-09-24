@@ -9,8 +9,8 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException
 
-from api.deps import current_night, get_site, get_view_window, get_window_mode
-from api.schemas import NightOut
+from api.deps import current_night, get_site, get_view_window, get_window_mode, load_night
+from api.schemas import NightBriefOut, NightOut
 from astro import local_now, moon_status
 from scoring import cloud_trend, dew_risk, night_summary, score_label_fr, temperature_range, \
     view_window_df, wind_quality
@@ -89,3 +89,37 @@ def get_night() -> dict:
             for t in df.index
         ],
     }
+
+
+# Part minimale d'heures de nuit couvertes par la prevision pour noter une
+# nuit. En dessous, la moyenne porterait sur quelques heures seulement et
+# afficherait un score qui a l'air complet sans l'etre.
+_MIN_FORECAST_COVERAGE = 0.5
+
+
+@router.get("/api/nights", response_model=list[NightBriefOut])
+def get_nights() -> list[dict]:
+    """Ce soir et les nuits suivantes (voir `config.NB_FORECAST_NIGHTS`), en
+    bref : de quoi choisir sa nuit, pas le detail de chacune."""
+    site = get_site()
+    nights, twilights = load_night(site)
+    window_mode, view_window = get_window_mode(), get_view_window()
+    out = []
+    for day, df in nights.items():
+        tw = twilights[day]
+        view_df = view_window_df(df, window_mode, view_window)
+        covered = view_df["cloud_cover"].notna() if "cloud_cover" in view_df else view_df.index.isna()
+        astro_dusk_aware = tw["astro_dusk"].replace(tzinfo=ZoneInfo(site["tz"]))
+        moon = moon_status(astro_dusk_aware, site=site)
+        brief = {
+            "date": day.isoformat(), "scorePct": None, "scoreLabel": None, "goHours": None,
+            "bestWindow": None, "moonIllum": moon["illum"],
+            "astroDusk": tw["astro_dusk"].isoformat(), "astroDawn": tw["astro_dawn"].isoformat(),
+        }
+        if len(view_df) and covered.mean() >= _MIN_FORECAST_COVERAGE:
+            s = night_summary(view_df[covered])
+            pct, label = score_label_fr(s["score"])
+            brief.update({"scorePct": pct, "scoreLabel": label, "goHours": s["go_hours"],
+                          "bestWindow": s["best_window"]})
+        out.append(brief)
+    return out

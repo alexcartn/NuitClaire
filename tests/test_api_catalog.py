@@ -173,3 +173,23 @@ def test_target_detail_counts_closed_outings_too(api_client):
     detail = api_client.get("/api/targets/M13").json()
     assert detail["exposureSessionMin"] == 45
     assert detail["exposureTotalMin"] == 45
+
+
+def test_list_messier_falls_back_to_the_static_catalog_when_weather_fails(api_client, monkeypatch):
+    import api.deps as deps
+
+    def boom(days, site):
+        raise RuntimeError("Open-Meteo injoignable")
+
+    monkeypatch.setattr(deps, "fetch_all", boom)
+    deps._night_cache.clear()
+    r = api_client.get("/api/messier")
+    assert r.status_code == 200
+    rows = r.json()
+    assert len(rows) == 110
+    assert all(row["feasibleTonight"] is None and row["start"] is None for row in rows)
+    m31 = next(row for row in rows if row["designation"] == "M31")
+    assert m31["messierId"] == "31"  # meme forme que les lignes calculees
+    assert m31["imageUrl"]
+    # Rien de faisable a affirmer sans prevision.
+    assert api_client.get("/api/messier", params={"onlyFeasible": "true"}).json() == []
