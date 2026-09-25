@@ -1373,3 +1373,78 @@ a {
 [data-theme="night"] .nc-sky-ground {
   fill: rgba(255, 74, 53, 0.12);
 }
+
+/* Lune, planetes (components/NightExtras.tsx). */
+.nc-moon-dark {
+  fill: #2a2733;
+}
+
+.nc-moon-lit {
+  fill: #ece9f2;
+}
+
+.nc-moon-edge {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+[data-theme="night"] .nc-moon-dark {
+  fill: #1a0503;
+}
+
+[data-theme="night"] .nc-moon-lit {
+  fill: var(--ink);
+}
+
+.nc-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surf2);
+  color: var(--ink2);
+  font: 400 var(--text-xs)/1.2 var(--font-text);
+}
+
+.nc-planet {
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--line);
+}
+
+.nc-planet:last-child {
+  border-bottom: none;
+}
+
+.nc-jupiter {
+  width: 100%;
+  height: 48px;
+  border-radius: 8px;
+  background: #07060a;
+}
+
+.nc-jupiter-disk {
+  fill: #f3d9a4;
+}
+
+.nc-jupiter-moon {
+  fill: #f4f2f7;
+}
+
+.nc-jupiter-label {
+  fill: rgba(240, 236, 250, 0.6);
+  font-family: var(--font-text);
+}
+
+[data-theme="night"] .nc-jupiter {
+  background: #000;
+}
+
+[data-theme="night"] .nc-jupiter-disk,
+[data-theme="night"] .nc-jupiter-moon {
+  fill: var(--ink);
+}
+
+[data-theme="night"] .nc-jupiter-label {
+  fill: var(--ink3);
+}

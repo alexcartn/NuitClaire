@@ -3,10 +3,11 @@ planifiee (voir GET /api/cron/alerts et vercel.json) : de quoi decider de
 sortir ou de preparer l'anti-buee avant la nuit, pas une surveillance en
 direct. Pur et sans reseau : prend le resume de la nuit, rend les messages.
 
-Deux alertes, activables dans Reglages (`settings.alerts`) :
+Trois alertes, activables dans Reglages (`settings.alerts`) :
 - "score" : la nuit atteint le seuil des bonnes conditions ;
 - "dew" : l'ecart temperature/point de rosee passe sous le seuil de buee
-  a un moment de la fenetre d'observation."""
+  a un moment de la fenetre d'observation ;
+- "iss" : la station spatiale passe, visible, ce soir (avant 1 h)."""
 import pandas as pd
 
 SCORE_THRESHOLD_PCT = 70
@@ -46,3 +47,18 @@ def evaluate(night_date: str, enabled: dict, facts: dict, sent: dict) -> list[di
                                  "prévoyez l'anti-buée.",
                          "url": "/", "tag": f"dew-{night_date}"})
     return messages
+
+
+def iss_message(night_date: str, enabled: dict, passes: list[dict], sent: dict) -> dict | None:
+    """Le plus beau passage visible de la soiree, s'il y en a un et que
+    l'alerte est activee (une fois par nuit)."""
+    if not enabled.get("iss") or sent.get("iss") == night_date:
+        return None
+    tonight = [p for p in passes if p["peak"][:10] == night_date and int(p["peak"][11:13]) >= 12]
+    if not tonight:
+        return None
+    best = max(tonight, key=lambda p: p["peakAlt"])
+    return {"alert": "iss", "title": "L'ISS passe ce soir",
+            "body": f"À {best['peak'][11:16]}, {best['peakAlt']}° au plus haut, de {best['startDir']} vers "
+                    f"{best['endDir']} ({best['brightness']}).",
+            "url": "/", "tag": f"iss-{night_date}"}

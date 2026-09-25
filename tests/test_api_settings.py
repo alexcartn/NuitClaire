@@ -4,7 +4,7 @@ def test_get_settings_returns_defaults(api_client):
     data = r.json()
     assert data["windowMode"] == "complete"
     assert data["viewWindow"] == {"startHour": 20.0, "endHour": 22.5}
-    assert data["alerts"] == {"score": True, "dew": False}
+    assert data["alerts"] == {"score": True, "dew": False, "iss": False}
     assert data["site"]["name"] == "Marson"
     assert data["site"]["tz"] == "Europe/Paris"
 
@@ -36,7 +36,7 @@ def test_put_settings_updates_window_mode_and_alerts(api_client):
     assert r.status_code == 200
     data = r.json()
     assert data["windowMode"] == "habituelle"
-    assert data["alerts"] == {"score": True, "dew": True}  # "score" conserve, non fourni
+    assert data["alerts"] == {"score": True, "dew": True, "iss": False}  # "score" conserve, non fourni
 
     assert api_client.get("/api/settings").json()["windowMode"] == "habituelle"
 

@@ -572,6 +572,22 @@ planetes viennent du serveur (`GET /api/sky/bodies`, PyEphem), gardees sur l'app
   dans l'axe. Une boussole de telephone se trompe de 5 a 10 deg : le viseur amene dans la
   region, le chemin d'etoiles de la fiche fait le reste.
 
+### Lune, planetes, station spatiale
+
+Trois sections repliables sur « Ce soir » (`components/NightExtras.tsx`), calculees par
+`extras.py` :
+
+- Lune (`GET /api/extras/moon`) : phase dessinee, age, lever et coucher, et les reliefs a
+  regarder aux jumelles ce soir, ceux que le terminateur eclaire en rasant (colongitude
+  PyEphem, liste de 29 mers, crateres et montagnes).
+- Planetes (`GET /api/extras/planets`) : celles qui passent au-dessus de 8 deg pendant la
+  nuit, creneau, meilleur moment et direction, eclat, constellation ; les quatre lunes de
+  Jupiter alignees comme aux jumelles, l'inclinaison des anneaux de Saturne, Uranus.
+- Station spatiale (`GET /api/extras/iss`) : passages visibles sur trois jours (ISS
+  eclairee, ciel sombre, 10 deg au moins), orbite recuperee chez Celestrak et gardee
+  12 h ; sans elle, la section le dit. Alerte optionnelle « passage visible ce soir »,
+  envoyee avec les autres en fin d'apres-midi.
+
 ### Recherche
 
 Par designation (prefixe : « M3 », « NGC70 ») ou par nom, en francais ou en anglais, sans

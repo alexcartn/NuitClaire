@@ -11,6 +11,7 @@ import { StatCard } from "../components/StatCard";
 import { SectorChips } from "../components/SectorChips";
 import { NightStrip } from "../components/NightStrip";
 import { NightPlan } from "../components/NightPlan";
+import { NightExtras } from "../components/NightExtras";
 import { CloudChart } from "../components/CloudChart";
 import { WindChart } from "../components/WindChart";
 import { TempDewChart } from "../components/TempDewChart";
@@ -202,6 +203,8 @@ export function CeSoir({
       </button>
 
       {targets.data && <NightPlan rows={targets.data} binoculars={binoculars} onOpenTarget={onOpenTarget} />}
+
+      <NightExtras />
 
       <div className="nc-card nc-stack">
         <div className="nc-eyebrow">Horizon dégagé</div>

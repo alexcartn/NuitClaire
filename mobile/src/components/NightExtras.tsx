@@ -1,0 +1,156 @@
+import { useCallback } from "react";
+import { api } from "../api";
+import { useFetch } from "../useFetch";
+import { fmtHM, plural } from "../format";
+import { Section } from "./Section";
+import { MoonPhase } from "./MoonPhase";
+import type { PlanetTonight } from "../sky/types";
+
+const WEEKDAYS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return "ce soir";
+  return `${WEEKDAYS[d.getDay()]} ${d.getDate()}`;
+}
+
+/** Jupiter et ses quatre lunes, alignees comme aux jumelles : est a gauche
+ * (on regarde vers le sud), une ligne de points de part et d'autre du disque. */
+function JupiterMoons({ moons }: { moons: NonNullable<PlanetTonight["moons"]> }) {
+  const span = Math.max(12, ...moons.map((m) => Math.abs(m.x))) + 2;
+  return (
+    <svg viewBox={`${-span} -3 ${2 * span} 6`} className="nc-jupiter" role="img" aria-label="Jupiter et ses lunes">
+      <circle cx={0} cy={0} r={1} className="nc-jupiter-disk" />
+      {moons
+        .filter((m) => m.visible)
+        .map((m) => (
+          <g key={m.name}>
+            <circle cx={-m.x} cy={0} r={0.45} className="nc-jupiter-moon" />
+            <text x={-m.x} y={-1.2} fontSize={1.3} textAnchor="middle" className="nc-jupiter-label">
+              {m.name[0]}
+            </text>
+          </g>
+        ))}
+      <text x={-span + 0.3} y={2.6} fontSize={1.2} className="nc-jupiter-label">E</text>
+      <text x={span - 1.3} y={2.6} fontSize={1.2} className="nc-jupiter-label">O</text>
+    </svg>
+  );
+}
+
+/** Lune, planetes et ISS de la nuit : trois sections repliables sur
+ * « Ce soir », utiles surtout aux jumelles. Gardees sur l'appareil. */
+export function NightExtras() {
+  const moon = useFetch(useCallback(() => api.moonTonight(), []), [], "extras-moon");
+  const planets = useFetch(useCallback(() => api.planetsTonight(), []), [], "extras-planets");
+  const iss = useFetch(useCallback(() => api.iss(), []), [], "extras-iss");
+
+  const m = moon.data;
+  return (
+    <>
+      {m && (
+        <Section id="soir-lune" title="Lune" summary={`${m.illum} % · ${m.waxing ? "croissante" : "décroissante"}`}>
+          <div className="nc-row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
+            <MoonPhase illum={m.illum} waxing={m.waxing} />
+            <div className="nc-stack-xs" style={{ gap: 2 }}>
+              <span className="nc-num" style={{ fontSize: "var(--text-md)" }}>{m.illum} %</span>
+              <span className="nc-caption">
+                {Math.round(m.ageDays)} jours · lever <span className="nc-num">{m.rise ? fmtHM(m.rise) : "—"}</span> ·
+                coucher <span className="nc-num">{m.set ? fmtHM(m.set) : "—"}</span>
+              </span>
+            </div>
+          </div>
+          <p className="nc-caption" style={{ margin: 0, color: "var(--ink2)" }}>{m.tip}</p>
+          {m.terminatorFeatures.length > 0 && (
+            <div className="nc-stack-xs">
+              <span className="nc-caption">À regarder aux jumelles ce soir, le long du terminateur :</span>
+              <div className="nc-row nc-wrap" style={{ gap: "var(--space-xs)" }}>
+                {m.terminatorFeatures.map((f) => (
+                  <span key={f} className="nc-tag">{f}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </Section>
+      )}
+
+      {planets.data && (
+        <Section
+          id="soir-planetes"
+          title="Planètes"
+          summary={planets.data.length ? planets.data.map((p) => p.name).join(" · ") : "aucune cette nuit"}
+          defaultOpen={planets.data.length > 0}
+        >
+          {planets.data.length === 0 && (
+            <p className="nc-caption" style={{ margin: 0 }}>Aucune planète assez haute pendant la nuit noire.</p>
+          )}
+          {planets.data.map((p) => (
+            <div key={p.name} className="nc-stack-xs nc-planet">
+              <div className="nc-row nc-between nc-baseline">
+                <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>{p.name}</span>
+                <span className="nc-num nc-caption">mag. {String(p.mag).replace(".", ",")} · {p.constellation}</span>
+              </div>
+              <span className="nc-caption nc-num" style={{ color: "var(--ink2)" }}>
+                visible {fmtHM(p.from)}–{fmtHM(p.to)} · au plus haut {p.bestAlt}° vers {fmtHM(p.bestTime)} ({p.sector})
+              </span>
+              {p.moons && (
+                <>
+                  <JupiterMoons moons={p.moons} />
+                  <span className="nc-caption">
+                    Aux jumelles, calées : les lunes galiléennes en ligne, vers {fmtHM(p.bestTime)}.
+                  </span>
+                </>
+              )}
+              {p.ringTiltDeg != null && (
+                <span className="nc-caption">
+                  Anneaux inclinés de {String(p.ringTiltDeg).replace(".", ",")}° : il faut un petit télescope, les
+                  jumelles montrent une étoile allongée au mieux.
+                </span>
+              )}
+              {p.name === "Uranus" && (
+                <span className="nc-caption">À la limite de l'œil nu : un point vert pâle aux jumelles.</span>
+              )}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {iss.data && (
+        <Section
+          id="soir-iss"
+          title="Station spatiale"
+          summary={
+            iss.data.available
+              ? iss.data.passes.length
+                ? `${dayLabel(iss.data.passes[0].peak)} ${fmtHM(iss.data.passes[0].peak)}`
+                : "aucun passage visible"
+              : "indisponible"
+          }
+          defaultOpen={false}
+        >
+          {!iss.data.available && <p className="nc-caption" style={{ margin: 0 }}>{iss.data.reason}</p>}
+          {iss.data.available && iss.data.passes.length === 0 && (
+            <p className="nc-caption" style={{ margin: 0 }}>Aucun passage visible dans les trois prochains jours.</p>
+          )}
+          {iss.data.passes.map((p) => (
+            <div key={p.start} className="nc-plan-row" style={{ cursor: "default" }}>
+              <span className="nc-num nc-none" style={{ fontSize: "var(--text-sm)", width: 64 }}>{dayLabel(p.peak)}</span>
+              <span className="nc-num nc-none" style={{ fontSize: "var(--text-sm)" }}>
+                {fmtHM(p.start)}→{fmtHM(p.end)}
+              </span>
+              <span className="nc-caption nc-grow">
+                {p.peakAlt}° · {p.startDir} → {p.endDir} · {p.brightness}
+              </span>
+            </div>
+          ))}
+          {iss.data.available && iss.data.passes.length > 0 && (
+            <p className="nc-caption" style={{ margin: 0 }}>
+              À l'œil nu : un point brillant qui traverse le ciel en quelques minutes, sans clignoter. Heures
+              calculées sur l'orbite du jour ({plural(iss.data.passes.length, "passage", "passages")} sur trois jours).
+            </p>
+          )}
+        </Section>
+      )}
+    </>
+  );
+}

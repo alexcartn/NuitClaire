@@ -5,6 +5,7 @@ import { disablePush, enablePush, pushState, type PushState } from "../push";
 const ALERT_LABEL: Record<string, string> = {
   score: "Me prévenir quand la nuit dépasse 70",
   dew: "Me prévenir d'un risque de buée (écart sous 1,5 °C)",
+  iss: "Me prévenir d'un passage visible de l'ISS",
 };
 
 const STATE_TEXT: Record<PushState, string> = {

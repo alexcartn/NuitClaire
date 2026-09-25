@@ -1,6 +1,7 @@
 """Notifications push : cle publique, abonnements, envoi de test, et la
 tache planifiee qui evalue les alertes de la nuit (voir alerts.py)."""
 import hmac
+from datetime import datetime
 import os
 from zoneinfo import ZoneInfo
 
@@ -115,6 +116,17 @@ def run_alerts(authorization: str | None = Header(default=None)) -> dict:
     with push_write_lock:
         data = notifications.load()
         messages = alerts.evaluate(night, s["alerts"], facts, data["sent"])
+        if s["alerts"].get("iss"):
+            import extras
+            from datetime import timezone as _tz
+
+            tle = extras.fetch_iss_tle()
+            if tle:
+                msg = alerts.iss_message(night, s["alerts"],
+                                         extras.iss_passes(tle, site, datetime.now(_tz.utc), days=1),
+                                         data["sent"])
+                if msg:
+                    messages.append(msg)
         results = {}
         for msg in messages:
             results[msg["alert"]] = notifications.broadcast(

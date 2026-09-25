@@ -31,7 +31,7 @@ _DEFAULT_FROZEN = MappingProxyType({
     # dict-ci qui fait foi une fois un reglage sauvegarde.
     "view_window": MappingProxyType({"start_hour": VIEW_WINDOW["start_hour"],
                                       "end_hour": VIEW_WINDOW["end_hour"]}),
-    "alerts": MappingProxyType({"score": True, "dew": False}),
+    "alerts": MappingProxyType({"score": True, "dew": False, "iss": False}),
     "places": (),
     # "seestar" ou "jumelles" (voir optics.py). Les caracteristiques des
     # jumelles completent config.BINOCULARS.

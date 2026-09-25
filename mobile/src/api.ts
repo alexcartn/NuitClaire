@@ -20,7 +20,7 @@ import type {
 } from "./types";
 
 import { readText, writeText } from "./storage";
-import type { SkyBodies } from "./sky/types";
+import type { IssInfo, MoonTonight, PlanetTonight, SkyBodies } from "./sky/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
@@ -112,6 +112,9 @@ export const api = {
   searchSuggest: (q: string, limit = 8) =>
     get<TargetSuggestion[]>("/api/search/suggest", { q, limit: String(limit) }),
   skyBodies: () => get<SkyBodies>("/api/sky/bodies"),
+  moonTonight: () => get<MoonTonight>("/api/extras/moon"),
+  planetsTonight: () => get<PlanetTonight[]>("/api/extras/planets"),
+  iss: () => get<IssInfo>("/api/extras/iss"),
   starHop: (designation: string) => get<StarHop>(`/api/targets/${encodeURIComponent(designation)}/starhop`),
   updateMessierSeen: (id: string, seen: boolean) =>
     request<string[]>("PUT", `/api/messier/${encodeURIComponent(id)}/seen`, { body: { seen } }),
