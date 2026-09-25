@@ -3,7 +3,6 @@ import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { fmtHM, plural } from "../format";
 import { Section } from "./Section";
-import { MoonPhase } from "./MoonPhase";
 import type { PlanetTonight } from "../sky/types";
 
 const WEEKDAYS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
@@ -63,44 +62,17 @@ function JupiterMoons({ moons }: { moons: NonNullable<PlanetTonight["moons"]> })
   );
 }
 
-/** Lune, planetes et ISS de la nuit : trois sections repliables sur
- * « Ce soir », utiles surtout aux jumelles. Fermees au depart : le resume
+/** Planetes et ISS de la nuit : deux sections repliables sur « Ce soir »,
+ * utiles surtout aux jumelles. La Lune a sa case en haut de l'ecran (une
+ * section ici la repetait). Fermees au depart : le resume
  * a droite dit l'essentiel, ouvertes elles noyaient l'ecran. Gardees sur
  * l'appareil. */
 export function NightExtras() {
-  const moon = useFetch(useCallback(() => api.moonTonight(), []), [], "extras-moon");
   const planets = useFetch(useCallback(() => api.planetsTonight(), []), [], "extras-planets");
   const iss = useFetch(useCallback(() => api.iss(), []), [], "extras-iss");
 
-  const m = moon.data;
   return (
     <>
-      {m && (
-        <Section id="soir-lune" title="Lune" defaultOpen={false} summary={`${m.illum} % · ${m.waxing ? "croissante" : "décroissante"}`}>
-          <div className="nc-row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
-            <MoonPhase illum={m.illum} waxing={m.waxing} />
-            <div className="nc-stack-xs" style={{ gap: 2 }}>
-              <span className="nc-num" style={{ fontSize: "var(--text-md)" }}>{m.illum} %</span>
-              <span className="nc-caption">
-                {Math.round(m.ageDays)} jours · lever <span className="nc-num">{m.rise ? fmtHM(m.rise) : "—"}</span> ·
-                coucher <span className="nc-num">{m.set ? fmtHM(m.set) : "—"}</span>
-              </span>
-            </div>
-          </div>
-          <p className="nc-caption" style={{ margin: 0, color: "var(--ink2)" }}>{m.tip}</p>
-          {m.terminatorFeatures.length > 0 && (
-            <div className="nc-stack-xs">
-              <span className="nc-caption">À regarder aux jumelles ce soir, le long du terminateur :</span>
-              <div className="nc-row nc-wrap" style={{ gap: "var(--space-xs)" }}>
-                {m.terminatorFeatures.map((f) => (
-                  <span key={f} className="nc-tag">{f}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </Section>
-      )}
-
       {planets.data && (
         <Section
           id="soir-planetes"

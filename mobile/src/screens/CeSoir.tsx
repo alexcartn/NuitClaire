@@ -9,6 +9,7 @@ import { ScreenHeader } from "../components/ScreenHeader";
 import { TabIcon } from "../components/TabIcon";
 import { ScoreCard } from "../components/ScoreCard";
 import { StatCard } from "../components/StatCard";
+import { MoonPhase } from "../components/MoonPhase";
 import { SectorChips } from "../components/SectorChips";
 import { NightStrip } from "../components/NightStrip";
 import { NightPlan } from "../components/NightPlan";
@@ -184,12 +185,15 @@ export function CeSoir({
         <StatCard
           label="Lune"
           value={
-            <>
-              {Math.round(n.moonIllum)}
-              <span className="nc-unit">%</span>
-            </>
+            <span className="nc-row" style={{ gap: "var(--space-xs)", alignItems: "center" }}>
+              <MoonPhase illum={n.moonIllum} waxing={n.moonWaxing} size={26} />
+              <span>
+                {Math.round(n.moonIllum)}
+                <span className="nc-unit">%</span>
+              </span>
+            </span>
           }
-          sub={`${n.moonWaxing ? "Croissante" : "Décroissante"} · ${n.moonSizeArcmin.toFixed(1)}'`}
+          sub={n.moonWaxing ? "Croissante" : "Décroissante"}
         />
         <StatCard label="Buée" valueIsWord value={n.dewRisk} sub={`Anti-buée : ${n.dewAdvice}`} />
         <StatCard
