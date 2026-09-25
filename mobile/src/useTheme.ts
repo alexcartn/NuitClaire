@@ -105,6 +105,20 @@ export function toggleNight(): void {
   else enterNight();
 }
 
+/** Choix direct d'un theme depuis l'en-tete (voir NightToggle). Entrer en
+ * vision nocturne par la retient le theme d'avant, comme `toggleNight` ; en
+ * sortir vers un theme choisi l'oublie. Un choix a la main, comme la
+ * bascule : le passage automatique ne le defait pas au matin. */
+export function chooseTheme(next: Theme): void {
+  writeText(AUTO_ENTERED_KEY, null);
+  if (next === "night") {
+    enterNight();
+  } else {
+    writeText(BEFORE_NIGHT_KEY, null);
+    setTheme(next);
+  }
+}
+
 export function setAutoNight(on: boolean): void {
   writeText(AUTO_KEY, on ? "1" : null);
   if (!on) writeText(AUTO_ENTERED_KEY, null);
@@ -130,6 +144,7 @@ export function useTheme() {
     ...snap,
     setTheme,
     toggleNight,
+    chooseTheme,
     setAutoNight,
     isNight: snap.theme === "night",
   };

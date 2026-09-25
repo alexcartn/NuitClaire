@@ -422,7 +422,7 @@ export function Reglages({ onChange }: { onChange: () => void }) {
         </div>
         <p className="nc-caption" style={{ margin: 0 }}>
           Vision nocturne : rouge sur noir et tailles augmentées, pour ne pas reperdre son adaptation à
-          l'obscurité. Accessible d'un appui en haut de chaque écran (bouton « Nuit »).
+          l'obscurité. Le thème se change aussi en haut de chaque écran.
         </p>
         <button
           onClick={() => setAutoNight(!auto)}

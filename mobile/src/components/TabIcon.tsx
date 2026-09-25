@@ -16,7 +16,7 @@
  * exactement les defauts qui ont fait abandonner les glyphes ici. */
 import type { ReactNode } from "react";
 
-export type TabIconName = "moon" | "target" | "grid" | "notebook" | "sliders" | "search" | "back" | "refresh" | "chevron" | "close" | "sky";
+export type TabIconName = "moon" | "target" | "grid" | "notebook" | "sliders" | "search" | "back" | "refresh" | "chevron" | "close" | "sky" | "sun" | "contrast";
 
 const PATHS: Record<TabIconName, ReactNode> = {
   // Croissant, comme l'icone de l'appli : la nuit en cours.
@@ -70,6 +70,20 @@ const PATHS: Record<TabIconName, ReactNode> = {
   chevron: <path d="M6 9.5l6 6 6-6" />,
   // Etoile a quatre branches : la carte du ciel.
   sky: <path d="M12 3.5l1.9 6.6 6.6 1.9-6.6 1.9L12 20.5l-1.9-6.6L3.5 12l6.6-1.9Z" />,
+  // Soleil : theme clair.
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" />
+    </>
+  ),
+  // Disque a moitie plein : theme sombre (le croissant est a la nuit).
+  contrast: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 4a8 8 0 0 0 0 16Z" fill="currentColor" />
+    </>
+  ),
   // Croix : vider un champ.
   close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   // Chevron : revenir a l'ecran d'avant.
