@@ -68,11 +68,25 @@ function permissionRequired(): boolean {
  * indefiniment sur "en attente d'une mesure". */
 const SILENCE_MS = 3000;
 
+/** Orientation complete, pour le viseur : alpha absolu (sens
+ * trigonometrique depuis le nord, deduit du cap), beta et gamma. */
+export interface Orientation {
+  alpha: number;
+  beta: number;
+  gamma: number;
+}
+
+/** Au plus 20 mises a jour par seconde : au-dela, rien de visible, et la
+ * carte recalculerait ses 1600 etoiles pour rien. */
+const ORIENTATION_EVERY_MS = 50;
+
 export function useCompass() {
   const [state, setState] = useState<CompassState>(() =>
     typeof window !== "undefined" && "DeviceOrientationEvent" in window ? "idle" : "unsupported",
   );
   const [heading, setHeading] = useState<number | null>(null);
+  const [orientation, setOrientation] = useState<Orientation | null>(null);
+  const lastOrientation = useRef(0);
   const started = useRef(false);
   const silence = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -88,6 +102,12 @@ export function useCompass() {
       }
       setHeading(value);
       setState("running");
+      const e = raw as CompassEvent;
+      const now = Date.now();
+      if (e.beta != null && e.gamma != null && now - lastOrientation.current >= ORIENTATION_EVERY_MS) {
+        lastOrientation.current = now;
+        setOrientation({ alpha: (360 - value) % 360, beta: e.beta, gamma: e.gamma });
+      }
     };
     // Une mesure doit arriver vite : au-dela, il n'y a pas de capteur.
     silence.current = setTimeout(() => {
@@ -134,6 +154,7 @@ export function useCompass() {
 
   return {
     heading,
+    orientation,
     state,
     start,
     // Le bouton d'activation n'a de sens que la ou une autorisation est

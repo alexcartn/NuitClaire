@@ -40,11 +40,13 @@ export function CeSoir({
   instrument,
   onGoTargets,
   onSearch,
+  onOpenSky,
   onOpenTarget,
 }: {
   instrument: Instrument;
   onGoTargets: () => void;
   onSearch: () => void;
+  onOpenSky: () => void;
   onOpenTarget: (designation: string) => void;
 }) {
   const [meteoOpen, setMeteoOpen] = useState(false);
@@ -123,6 +125,9 @@ export function CeSoir({
               title="Actualiser la prévision"
             >
               <TabIcon name="refresh" />
+            </button>
+            <button onClick={onOpenSky} className="nc-round-btn" aria-label="Carte du ciel" title="Carte du ciel">
+              <TabIcon name="sky" />
             </button>
             <button onClick={onSearch} className="nc-round-btn" aria-label="Rechercher un objet" title="Rechercher un objet">
               <TabIcon name="search" />

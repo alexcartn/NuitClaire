@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, UNAUTHORIZED_EVENT } from "./api";
 import { useFetch } from "./useFetch";
 import { applyUpdate, usePwa } from "./pwa";
@@ -18,6 +18,11 @@ import { Recherche } from "./screens/Recherche";
 import { Reglages } from "./screens/Reglages";
 import { Journal } from "./screens/Journal";
 
+// Carte du ciel et viseur : charges a la demande (catalogue d'etoiles
+// compris), pour ne pas alourdir l'ouverture de l'appli. Le service worker
+// met ce morceau en cache comme le reste : il marche hors ligne.
+const Ciel = lazy(() => import("./screens/Ciel"));
+
 const SCREENS: Screen[] = ["soir", "cibles", "messier", "journal", "reglages"];
 
 /** Ou l'on est, et comment on y est arrive. Pose tel quel dans
@@ -33,6 +38,8 @@ interface Nav {
   selected: string | null;
   backTo: Screen;
   depth: number;
+  /** Ecran Ciel : carte ou viseur. */
+  skyMode?: "carte" | "viseur";
 }
 
 /** Ecran d'ouverture : "soir" par defaut, ou celui demande par l'URL. Sert
@@ -189,6 +196,17 @@ export default function App() {
     });
   };
 
+  const openSky = (designation: string | null, mode: "carte" | "viseur") => {
+    const current = navRef.current;
+    push({
+      screen: "ciel",
+      selected: designation,
+      skyMode: mode,
+      backTo: current.screen === "detail" || current.screen === "recherche" ? current.backTo : current.screen,
+      depth: current.depth + 1,
+    });
+  };
+
   const openSearch = () => {
     const current = navRef.current;
     push({ screen: "recherche", selected: null, backTo: current.screen, depth: current.depth + 1 });
@@ -223,7 +241,13 @@ export default function App() {
       {needToken && <TokenGate />}
       <div ref={scroller} className="nc-scroll" style={{ flex: 1, overflow: "auto" }}>
         {screen === "soir" && (
-          <CeSoir instrument={instrument} onGoTargets={() => changeTab("cibles")} onSearch={openSearch} onOpenTarget={openTarget} />
+          <CeSoir
+            instrument={instrument}
+            onGoTargets={() => changeTab("cibles")}
+            onSearch={openSearch}
+            onOpenSky={() => openSky(null, "carte")}
+            onOpenTarget={openTarget}
+          />
         )}
         {screen === "cibles" && (
           <Cibles
@@ -242,6 +266,7 @@ export default function App() {
             instrument={instrument}
             horizon={state?.horizon}
             horizonAlt={state?.horizonAlt}
+            onOpenSky={(mode) => openSky(selected, mode)}
             windowMode={state?.windowMode}
             viewWindow={state?.viewWindow}
             onBack={back}
@@ -258,6 +283,17 @@ export default function App() {
           />
         )}
         {screen === "journal" && <Journal instrument={instrument} onOpenTarget={openTarget} onCaptureChange={reloadState} />}
+        {screen === "ciel" && (
+          <Suspense fallback={<div className="nc-screen"><p className="nc-caption">Chargement de la carte…</p></div>}>
+            <Ciel
+              state={state}
+              initialTarget={selected}
+              initialMode={nav.skyMode ?? "carte"}
+              onOpenTarget={openTarget}
+              onBack={back}
+            />
+          </Suspense>
+        )}
         {screen === "recherche" && (
           <Recherche
             onOpenTarget={openTarget}
@@ -273,7 +309,7 @@ export default function App() {
         {screen === "reglages" && <Reglages onChange={reloadState} />}
       </div>
       <TabBar
-        active={screen === "detail" || screen === "recherche" ? nav.backTo : screen}
+        active={screen === "detail" || screen === "recherche" || screen === "ciel" ? nav.backTo : screen}
         onChange={changeTab}
       />
     </div>

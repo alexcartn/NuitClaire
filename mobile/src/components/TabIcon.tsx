@@ -16,7 +16,7 @@
  * exactement les defauts qui ont fait abandonner les glyphes ici. */
 import type { ReactNode } from "react";
 
-export type TabIconName = "moon" | "target" | "grid" | "notebook" | "sliders" | "search" | "back" | "refresh" | "chevron" | "close";
+export type TabIconName = "moon" | "target" | "grid" | "notebook" | "sliders" | "search" | "back" | "refresh" | "chevron" | "close" | "sky";
 
 const PATHS: Record<TabIconName, ReactNode> = {
   // Croissant, comme l'icone de l'appli : la nuit en cours.
@@ -68,6 +68,8 @@ const PATHS: Record<TabIconName, ReactNode> = {
   ),
   // Chevron vers le bas : section repliable (tourne quand elle s'ouvre).
   chevron: <path d="M6 9.5l6 6 6-6" />,
+  // Etoile a quatre branches : la carte du ciel.
+  sky: <path d="M12 3.5l1.9 6.6 6.6 1.9-6.6 1.9L12 20.5l-1.9-6.6L3.5 12l6.6-1.9Z" />,
   // Croix : vider un champ.
   close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   // Chevron : revenir a l'ecran d'avant.

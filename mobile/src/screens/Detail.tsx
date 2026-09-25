@@ -33,6 +33,7 @@ function fmtExposureDate(iso: string): string {
 
 export function Detail({
   instrument = "seestar",
+  onOpenSky,
   designation,
   captured,
   horizon,
@@ -51,6 +52,7 @@ export function Detail({
   onBack: () => void;
   onCaptureChange: () => void;
   instrument?: Instrument;
+  onOpenSky?: (mode: "carte" | "viseur") => void;
 }) {
   const fetchDetail = useCallback(() => api.targetDetail(designation), [designation]);
   const { data, loading, error, reload } = useFetch(fetchDetail, [designation]);
@@ -155,6 +157,12 @@ export function Detail({
           )}
 
           {bino && <StarHopCard designation={designation} />}
+          {onOpenSky && (
+            <div className="nc-row">
+              <button onClick={() => onOpenSky("carte")} className="nc-btn nc-grow">Sur la carte du ciel</button>
+              <button onClick={() => onOpenSky("viseur")} className="nc-btn nc-grow">Viseur</button>
+            </div>
+          )}
 
           <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>

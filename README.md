@@ -554,6 +554,24 @@ Etoiles jusqu'a la magnitude 6 et traces des constellations : `data/stars.csv` e
 npm d3-celestial (BSD-3-Clause, (c) 2015 Olaf Frohn, donnees Hipparcos ; licence dans
 `data/STARS_LICENSE.txt`).
 
+### Carte du ciel et viseur
+
+Ecran « Ciel », ouvert depuis « Ce soir » (etoile en haut a droite) ou depuis une fiche
+(« Sur la carte du ciel », « Viseur »). Tout se calcule sur le telephone (`src/sky/sky.ts`,
+teste) : temps sideral, hauteur et azimut, projections ; les 1627 etoiles a l'oeil nu et
+les constellations sont embarquees (`src/sky/skyData.json`, genere par
+`scripts/build_stars.py`), et le module est charge a la demande. Seules la Lune et les
+planetes viennent du serveur (`GET /api/sky/bodies`, PyEphem), gardees sur l'appareil.
+
+- Carte : le ciel entier en dome (zenith au centre, horizon au bord, est a gauche), Lune,
+  planetes, cibles de ce soir, et ce que cache l'horizon (secteurs bouches, arbres a leur
+  hauteur). Heure reglable jusqu'a 8 h plus tard ; option pour tourner avec la boussole.
+- Viseur : le telephone tenu contre les jumelles, le dos vers le ciel. Direction visee
+  deduite de l'orientation complete (alpha, beta, gamma), ciel autour de la visee, champ
+  des jumelles au centre, consigne « 12° a droite, 8° plus haut » et vibration une fois
+  dans l'axe. Une boussole de telephone se trompe de 5 a 10 deg : le viseur amene dans la
+  region, le chemin d'etoiles de la fiche fait le reste.
+
 ### Recherche
 
 Par designation (prefixe : « M3 », « NGC70 ») ou par nom, en francais ou en anglais, sans

@@ -1207,3 +1207,169 @@ a {
   font: 400 var(--text-sm)/1.45 var(--font-text);
   color: var(--ink);
 }
+
+/* Carte du ciel et viseur (src/sky/). Fond de ciel sombre dans tous les
+   themes ; en vision nocturne, tout passe au rouge. */
+.nc-sky {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  touch-action: manipulation;
+}
+
+.nc-sky-bg {
+  fill: #07060a;
+}
+
+.nc-sky-grid {
+  fill: none;
+  stroke: rgba(170, 160, 200, 0.18);
+  stroke-width: 1;
+}
+
+.nc-sky-horizon {
+  fill: none;
+  stroke: rgba(240, 236, 250, 0.5);
+  stroke-width: 1.5;
+}
+
+.nc-sky-blocked {
+  fill: rgba(120, 110, 130, 0.35);
+}
+
+.nc-sky-trees,
+.nc-sky-ground {
+  fill: rgba(60, 90, 60, 0.45);
+}
+
+.nc-sky-const {
+  stroke: rgba(170, 160, 200, 0.35);
+  stroke-width: 1;
+}
+
+.nc-sky-star {
+  fill: #f4f2f7;
+}
+
+.nc-sky-label,
+.nc-sky-cardinal {
+  fill: rgba(240, 236, 250, 0.7);
+  font-family: var(--font-text);
+}
+
+.nc-sky-cardinal {
+  font-weight: 700;
+  fill: var(--ink2);
+}
+
+.nc-sky-planet {
+  fill: #f3d9a4;
+}
+
+.nc-sky-moon {
+  fill: #e8e6ef;
+}
+
+.nc-sky-planet-label {
+  fill: rgba(243, 217, 164, 0.9);
+  font-family: var(--font-text);
+}
+
+.nc-sky-target {
+  fill: none;
+  stroke: rgba(240, 236, 250, 0.75);
+  stroke-width: 1.5;
+}
+
+.nc-sky-target-sel {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.nc-sky-target-label {
+  fill: rgba(240, 236, 250, 0.75);
+  font-family: var(--font-num);
+}
+
+.nc-sky-target-label-sel {
+  fill: var(--accent);
+  font-family: var(--font-num);
+  font-weight: 700;
+}
+
+.nc-sky-time {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.nc-viewfinder {
+  border-radius: 12px;
+}
+
+.nc-vf-field {
+  fill: none;
+  stroke: rgba(240, 236, 250, 0.6);
+  stroke-width: 2;
+}
+
+.nc-vf-field-ok {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.nc-vf-cross {
+  stroke: rgba(240, 236, 250, 0.8);
+  stroke-width: 1.5;
+}
+
+.nc-vf-arrow {
+  fill: var(--accent);
+}
+
+.nc-vf-status {
+  font: 600 var(--text-md)/1.3 var(--font-text);
+  text-align: center;
+  padding: var(--space-sm);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surf);
+}
+
+.nc-vf-status-ok {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--onaccent);
+}
+
+[data-theme="night"] .nc-sky-bg {
+  fill: #000;
+}
+
+[data-theme="night"] .nc-sky-star,
+[data-theme="night"] .nc-sky-moon,
+[data-theme="night"] .nc-sky-planet {
+  fill: var(--ink);
+}
+
+[data-theme="night"] .nc-sky-const,
+[data-theme="night"] .nc-sky-grid,
+[data-theme="night"] .nc-sky-horizon,
+[data-theme="night"] .nc-sky-target,
+[data-theme="night"] .nc-vf-field,
+[data-theme="night"] .nc-vf-cross {
+  stroke: var(--ink3);
+}
+
+[data-theme="night"] .nc-sky-label,
+[data-theme="night"] .nc-sky-cardinal,
+[data-theme="night"] .nc-sky-planet-label,
+[data-theme="night"] .nc-sky-target-label {
+  fill: var(--ink2);
+}
+
+[data-theme="night"] .nc-sky-blocked,
+[data-theme="night"] .nc-sky-trees,
+[data-theme="night"] .nc-sky-ground {
+  fill: rgba(255, 74, 53, 0.12);
+}
