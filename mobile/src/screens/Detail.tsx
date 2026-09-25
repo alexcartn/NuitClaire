@@ -5,12 +5,13 @@ import { mutate, useSessions } from "../useSessions";
 import { targetHistory } from "../journalRead";
 import { newOp } from "../sessionQueue";
 import { AltitudeChart } from "../components/AltitudeChart";
+import { StarHopCard } from "../components/StarHopCard";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
 import { fmtH, fmtHM, plural } from "../format";
 import { tap } from "../haptics";
-import type { ViewWindow } from "../types";
+import type { Instrument, ViewWindow } from "../types";
 
 /** '90' -> "1 h 30" ; en-dessous de l'heure, "45 min". */
 function fmtMinutes(total: number): string {
@@ -31,6 +32,7 @@ function fmtExposureDate(iso: string): string {
 }
 
 export function Detail({
+  instrument = "seestar",
   designation,
   captured,
   horizon,
@@ -48,6 +50,7 @@ export function Detail({
   viewWindow?: ViewWindow;
   onBack: () => void;
   onCaptureChange: () => void;
+  instrument?: Instrument;
 }) {
   const fetchDetail = useCallback(() => api.targetDetail(designation), [designation]);
   const { data, loading, error, reload } = useFetch(fetchDetail, [designation]);
@@ -78,11 +81,15 @@ export function Detail({
     reload();
   };
 
+  // Aux jumelles, l'objectif est visuel : « vu », pas « capture ».
+  const bino = instrument === "jumelles";
+
   const toggleCapture = async () => {
     if (!data?.messierId) return;
     setCapturing(true);
     try {
-      await api.updateMessierCapture(data.messierId, !captured.has(data.messierId));
+      if (bino) await api.updateMessierSeen(data.messierId, !captured.has(data.messierId));
+      else await api.updateMessierCapture(data.messierId, !captured.has(data.messierId));
       tap();
       onCaptureChange();
     } finally {
@@ -147,6 +154,8 @@ export function Detail({
             />
           )}
 
+          {bino && <StarHopCard designation={designation} />}
+
           <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               {/* Bornes lues dans la serie elle-meme : l'intitule annoncait
@@ -173,11 +182,11 @@ export function Detail({
               ["Coordonnées", `${data.ra.toFixed(3)}h / ${data.dec.toFixed(3)}°`],
               ["Magnitude", data.mag != null ? data.mag.toFixed(1) : "inconnue"],
               ["Taille", data.sizeW && data.sizeH ? `${data.sizeW.toFixed(1)}' x ${data.sizeH.toFixed(1)}'` : "inconnue"],
-              ["Cadrage Seestar", data.cadrage],
+              [bino ? "Dans les jumelles" : "Cadrage Seestar", data.cadrage],
               ["Fenêtre exploitable", data.start ? `${data.start}–${data.end} (${data.hours} h)` : "Aucune ce soir"],
-              ["Filtre conseillé", data.filter],
+              ...(bino ? [] : [["Filtre conseillé", data.filter]]),
               ["Séparation lunaire mini", `${Math.round(data.moonSepDeg)}°`],
-              ["Temps de pose", `${data.exposureLowMin}–${data.exposureHighMin} min`],
+              ...(bino ? [] : [["Temps de pose", `${data.exposureLowMin}–${data.exposureHighMin} min`]]),
             ].map(([k, v], i, arr) => (
               <div
                 key={k}
@@ -194,6 +203,8 @@ export function Detail({
             ))}
           </div>
 
+          {/* Temps de pose : une affaire de photo, sans objet aux jumelles. */}
+          {!bino && (
           <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div className="nc-eyebrow">Temps d'expo</div>
@@ -264,6 +275,7 @@ export function Detail({
               </div>
             )}
           </div>
+          )}
 
           {data.reasons.length > 0 && (
             <div className="nc-card" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -327,7 +339,9 @@ export function Detail({
                   color: captured.has(data.messierId) ? "var(--onaccent)" : "var(--ink)",
                 }}
               >
-                {captured.has(data.messierId) ? "Capturé ✓" : "Marquer comme capturé"}
+                {captured.has(data.messierId)
+                  ? bino ? "Vu ✓" : "Capturé ✓"
+                  : bino ? "Marquer comme vu" : "Marquer comme capturé"}
               </button>
             )}
             <button onClick={addToJournal} disabled={addedToJournal} className="nc-btn" style={{ flex: "none" }}>

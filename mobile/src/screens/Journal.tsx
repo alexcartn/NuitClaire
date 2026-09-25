@@ -14,11 +14,12 @@ import { AddToSession } from "../journal/AddToSession";
 import { CurrentSessionCard } from "../journal/CurrentSessionCard";
 import { PastOutings } from "../journal/PastOutings";
 import { StartSuggestions } from "../journal/StartSuggestions";
-import type { Feeling, Site } from "../types";
+import type { Feeling, Instrument, Site } from "../types";
 
 /** Le carnet : session en cours, puis sorties passees. Chaque bloc vit dans
  * src/journal/ ; ce fichier en faisait 900 lignes a lui seul. */
-export function Journal({ onOpenTarget, onCaptureChange }: {
+export function Journal({ instrument = "seestar", onOpenTarget, onCaptureChange }: {
+  instrument?: Instrument;
   onOpenTarget: (designation: string) => void;
   onCaptureChange: () => void;
 }) {
@@ -106,7 +107,8 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
           current={current}
           places={places}
           pendingNotes={pendingNotes}
-          captured={new Set(appState?.messierCaptured ?? [])}
+          binoculars={instrument === "jumelles"}
+          captured={new Set((instrument === "jumelles" ? appState?.messierSeen : appState?.messierCaptured) ?? [])}
           onCaptureChange={() => {
             reloadAppState();
             onCaptureChange();

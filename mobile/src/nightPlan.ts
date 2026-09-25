@@ -38,11 +38,24 @@ function fromNightMinutes(minutes: number): string {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
-export function planNight(rows: PlanInput[]): PlanBlock[] {
+export interface PlanOptions {
+  blockMin?: number;
+  minBlockMin?: number;
+  maxBlocks?: number;
+}
+
+/** Aux jumelles, un objet se regarde en un quart d'heure, pas en une heure
+ * de pose : blocs courts, et plus d'objets dans la nuit. */
+export const BINOCULAR_PLAN: PlanOptions = { blockMin: 15, minBlockMin: 10, maxBlocks: 10 };
+
+export function planNight(rows: PlanInput[], options: PlanOptions = {}): PlanBlock[] {
+  const BLOCK = options.blockMin ?? BLOCK_MIN;
+  const MIN_BLOCK = options.minBlockMin ?? MIN_BLOCK_MIN;
+  const MAX = options.maxBlocks ?? MAX_BLOCKS;
   const windows = rows
     .filter((r): r is PlanInput & { start: string; end: string } => Boolean(r.start && r.end))
     .map((r) => ({ designation: r.designation, from: toNightMinutes(r.start), to: toNightMinutes(r.end) }))
-    .filter((w) => w.to - w.from >= MIN_BLOCK_MIN);
+    .filter((w) => w.to - w.from >= MIN_BLOCK);
   if (windows.length === 0) return [];
 
   const plan: PlanBlock[] = [];
@@ -50,9 +63,9 @@ export function planNight(rows: PlanInput[]): PlanBlock[] {
   const nightEnd = Math.max(...windows.map((w) => w.to));
   let t = Math.min(...windows.map((w) => w.from));
 
-  while (t < nightEnd && plan.length < MAX_BLOCKS) {
+  while (t < nightEnd && plan.length < MAX) {
     const now = t;
-    const pick = windows.find((w) => !used.has(w.designation) && w.from <= now && w.to - now >= MIN_BLOCK_MIN);
+    const pick = windows.find((w) => !used.has(w.designation) && w.from <= now && w.to - now >= MIN_BLOCK);
     if (!pick) {
       // Personne de disponible maintenant : on saute au prochain lever.
       const next = windows
@@ -63,8 +76,8 @@ export function planNight(rows: PlanInput[]): PlanBlock[] {
       continue;
     }
     // Pas de bloc qui laisserait derriere lui une miette inutilisable.
-    let end = Math.min(t + BLOCK_MIN, pick.to);
-    if (pick.to - end < MIN_BLOCK_MIN) end = Math.min(pick.to, t + BLOCK_MIN + MIN_BLOCK_MIN);
+    let end = Math.min(t + BLOCK, pick.to);
+    if (pick.to - end < MIN_BLOCK) end = Math.min(pick.to, t + BLOCK + MIN_BLOCK);
     plan.push({ designation: pick.designation, start: fromNightMinutes(t), end: fromNightMinutes(end) });
     used.add(pick.designation);
     t = end;

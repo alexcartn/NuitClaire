@@ -9,6 +9,7 @@ import { Compass } from "../components/Compass";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { Section } from "../components/Section";
 import { AlertsCard } from "../components/AlertsCard";
+import { InstrumentSwitch } from "../components/InstrumentSwitch";
 import { HorizonEditor, horizonSummary } from "../components/HorizonEditor";
 import { COMPASS_SECTORS, type Settings, type Site } from "../types";
 import { fmtDecimalHour, fmtLatLon, plural } from "../format";
@@ -283,6 +284,54 @@ export function Reglages({ onChange }: { onChange: () => void }) {
           />
         )}
       </Section>
+
+      {data && (
+        <Section
+          id="reglages-instrument"
+          title="Instrument"
+          summary={data.instrument === "jumelles" ? `Jumelles ${data.binoculars.label}` : "Seestar S50"}
+          defaultOpen={false}
+        >
+          <InstrumentSwitch
+            instrument={data.instrument}
+            binocularsLabel={data.binoculars.label}
+            onChanged={() => {
+              reloadSettings();
+              onChange();
+            }}
+          />
+          <p className="nc-caption" style={{ margin: 0 }}>
+            Aux jumelles : seulement ce qu'elles montrent (magnitude {String(data.binoculars.limitMag).replace(".", ",")} au
+            plus pour un objet étendu), un chemin d'étoiles dans chaque fiche, et un Pokédex Messier « vus » à part.
+          </p>
+          <div className="nc-grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+            {([
+              ["magnification", "Grossissement", Number(data.binoculars.label.split("x")[0]), "x"],
+              ["aperture_mm", "Diamètre", data.binoculars.apertureMm, "mm"],
+              ["fov_deg", "Champ", data.binoculars.fovDeg, "°"],
+            ] as const).map(([key, label, value, unit]) => (
+              <label key={key} className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
+                <span className="nc-caption">{label} ({unit})</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step={key === "fov_deg" ? 0.1 : 1}
+                  defaultValue={value}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value.replace(",", "."));
+                    if (!Number.isFinite(v) || v <= 0 || v === value) return;
+                    void saveSettings({}, { binoculars: { [key]: v } }, "Jumelles");
+                  }}
+                  className="nc-input nc-num"
+                />
+              </label>
+            ))}
+          </div>
+          <p className="nc-caption" style={{ margin: 0 }}>
+            Le champ réel est gravé sur les jumelles (« 6,5° » ou « 114 m à 1000 m » : divisez par 17,5).
+          </p>
+        </Section>
+      )}
 
       {data && (
         <Section id="reglages-nuit" title="Fenêtre d'observation" summary={windowSummary} defaultOpen={false}>

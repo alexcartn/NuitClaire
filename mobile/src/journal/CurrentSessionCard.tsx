@@ -14,7 +14,9 @@ import { Rating } from "./Rating";
 import { Timeline } from "./Timeline";
 
 /** La sortie en cours : cibles, fil de la nuit, ressenti, cloture. */
-export function CurrentSessionCard({ current, places, pendingNotes, captured, send, onClose, onOpenTarget, onCaptureChange }: {
+export function CurrentSessionCard({ current, places, pendingNotes, captured, binoculars = false, send, onClose, onOpenTarget, onCaptureChange }: {
+  /** Aux jumelles, on propose « vu » (Pokedex visuel) plutot que « capture ». */
+  binoculars?: boolean;
   current: CurrentSession;
   /** Messier deja captures (identifiants "31"...), pour proposer la capture
    * quand une cible Messier est cochee faite. */
@@ -53,7 +55,8 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
     setCapturing(id);
     setCaptureError(null);
     try {
-      await api.updateMessierCapture(id, true);
+      if (binoculars) await api.updateMessierSeen(id, true);
+      else await api.updateMessierCapture(id, true);
       tap();
       onCaptureChange();
     } catch {
@@ -163,13 +166,15 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
                 if (!item.done || !id || captured.has(id)) return null;
                 return (
                   <div className="nc-row nc-between nc-notice">
-                    <span>{item.designation} rejoint ton objectif Messier ?</span>
+                    <span>
+                      {item.designation} rejoint {binoculars ? "tes Messier vus aux jumelles" : "ton objectif Messier"} ?
+                    </span>
                     <button
                       onClick={() => markCaptured(id)}
                       disabled={capturing === id}
                       className="nc-chip nc-chip-active nc-none"
                     >
-                      {capturing === id ? "…" : "Marquer capturé"}
+                      {capturing === id ? "…" : binoculars ? "Marquer vu" : "Marquer capturé"}
                     </button>
                   </div>
                 );

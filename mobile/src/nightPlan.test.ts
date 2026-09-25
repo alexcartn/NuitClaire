@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planNight } from "./nightPlan.ts";
+import { BINOCULAR_PLAN, planNight } from "./nightPlan.ts";
 
 test("enchaine les cibles dans l'ordre de priorite, a travers minuit", () => {
   const plan = planNight([
@@ -31,4 +31,13 @@ test("ignore les creneaux trop courts et les cibles infaisables", () => {
 test("ne laisse pas de miette en fin de creneau", () => {
   const plan = planNight([{ designation: "M13", start: "21:00", end: "22:30" }]);
   assert.deepEqual(plan, [{ designation: "M13", start: "21:00", end: "22:30" }]);
+});
+
+test("aux jumelles, des blocs d'un quart d'heure", () => {
+  const plan = planNight(
+    [{ designation: "M31", start: "21:00", end: "05:00" }, { designation: "M45", start: "21:00", end: "05:00" }],
+    BINOCULAR_PLAN,
+  );
+  assert.deepEqual(plan[0], { designation: "M31", start: "21:00", end: "21:15" });
+  assert.deepEqual(plan[1], { designation: "M45", start: "21:15", end: "21:30" });
 });

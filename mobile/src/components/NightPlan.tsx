@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { planNight } from "../nightPlan";
+import { BINOCULAR_PLAN, planNight } from "../nightPlan";
 import { mutate } from "../useSessions";
 import { newOp } from "../sessionQueue";
 import { tap } from "../haptics";
@@ -7,8 +7,12 @@ import type { TargetRow } from "../types";
 
 /** Enchainement suggere pour la nuit (voir nightPlan.ts), avec un geste
  * pour tout poser dans le journal avant de partir. */
-export function NightPlan({ rows, onOpenTarget }: { rows: TargetRow[]; onOpenTarget: (d: string) => void }) {
-  const plan = planNight(rows);
+export function NightPlan({ rows, binoculars = false, onOpenTarget }: {
+  rows: TargetRow[];
+  binoculars?: boolean;
+  onOpenTarget: (d: string) => void;
+}) {
+  const plan = planNight(rows, binoculars ? BINOCULAR_PLAN : {});
   const [added, setAdded] = useState(false);
   if (plan.length === 0) return null;
   const byDesignation = new Map(rows.map((r) => [r.designation, r]));

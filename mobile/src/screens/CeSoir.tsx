@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
-import { fmtLatLon, plural } from "../format";
+import { fmtLatLon, plural, targetsCacheKey } from "../format";
 import { StaleNotice } from "../components/StaleNotice";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -14,7 +14,7 @@ import { NightPlan } from "../components/NightPlan";
 import { CloudChart } from "../components/CloudChart";
 import { WindChart } from "../components/WindChart";
 import { TempDewChart } from "../components/TempDewChart";
-import type { CloudTrend } from "../types";
+import type { CloudTrend, Instrument } from "../types";
 
 /** Tendance nuages : un mot et une fleche, dans la couleur de l'echelle de
  * qualite. Les pastilles emoji d'avant (vert, jaune, rouge) s'affichaient en
@@ -37,10 +37,12 @@ function todayLabel(): string {
 }
 
 export function CeSoir({
+  instrument,
   onGoTargets,
   onSearch,
   onOpenTarget,
 }: {
+  instrument: Instrument;
   onGoTargets: () => void;
   onSearch: () => void;
   onOpenTarget: (designation: string) => void;
@@ -50,8 +52,10 @@ export function CeSoir({
   const fetchNight = useCallback(() => api.night(), []);
   const fetchNights = useCallback(() => api.nights(), []);
   const fetchState = useCallback(() => api.state(), []);
-  const fetchTargets = useCallback(() => api.targets(), []);
-  const fetchMessier = useCallback(() => api.messier(true), []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchTargets = useCallback(() => api.targets(), [instrument]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchMessier = useCallback(() => api.messier(true), [instrument]);
 
   // Cles de cache : la derniere reponse reussie est reaffichee au demarrage,
   // avant meme la requete, pour que l'appli installee montre quelque chose
@@ -59,8 +63,8 @@ export function CeSoir({
   const night = useFetch(fetchNight, [], "night");
   const nights = useFetch(fetchNights, [], "nights");
   const state = useFetch(fetchState, [], "state");
-  const targets = useFetch(fetchTargets, [], "targets");
-  const messier = useFetch(fetchMessier, [], "messier:true");
+  const targets = useFetch(fetchTargets, [instrument], targetsCacheKey(instrument));
+  const messier = useFetch(fetchMessier, [instrument], `messier:true:${instrument}`);
   const stale = (night.error || state.error) && night.data && state.data;
 
   const reloadAll = () => {
@@ -89,7 +93,8 @@ export function CeSoir({
 
   const n = night.data;
   const site = state.data.site;
-  const captured = new Set(state.data.messierCaptured);
+  const binoculars = instrument === "jumelles";
+  const captured = new Set((binoculars ? state.data.messierSeen : state.data.messierCaptured) ?? []);
   const uncapturedMessier =
     messier.data?.filter((r) => r.messierId && !captured.has(r.messierId)).length ?? 0;
   // Rien tant que la liste n'est pas la : « 0 cible » pendant le
@@ -184,14 +189,14 @@ export function CeSoir({
           </span>
           <span style={{ fontSize: "var(--text-xs)", opacity: 0.75 }}>
             {targetCount != null && messier.data
-              ? `dont ${plural(uncapturedMessier, "Messier pas encore capturé", "Messier pas encore capturés")}`
+              ? `${binoculars ? "aux jumelles, " : ""}dont ${plural(uncapturedMessier, `Messier pas encore ${binoculars ? "vu" : "capturé"}`, `Messier pas encore ${binoculars ? "vus" : "capturés"}`)}`
               : "calcul des créneaux…"}
           </span>
         </span>
         <span style={{ fontSize: "var(--text-md)" }} aria-hidden="true">→</span>
       </button>
 
-      {targets.data && <NightPlan rows={targets.data} onOpenTarget={onOpenTarget} />}
+      {targets.data && <NightPlan rows={targets.data} binoculars={binoculars} onOpenTarget={onOpenTarget} />}
 
       <div className="nc-card nc-stack">
         <div className="nc-eyebrow">Horizon dégagé</div>

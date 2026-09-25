@@ -39,3 +39,9 @@ export function windowLabel(windowMode: string | undefined, view?: { startHour: 
     ? `${fmtDecimalHour(view.startHour)}–${fmtDecimalHour(view.endHour)}`
     : "nuit complète";
 }
+
+/** Cle du cache de la liste « Cibles » : une par instrument, pour ne pas
+ * afficher la liste du Seestar le temps de charger celle des jumelles. */
+export function targetsCacheKey(instrument: string | undefined): string {
+  return instrument === "jumelles" ? "targets:jumelles" : "targets";
+}

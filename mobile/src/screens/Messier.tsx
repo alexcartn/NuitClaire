@@ -9,6 +9,8 @@ import { buildDex, captureDates, MESSIER_TOTAL, MONTHS_FR, pace, type DexEntry }
 import { StaleNotice } from "../components/StaleNotice";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { InstrumentSwitch } from "../components/InstrumentSwitch";
+import type { Instrument } from "../types";
 import { Section } from "../components/Section";
 import { useRemembered } from "../useRemembered";
 
@@ -63,15 +65,27 @@ function DexChips({ entries, onOpen }: { entries: DexEntry[]; onOpen: (d: string
  * pour le classement). */
 export function Messier({
   captured,
+  instrument,
+  binocularsLabel,
+  onInstrumentChange,
   onOpenTarget,
 }: {
   captured: Set<string>;
+  instrument: Instrument;
+  binocularsLabel?: string;
+  onInstrumentChange: () => void;
   onOpenTarget: (designation: string) => void;
 }) {
-  const fetchRows = useCallback(() => api.messier(false), []);
-  const rows = useFetch(fetchRows, [], "messier:false");
-  const fetchSeason = useCallback(() => api.messierSeason(), []);
-  const season = useFetch(fetchSeason, [], "messier-season");
+  // Une liste et une saison par instrument : aux jumelles, les hauteurs et
+  // la tolerance a la Lune ne sont pas celles du Seestar.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchRows = useCallback(() => api.messier(false), [instrument]);
+  const rows = useFetch(fetchRows, [instrument], instrument === "jumelles" ? "messier:false:jumelles" : "messier:false");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchSeason = useCallback(() => api.messierSeason(), [instrument]);
+  const season = useFetch(fetchSeason, [instrument], instrument === "jumelles" ? "messier-season:jumelles" : "messier-season");
+  const bino = instrument === "jumelles";
+  const done = bino ? "vus" : "capturés";
   const sessions = useSessions();
   const [showAllGrid, setShowAllGrid] = useRemembered("messier:grid-all", true);
   const [addedTonight, setAddedTonight] = useState(false);
@@ -113,13 +127,20 @@ export function Messier({
   return (
     <div className="nc-screen">
       <ScreenHeader
-        eyebrow="Objectif Messier"
+        eyebrow={bino ? "Messier aux jumelles" : "Objectif Messier"}
         title={
           <>
-            <span className="nc-num">{dex.capturedCount}</span> sur {MESSIER_TOTAL} capturés
+            <span className="nc-num">{dex.capturedCount}</span> sur {MESSIER_TOTAL} {done}
           </>
         }
       />
+
+      <InstrumentSwitch instrument={instrument} binocularsLabel={binocularsLabel} onChanged={onInstrumentChange} />
+      {bino && (
+        <p className="nc-caption" style={{ margin: 0 }}>
+          Un objectif à part : « vu aux jumelles » ne compte pas comme photographié, et inversement.
+        </p>
+      )}
 
       <div className="nc-card nc-stack">
         <div style={{ height: 10, borderRadius: 5, background: "var(--bar)", overflow: "hidden" }}>
@@ -308,7 +329,7 @@ export function Messier({
               key={e.id}
               onClick={() => onOpenTarget(e.designation)}
               className={`nc-dex-cell ${e.captured ? "nc-dex-captured" : "nc-strip"}`}
-              aria-label={`${e.designation}${e.captured ? ", capturé" : ""}${e.tonight ? ", visible ce soir" : ""}`}
+              aria-label={`${e.designation}${e.captured ? (bino ? ", vu" : ", capturé") : ""}${e.tonight ? ", visible ce soir" : ""}`}
             >
               {e.captured && e.row?.imageUrl && (
                 <img

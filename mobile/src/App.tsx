@@ -202,7 +202,9 @@ export default function App() {
 
   const fetchState = useCallback(() => api.state(), []);
   const { data: state, reload: reloadState } = useFetch(fetchState, [], "state");
-  const captured = new Set(state?.messierCaptured ?? []);
+  // Aux jumelles, l'objectif Messier est visuel : « vu », pas « capture ».
+  const instrument = state?.instrument ?? "seestar";
+  const captured = new Set((instrument === "jumelles" ? state?.messierSeen : state?.messierCaptured) ?? []);
 
   const { screen, selected } = nav;
 
@@ -221,11 +223,14 @@ export default function App() {
       {needToken && <TokenGate />}
       <div ref={scroller} className="nc-scroll" style={{ flex: 1, overflow: "auto" }}>
         {screen === "soir" && (
-          <CeSoir onGoTargets={() => changeTab("cibles")} onSearch={openSearch} onOpenTarget={openTarget} />
+          <CeSoir instrument={instrument} onGoTargets={() => changeTab("cibles")} onSearch={openSearch} onOpenTarget={openTarget} />
         )}
         {screen === "cibles" && (
           <Cibles
             captured={captured}
+            instrument={instrument}
+            binocularsLabel={state?.binoculars?.label}
+            onInstrumentChange={reloadState}
             windowLabel={windowLabel(state?.windowMode, state?.viewWindow)}
             onOpenTarget={openTarget}
           />
@@ -234,6 +239,7 @@ export default function App() {
           <Detail
             designation={selected}
             captured={captured}
+            instrument={instrument}
             horizon={state?.horizon}
             horizonAlt={state?.horizonAlt}
             windowMode={state?.windowMode}
@@ -243,9 +249,15 @@ export default function App() {
           />
         )}
         {screen === "messier" && (
-          <Messier captured={captured} onOpenTarget={openTarget} />
+          <Messier
+            captured={captured}
+            instrument={instrument}
+            binocularsLabel={state?.binoculars?.label}
+            onInstrumentChange={reloadState}
+            onOpenTarget={openTarget}
+          />
         )}
-        {screen === "journal" && <Journal onOpenTarget={openTarget} onCaptureChange={reloadState} />}
+        {screen === "journal" && <Journal instrument={instrument} onOpenTarget={openTarget} onCaptureChange={reloadState} />}
         {screen === "recherche" && (
           <Recherche
             onOpenTarget={openTarget}

@@ -1095,3 +1095,115 @@ a {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Choix a deux ou trois options exclusives (instrument). */
+.nc-segmented {
+  display: flex;
+  padding: 3px;
+  gap: 3px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surf);
+}
+
+.nc-segment {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink2);
+  font: 600 var(--text-xs)/1 var(--font-text);
+  cursor: pointer;
+}
+
+.nc-segment-active {
+  background: var(--accent);
+  color: var(--onaccent);
+}
+
+[data-theme="night"] .nc-segment {
+  min-height: 48px;
+}
+
+/* Carte du chemin d'etoiles (components/StarHopChart.tsx). Fond sombre
+   quel que soit le theme : c'est un bout de ciel. */
+.nc-starhop {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: #07060a;
+  border: 1px solid var(--line);
+}
+
+[data-theme="night"] .nc-starhop {
+  background: #000;
+}
+
+.nc-starhop-const {
+  stroke: rgba(170, 160, 200, 0.35);
+  stroke-width: 1.5;
+}
+
+.nc-starhop-path {
+  fill: none;
+  stroke: rgba(240, 236, 250, 0.55);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.nc-starhop-field {
+  fill: none;
+  stroke: rgba(240, 236, 250, 0.35);
+  stroke-width: 1.5;
+}
+
+.nc-starhop-field-target {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.nc-starhop-star {
+  fill: #f4f2f7;
+}
+
+.nc-starhop-label,
+.nc-starhop-step {
+  fill: rgba(240, 236, 250, 0.7);
+  font-family: var(--font-text);
+}
+
+.nc-starhop-target {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+/* Vision nocturne : tout en rouge, plus aucune lumiere blanche. */
+[data-theme="night"] .nc-starhop-star {
+  fill: var(--ink);
+}
+
+[data-theme="night"] .nc-starhop-const,
+[data-theme="night"] .nc-starhop-field {
+  stroke: var(--ink3);
+}
+
+[data-theme="night"] .nc-starhop-path {
+  stroke: var(--ink2);
+}
+
+[data-theme="night"] .nc-starhop-label,
+[data-theme="night"] .nc-starhop-step {
+  fill: var(--ink2);
+}
+
+.nc-starhop-steps {
+  margin: 0;
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  font: 400 var(--text-sm)/1.45 var(--font-text);
+  color: var(--ink);
+}

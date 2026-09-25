@@ -529,6 +529,31 @@ l'a pas pris, et recharge l'etat partage de l'appli.
   cible passe au-dessus (`scoring.sector_floor`). Les horizons booleens (appli Streamlit,
   anciens reglages) restent acceptes.
 
+### Jumelles
+
+Instrument actif au choix (Reglages, ou la bascule en tete de « Cibles » et « Messier ») :
+Seestar S50, ou jumelles (10x50 et champ de 6,5 deg par defaut, reglables). Aux jumelles
+(`optics.py`) :
+
+- la liste ne garde que ce qu'elles montrent : magnitude d'objet etendu au plus
+  2 + 5 log D - 2 (8,5 pour 50 mm), taille d'au moins 1', amas et doubles toujours ;
+  plus des classiques absents du catalogue Seestar (`data/binoculars.csv` : Cr 399,
+  Mel 20, Mel 25, Mel 111, cascade de Kemble, Stock 2, Albireo, Mizar, epsilon Lyr) ;
+- cadrage « tient dans le champ », hauteurs de 15 a 90 deg, et une Lune peu genante pour
+  les amas et les doubles (les nebuleuses et galaxies s'effacent toujours) ;
+- plan de la nuit par quarts d'heure ;
+- un Pokedex Messier « vus » a part (`progress.messier_seen`, `PUT /api/messier/{id}/seen`) :
+  vu aux jumelles ne compte pas comme photographie ;
+- dans chaque fiche, le chemin d'etoiles (`starhop.py`, `GET /api/targets/{d}/starhop`) :
+  une etoile de depart brillante, des sauts de trois quarts de champ appuyes sur les
+  etoiles visibles, et une carte orientee comme le ciel (zenith en haut), avec un cercle
+  de la taille du champ a chaque etape. Pour M31 : Mirach, mu And, M31.
+
+Etoiles jusqu'a la magnitude 6 et traces des constellations : `data/stars.csv` et
+`data/constellation_lines.json`, generes par `scripts/build_stars.py` depuis le paquet
+npm d3-celestial (BSD-3-Clause, (c) 2015 Olaf Frohn, donnees Hipparcos ; licence dans
+`data/STARS_LICENSE.txt`).
+
 ### Recherche
 
 Par designation (prefixe : « M3 », « NGC70 ») ou par nom, en francais ou en anglais, sans

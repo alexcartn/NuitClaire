@@ -11,6 +11,32 @@ export interface ViewWindow {
   endHour: number;
 }
 
+export type Instrument = "seestar" | "jumelles";
+
+/** Jumelles configurees (voir optics.py). */
+export interface Binoculars {
+  label: string;
+  fovDeg: number;
+  apertureMm: number;
+  minAltDeg: number;
+  limitMag: number;
+}
+
+/** Chemin d'etoiles vers une cible (voir starhop.py). Coordonnees en degres
+ * sur le ciel, zenith en haut (y vers le haut). */
+export interface StarHop {
+  fovDeg: number;
+  time: string;
+  anchor: string;
+  distanceDeg: number;
+  hops: { x: number; y: number; label: string | null; target: boolean }[];
+  steps: string[];
+  stars: { x: number; y: number; mag: number; label: string | null }[];
+  lines: [number, number, number, number][];
+  radiusDeg: number;
+  nakedEye: boolean;
+}
+
 export interface Settings {
   site: Site;
   windowMode: "complete" | "habituelle";
@@ -18,6 +44,8 @@ export interface Settings {
   alerts: Record<string, boolean>;
   /** Lieux deja utilises, le plus recent d'abord (le lieu actif compris). */
   places: Site[];
+  instrument: Instrument;
+  binoculars: Binoculars;
 }
 
 export interface AppState {
@@ -25,6 +53,10 @@ export interface AppState {
   horizon: Record<string, boolean>;
   /** Hauteur (deg) a partir de laquelle chaque secteur ouvert est degage. */
   horizonAlt: Record<string, number>;
+  instrument?: Instrument;
+  binoculars?: Binoculars;
+  /** Messier vus aux jumelles (objectif visuel, distinct des captures). */
+  messierSeen?: string[];
   windowMode: string;
   viewWindow: ViewWindow;
   messierCaptured: string[];
@@ -189,6 +221,8 @@ export interface SettingsUpdate {
   windowMode?: "complete" | "habituelle";
   viewWindow?: ViewWindow;
   alerts?: Record<string, boolean>;
+  instrument?: Instrument;
+  binoculars?: { magnification?: number; aperture_mm?: number; fov_deg?: number };
 }
 
 export interface GeocodeResult {

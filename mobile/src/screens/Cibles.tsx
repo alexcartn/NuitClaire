@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { useRemembered } from "../useRemembered";
-import { plural } from "../format";
+import { plural, targetsCacheKey } from "../format";
 import { StaleNotice } from "../components/StaleNotice";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -18,7 +18,8 @@ import {
   visibleDuring,
   type CiblesGroup,
 } from "../ciblesView";
-import type { TargetRow } from "../types";
+import type { Instrument, TargetRow } from "../types";
+import { InstrumentSwitch } from "../components/InstrumentSwitch";
 
 /** Cartes affichees par groupe avant « Voir les N autres ». */
 const GROUP_PAGE = 8;
@@ -57,10 +58,16 @@ function GroupSection({ group, index, captured, onOpenTarget }: {
  * groupes repliables, les filtres ranges dans leur propre section. */
 export function Cibles({
   captured,
+  instrument,
+  binocularsLabel,
+  onInstrumentChange,
   windowLabel,
   onOpenTarget,
 }: {
   captured: Set<string>;
+  instrument: Instrument;
+  binocularsLabel?: string;
+  onInstrumentChange: () => void;
   /** "nuit complète" ou "20:00–22:30" : le titre annoncait « nuit complete »
    * en dur, meme en fenetre habituelle. */
   windowLabel: string;
@@ -76,8 +83,13 @@ export function Cibles({
   // Une seule requete, filtree sur le telephone : filtrer par type cote
   // serveur faisait disparaitre les autres types des puces des qu'on en
   // choisissait un. Meme cle que « Ce soir » : c'est la meme liste.
-  const fetchTargets = useCallback(() => api.targets(), []);
-  const { data: rows, loading, error, fetchedAt, reload } = useFetch(fetchTargets, [], "targets");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchTargets = useCallback(() => api.targets(), [instrument]);
+  const { data: rows, loading, error, fetchedAt, reload } = useFetch(
+    fetchTargets,
+    [instrument],
+    targetsCacheKey(instrument),
+  );
 
   const filters = { types, magRange, singleFrame };
   const allTypes = useMemo(() => distinctTypes(rows), [rows]);
@@ -93,7 +105,10 @@ export function Cibles({
     () => (selectedHour == null ? filtered : filtered.filter((r) => visibleDuring(r, selectedHour))),
     [filtered, selectedHour],
   );
-  const groups = useMemo(() => groupRows(visible, captured), [visible, captured]);
+  const groups = useMemo(
+    () => groupRows(visible, captured, instrument === "jumelles" ? "Messier pas encore vus" : "Messier à capturer"),
+    [visible, captured, instrument],
+  );
   const nFilters = activeFilterCount(filters);
 
   const toggleType = (t: string) =>
@@ -109,8 +124,14 @@ export function Cibles({
       <ScreenHeader
         eyebrow="Cibles faisables"
         title={rows ? `${plural(visible.length, "cible", "cibles")} · ${selectedHour != null ? `vers ${hourLabel(selectedHour)}` : windowLabel}` : "Chargement…"}
-        sub="Messier manquants d'abord, puis cadrage simple, puis heures disponibles."
+        sub={
+          instrument === "jumelles"
+            ? "Ce que des jumelles montrent vraiment : Messier pas encore vus d'abord."
+            : "Messier manquants d'abord, puis cadrage simple, puis heures disponibles."
+        }
       />
+
+      <InstrumentSwitch instrument={instrument} binocularsLabel={binocularsLabel} onChanged={onInstrumentChange} />
 
       {loading && !rows && <p className="nc-caption">Chargement…</p>}
       {error &&
@@ -130,7 +151,7 @@ export function Cibles({
             style={{ alignSelf: "flex-start" }}
             aria-pressed={singleFrame}
           >
-            Cadre unique seulement
+            {instrument === "jumelles" ? "Tient dans le champ seulement" : "Cadre unique seulement"}
           </button>
           {nFilters > 0 && (
             <button onClick={resetFilters} className="nc-link">

@@ -12,6 +12,7 @@ import type {
   Settings,
   SettingsUpdate,
   Site,
+  StarHop,
   Stats,
   TargetDetail,
   TargetRow,
@@ -109,6 +110,9 @@ export const api = {
   search: (q: string) => get<TargetRow[]>("/api/search", { q }),
   searchSuggest: (q: string, limit = 8) =>
     get<TargetSuggestion[]>("/api/search/suggest", { q, limit: String(limit) }),
+  starHop: (designation: string) => get<StarHop>(`/api/targets/${encodeURIComponent(designation)}/starhop`),
+  updateMessierSeen: (id: string, seen: boolean) =>
+    request<string[]>("PUT", `/api/messier/${encodeURIComponent(id)}/seen`, { body: { seen } }),
   targetDetail: (designation: string) =>
     get<TargetDetail>(`/api/targets/${encodeURIComponent(designation)}`),
 
