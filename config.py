@@ -26,6 +26,18 @@ SEESTAR = {
     "low_messier_culmination_deg": 25,
 }
 
+# Jumelles par defaut (profil « Jumelles », voir optics.py) : une 10x50,
+# champ reel ~6,5 deg. Modifiables dans Reglages.
+BINOCULARS = {
+    "magnification": 10,
+    "aperture_mm": 50,
+    "fov_deg": 6.5,
+    # Pas de monture alt-az a menager : on vise bas, et jusqu'au zenith
+    # (inconfortable, mais possible allonge).
+    "min_alt_deg": 15,
+    "max_alt_deg": 90,
+}
+
 # Modele du score astro horaire (voir `scoring.hourly_score`). Les facteurs se
 # multiplient au lieu de s'additionner : le pire l'emporte, comme dehors. Le
 # modele additif precedent donnait 84/100 a un ciel entierement couvert de

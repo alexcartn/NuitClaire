@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from astro import fits_in_fov
+from optics import framing
 from imagery import dss_image_url
 from scoring import target_windows, target_feasibility_reasons
 
@@ -46,7 +46,7 @@ def common_row_fields(tgt: dict, w: dict, night_df: pd.DataFrame, horizon: dict,
         "Fin": w["end"].strftime("%H:%M") if w["end"] is not None else None,
         "Heures": w["hours"],
         "Alt max deg": w["max_alt"], "Lune deg": w["min_moon_sep"],
-        "Cadrage": fits_in_fov(*w["size"]) if all(w["size"]) else "taille inconnue",
+        "Cadrage": framing(tgt, w["size"]),
         "Image": dss_image_url(tgt["ra"], tgt["dec"], tgt.get("w"), tgt.get("h")),
         "RA": tgt["ra"], "Dec": tgt["dec"], "Mag": tgt.get("mag"),
         "TailleW": tgt.get("w"), "TailleH": tgt.get("h"),

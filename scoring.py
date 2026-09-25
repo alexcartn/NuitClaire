@@ -271,7 +271,8 @@ def temperature_range(df: pd.DataFrame, now: pd.Timestamp | None) -> dict:
     }
 
 
-_CADRAGE_RANK = {"cadre unique": 0, "mosaique 2x": 1, "mosaique large": 2}
+_CADRAGE_RANK = {"cadre unique": 0, "mosaique 2x": 1, "mosaique large": 2,
+                 "tient dans le champ": 0, "déborde du champ": 1}
 
 
 def discovery_sort_key(row: dict, captured: set) -> tuple:
@@ -317,13 +318,20 @@ def culmination_deg(dec_deg: float, lat_deg: float) -> float:
 
 
 def min_alt_for(target: dict, site: dict = SITE) -> float:
-    """Hauteur minimale exigee pour cette cible : celle du Seestar, sauf pour
-    un Messier qui ne monte jamais assez depuis ce site (voir
+    """Hauteur minimale exigee pour cette cible : celle de l'instrument (le
+    Seestar, ou les jumelles portees par `target["optics"]`), sauf pour un
+    Messier qui ne monte jamais assez depuis ce site (voir
     `SEESTAR["low_messier_min_alt_deg"]`)."""
+    base = (target.get("optics") or {}).get("min_alt_deg", SEESTAR["min_alt_deg"])
     if target.get("messier") and target.get("dec") is not None \
             and culmination_deg(target["dec"], site["lat"]) < SEESTAR["low_messier_culmination_deg"]:
-        return SEESTAR["low_messier_min_alt_deg"]
-    return SEESTAR["min_alt_deg"]
+        return min(base, SEESTAR["low_messier_min_alt_deg"])
+    return base
+
+
+def max_alt_for(target: dict) -> float:
+    """Hauteur maximale : le Seestar decroche pres du zenith, pas des jumelles."""
+    return (target.get("optics") or {}).get("max_alt_deg", SEESTAR["max_alt_deg"])
 
 
 def sector_floor(horizon: dict, sector: str) -> float | None:
@@ -347,8 +355,14 @@ def _sector_ok(d: pd.DataFrame, horizon: dict) -> pd.Series:
 
 
 def _uses_lp(target: dict) -> bool:
-    """Cible en emission, photographiee avec le filtre LP du S50 (colonne
-    `filter` du catalogue : nebuleuses, regions HII, planetaires, remanents)."""
+    """Cible peu genee par la Lune. Au Seestar : objet en emission
+    photographie avec le filtre LP (colonne `filter` du catalogue :
+    nebuleuses, regions HII, planetaires, remanents). Aux jumelles : amas
+    d'etoiles et doubles, qui restent nets a l'oeil sous la Lune, quand
+    nebuleuses et galaxies s'effacent (voir optics.MOON_TOLERANT_TYPES)."""
+    if target.get("optics"):
+        from optics import MOON_TOLERANT_TYPES
+        return target.get("type") in MOON_TOLERANT_TYPES
     return target.get("filter") == "LP"
 
 
@@ -377,7 +391,7 @@ def target_windows(df: pd.DataFrame, target: dict, horizon: dict | None = None,
     horizon = horizon if horizon is not None else {s: True for s in COMPASS_SECTORS}
     d = _target_sky_frame(df, target, site=site)
     min_alt = min_alt_for(target, site)
-    ok = d[(d["alt"] >= min_alt) & (d["alt"] <= SEESTAR["max_alt_deg"])
+    ok = d[(d["alt"] >= min_alt) & (d["alt"] <= max_alt_for(target))
            & (target_score(d, target) >= 0.6) & _sector_ok(d, horizon)
            & ~_moon_veto(d, target)]
     return {
@@ -406,7 +420,7 @@ def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | N
     d = _target_sky_frame(df, target, site=site)
 
     min_alt = min_alt_for(target, site)
-    alt_ok = (d["alt"] >= min_alt) & (d["alt"] <= SEESTAR["max_alt_deg"])
+    alt_ok = (d["alt"] >= min_alt) & (d["alt"] <= max_alt_for(target))
     sector_ok = _sector_ok(d, horizon)
     score_ok = target_score(d, target) >= 0.6  # meme seuil que target_windows
     moon_ok = ~_moon_veto(d, target)
@@ -414,7 +428,7 @@ def target_feasibility_reasons(df: pd.DataFrame, target: dict, horizon: dict | N
     reasons = []
     if not alt_ok.any():
         reasons.append(
-            f"Ne monte jamais entre {min_alt:.0f}° et {SEESTAR['max_alt_deg']:.0f}° "
+            f"Ne monte jamais entre {min_alt:.0f}° et {max_alt_for(target):.0f}° "
             f"d'altitude cette nuit (maximum atteint : {d['alt'].max():.0f}°).")
     elif not (alt_ok & sector_ok).any():
         reasons.append("Ne passe dans un secteur d'horizon degage (au-dessus de ce qui "

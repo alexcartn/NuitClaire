@@ -5,7 +5,8 @@ import settings as settings_store
 from api.deps import settings_write_lock, site_from_settings
 from api.schemas import GeocodeRequest, GeocodeResult, ReverseGeocodeRequest, ReverseGeocodeResult, \
     SettingsOut, SettingsUpdate
-from api.translate import site_to_out
+from api.translate import binoculars_to_out, site_to_out
+from optics import binocular_optics
 from geocode import GeocodeError, geocode, reverse_geocode
 
 router = APIRouter()
@@ -23,7 +24,8 @@ def _settings_out(s: dict) -> dict:
     places = s["places"] if any(p["name"] == site["name"] for p in s["places"]) else [site] + s["places"]
     return {"site": site_to_out(site), "windowMode": s["window_mode"],
             "viewWindow": _view_window_out(s), "alerts": s["alerts"],
-            "places": [site_to_out(p) for p in places]}
+            "places": [site_to_out(p) for p in places],
+            "instrument": s["instrument"], "binoculars": binoculars_to_out(binocular_optics(s))}
 
 
 @router.get("/api/settings", response_model=SettingsOut)
@@ -53,6 +55,15 @@ def update_settings(body: SettingsUpdate) -> dict:
             s["window_mode"] = body.windowMode
         if body.viewWindow is not None:
             s["view_window"] = {"start_hour": body.viewWindow.startHour, "end_hour": body.viewWindow.endHour}
+        if body.instrument is not None:
+            if body.instrument not in ("seestar", "jumelles"):
+                raise HTTPException(422, "instrument doit etre 'seestar' ou 'jumelles'.")
+            s["instrument"] = body.instrument
+        if body.binoculars is not None:
+            given = {k: v for k, v in body.binoculars.model_dump().items() if v is not None}
+            if "fov_deg" in given and not 1 <= given["fov_deg"] <= 15:
+                raise HTTPException(422, "Le champ des jumelles doit etre entre 1 et 15 degres.")
+            s["binoculars"] = {**s["binoculars"], **given}
         if body.alerts is not None:
             s["alerts"] = {**s["alerts"], **body.alerts}
         settings_store.save(s)

@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 import progress as progress_store
 from api.deps import get_site, progress_write_lock
-from api.schemas import AddExposure, ExposureEntryOut, HorizonUpdate, MessierCaptureUpdate
+from api.schemas import AddExposure, ExposureEntryOut, HorizonUpdate, MessierCaptureUpdate, MessierSeenUpdate
 from astro import COMPASS_SECTORS, local_now
 
 router = APIRouter()
@@ -24,6 +24,19 @@ def update_horizon(body: HorizonUpdate) -> dict:
             prog["horizon_alt"][body.sector] = body.minAlt
         progress_store.save(prog)
         return prog["horizon"]
+
+
+@router.put("/api/messier/{messier_id}/seen", response_model=list[str])
+def update_messier_seen(messier_id: str, body: MessierSeenUpdate) -> list[str]:
+    """Messier vu aux jumelles : objectif visuel, distinct des captures."""
+    with progress_write_lock:
+        prog = progress_store.load()
+        seen = [m for m in prog["messier_seen"] if m != messier_id]
+        if body.seen:
+            seen.append(messier_id)
+        prog["messier_seen"] = seen
+        progress_store.save(prog)
+        return seen
 
 
 @router.put("/api/messier/{messier_id}", response_model=list[str])

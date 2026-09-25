@@ -25,6 +25,8 @@ class SettingsOut(BaseModel):
     alerts: dict[str, bool]
     # Lieux deja utilises, le plus recent d'abord (voir settings.remember_place).
     places: list[SiteOut] = []
+    instrument: str = "seestar"
+    binoculars: "BinocularsOut | None" = None
 
 
 class SiteUpdate(BaseModel):
@@ -38,8 +40,24 @@ class ViewWindowUpdate(BaseModel):
     endHour: float = Field(ge=0, le=24)
 
 
+class BinocularsIn(BaseModel):
+    magnification: int | None = None
+    aperture_mm: int | None = None
+    fov_deg: float | None = None
+
+
+class BinocularsOut(BaseModel):
+    label: str
+    fovDeg: float
+    apertureMm: float
+    minAltDeg: float
+    limitMag: float
+
+
 class SettingsUpdate(BaseModel):
     site: SiteUpdate | None = None
+    instrument: str | None = None
+    binoculars: BinocularsIn | None = None
     windowMode: str | None = None
     viewWindow: ViewWindowUpdate | None = None
     alerts: dict[str, bool] | None = None
@@ -62,6 +80,10 @@ class GeocodeResult(BaseModel):
     lat: float
     lon: float
     displayName: str
+
+
+class MessierSeenUpdate(BaseModel):
+    seen: bool
 
 
 class HorizonUpdate(BaseModel):
@@ -90,6 +112,10 @@ class StateOut(BaseModel):
     site: SiteOut
     horizon: dict[str, bool]
     horizonAlt: dict[str, int]
+    instrument: str = "seestar"
+    binoculars: BinocularsOut | None = None
+    # Messier vus aux jumelles (objectif visuel, distinct des captures).
+    messierSeen: list[str] = []
     windowMode: str
     viewWindow: ViewWindowOut
     messierCaptured: list[str]
@@ -406,3 +432,6 @@ class StatsOut(BaseModel):
     avgScoreSuccessful: float | None
     exposureByTarget: list[TargetExposureOut]
     totalExposureMin: int
+
+
+SettingsOut.model_rebuild()

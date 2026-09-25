@@ -6,7 +6,8 @@ from fastapi import APIRouter
 import settings as settings_store
 from api.deps import get_progress, site_from_settings
 from api.schemas import StateOut
-from api.translate import site_to_out
+from api.translate import binoculars_to_out, site_to_out
+from optics import binocular_optics
 
 router = APIRouter()
 
@@ -22,4 +23,7 @@ def get_state() -> dict:
         "windowMode": s["window_mode"],
         "viewWindow": {"startHour": s["view_window"]["start_hour"], "endHour": s["view_window"]["end_hour"]},
         "messierCaptured": prog["messier_captured"],
+        "messierSeen": prog["messier_seen"],
+        "instrument": s["instrument"],
+        "binoculars": binoculars_to_out(binocular_optics(s)),
     }

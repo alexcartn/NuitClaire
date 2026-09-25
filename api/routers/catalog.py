@@ -17,6 +17,7 @@ from api.translate import row_to_target_out
 from astro import fits_in_fov
 from catalog import find_target, french_name, load_messier, search_by_name, search_prefix
 from imagery import dss_image_url
+from optics import optics_from_settings, with_optics
 from rows import day_frame, filter_label, row_from_search
 from scoring import discovery_sort_key, min_alt_for, recommended_exposure_minutes, target_altitude_series
 from wiki import wiki_title_candidates
@@ -32,7 +33,7 @@ def list_targets(types: list[str] | None = Query(default=None)) -> list[dict]:
     sel, df, _ = current_night(site)
     if sel is None:
         return []
-    rows = feasible_rows(site, sel, horizon, window_mode, "targets", s["view_window"])
+    rows = feasible_rows(site, sel, horizon, window_mode, "targets", s["view_window"], optics_from_settings(s))
     # Meme tri que la galerie Streamlit (app.py) : Messier pas encore
     # captures d'abord, puis cadrages simples, puis heures disponibles.
     # `feasible_rows` rend l'ordre du catalogue (NGC0040, IC0010, NGC0103...),
@@ -41,7 +42,10 @@ def list_targets(types: list[str] | None = Query(default=None)) -> list[dict]:
     # le classement que l'ecran annonce dans son sous-titre etait donc
     # invisible la ou il sert, alors que `discovery_sort_key` existait et
     # etait deja testee.
-    captured = set(progress_store.load()["messier_captured"])
+    # Aux jumelles, l'objectif est le Pokedex visuel : ce qui « manque »
+    # est ce qui n'a pas encore ete vu.
+    prog = progress_store.load()
+    captured = set(prog["messier_seen"] if s["instrument"] == "jumelles" else prog["messier_captured"])
     rows = sorted(rows, key=lambda r: discovery_sort_key(r, captured))
     if types:
         rows = [r for r in rows if r["Type"] in types]
@@ -82,7 +86,8 @@ def list_messier(onlyFeasible: bool = False) -> list[dict]:
     # Respecte desormais le mode de fenetre comme le catalogue "targets"
     # (voir `api.deps.feasible_rows`) : coherent avec la liste de cibles et
     # le graphe d'altitude de la fiche detail plutot qu'une exception.
-    rows = feasible_rows(site, sel, horizon, s["window_mode"], "messier", s["view_window"])
+    rows = feasible_rows(site, sel, horizon, s["window_mode"], "messier", s["view_window"],
+                         optics_from_settings(s))
     if onlyFeasible:
         rows = [r for r in rows if r["Faisable ce soir"] == "Oui"]
     return [row_to_target_out(r) for r in rows]
@@ -94,19 +99,20 @@ def messier_season() -> list[dict]:
     (voir season.py). Pour la page Messier : ce soir, bientot, plus tard,
     jamais d'ici."""
     s = settings_store.load()
-    return cached_messier_season(site_from_settings(s), get_horizon())
+    return cached_messier_season(site_from_settings(s), get_horizon(), optics_from_settings(s))
 
 
 @router.get("/api/search", response_model=list[TargetRowOut])
 def search(q: str = Query(min_length=1)) -> list[dict]:
-    site, horizon = get_site(), get_horizon()
+    s = settings_store.load()
+    site, horizon = site_from_settings(s), get_horizon()
     sel, df, _ = current_night(site)
     if sel is None:
         return []
     found = find_target(q)
     if not found:
         return []
-    return [row_to_target_out(row_from_search(found, df, horizon, site))]
+    return [row_to_target_out(row_from_search(with_optics(found, optics_from_settings(s)), df, horizon, site))]
 
 
 @router.get("/api/search/suggest", response_model=list[TargetSuggestionOut])
@@ -140,6 +146,7 @@ def target_detail(designation: str) -> dict:
     target = find_target(designation)
     if not target:
         raise HTTPException(404, f"Aucun objet trouve pour « {designation} ».")
+    target = with_optics(target, optics_from_settings(settings_store.load()))
 
     row = row_from_search(target, df, horizon, site)
     out = row_to_target_out(row)
@@ -178,3 +185,31 @@ def target_detail(designation: str) -> dict:
         "exposureTotalMin": free_min + session_min,
     })
     return out
+
+
+@router.get("/api/targets/{designation}/starhop")
+def target_star_hop(designation: str) -> dict:
+    """Chemin d'etoiles aux jumelles configurees (voir starhop.py). Carte
+    orientee comme le ciel maintenant si la cible est levee, sinon a l'heure
+    ou elle culmine cette nuit."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from optics import binocular_optics
+    from starhop import star_hop
+
+    s = settings_store.load()
+    site = site_from_settings(s)
+    target = find_target(designation)
+    if not target:
+        raise HTTPException(404, f"Aucun objet trouve pour « {designation} ».")
+    tz = ZoneInfo(site["tz"])
+    when = datetime.now(tz)
+    sel, df, _ = current_night(site)
+    if sel is not None:
+        series = target_altitude_series(day_frame(df, site), {"ra": target["ra"], "dec": target["dec"]}, site=site)
+        now_naive = when.replace(tzinfo=None)
+        up_now = [t for t, a in series["alt"].items() if abs((t - now_naive).total_seconds()) <= 1800 and a > 10]
+        if not up_now:
+            when = series["alt"].idxmax().to_pydatetime().replace(tzinfo=tz)
+    return star_hop(target, binocular_optics(s)["fov_deg"], when, site)

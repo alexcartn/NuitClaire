@@ -33,6 +33,10 @@ _DEFAULT_FROZEN = MappingProxyType({
                                       "end_hour": VIEW_WINDOW["end_hour"]}),
     "alerts": MappingProxyType({"score": True, "dew": False}),
     "places": (),
+    # "seestar" ou "jumelles" (voir optics.py). Les caracteristiques des
+    # jumelles completent config.BINOCULARS.
+    "instrument": "seestar",
+    "binoculars": MappingProxyType({}),
 })
 
 
@@ -44,6 +48,8 @@ def default() -> dict:
         "view_window": dict(_DEFAULT_FROZEN["view_window"]),
         "alerts": dict(_DEFAULT_FROZEN["alerts"]),
         "places": [],
+        "instrument": "seestar",
+        "binoculars": {},
     }
 
 
@@ -69,6 +75,11 @@ def load(path: Path = SETTINGS_PATH) -> dict:
     if not isinstance(alerts_override, dict):
         alerts_override = {}
     merged["alerts"] = {**_DEFAULT_FROZEN["alerts"], **alerts_override}
+
+    if merged.get("instrument") not in ("seestar", "jumelles"):
+        merged["instrument"] = "seestar"
+    if not isinstance(merged.get("binoculars"), dict):
+        merged["binoculars"] = {}
 
     places = raw.get("places")
     merged["places"] = [p for p in places if isinstance(p, dict) and p.get("name")] \

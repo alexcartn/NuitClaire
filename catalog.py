@@ -56,6 +56,13 @@ def load_messier() -> list[dict]:
     return _load_csv(DATA_DIR / "messier.csv")
 
 
+@lru_cache(maxsize=1)
+def load_binocular_extras() -> list[dict]:
+    """Classiques des jumelles absents du catalogue NGC/IC du Seestar
+    (astérismes, grands amas Collinder/Melotte, doubles) -- voir optics.py."""
+    return _load_csv(DATA_DIR / "binoculars.csv")
+
+
 def _normalize_designation(text: str) -> str:
     """'NGC 7380' / 'ngc7380' / 'IC 434' / 'ic0434' -> 'NGC7380' / 'IC434' :
     insensible a la casse, aux espaces, et aux zeros de tete du numero (le
@@ -80,7 +87,7 @@ def search_prefix(query: str, limit: int = 8) -> list[dict]:
         return []
     results = []
     seen = set()
-    for tgt in load_messier() + load_targets():
+    for tgt in load_messier() + load_targets() + load_binocular_extras():
         if tgt["name"] in seen:
             continue
         candidates = (tgt["name"], tgt.get("ngc_name") or "")
@@ -122,6 +129,10 @@ FRENCH_NAMES: dict[str, list[str]] = {
     "NGC7380": ["Nébuleuse du Sorcier"], "NGC1499": ["Nébuleuse de Californie"],
     "NGC2392": ["Nébuleuse de l'Esquimau"], "NGC7662": ["Boule de neige bleue"],
     "NGC457": ["Amas de la Chouette", "Amas E.T."],
+    "CR399": ["Cintre", "Amas de Brocchi"], "MEL20": ["Amas d'Alpha Persei"],
+    "MEL111": ["Amas de la Chevelure de Bérénice"], "MEL25": ["Hyades"],
+    "KEMBLE1": ["Cascade de Kemble"], "ALBIREO": ["Albireo"], "MIZAR": ["Mizar et Alcor"],
+    "EPSLYR": ["Double double de la Lyre", "Epsilon Lyrae"],
 }
 
 
@@ -152,7 +163,7 @@ def search_by_name(query: str, limit: int = 8) -> list[dict]:
     if len(folded) < 3:
         return []
     results, seen = [], set()
-    for tgt in load_messier() + load_targets():
+    for tgt in load_messier() + load_targets() + load_binocular_extras():
         if tgt["name"] in seen:
             continue
         names = [tgt.get("common_name") or ""]
@@ -175,7 +186,7 @@ def find_target(query: str) -> dict | None:
     normalized = _normalize_designation(query)
     if not normalized:
         return None
-    for tgt in load_messier() + load_targets():
+    for tgt in load_messier() + load_targets() + load_binocular_extras():
         candidates = (tgt["name"], tgt.get("ngc_name") or "")
         if any(_normalize_designation(c) == normalized for c in candidates if c):
             return tgt

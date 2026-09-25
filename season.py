@@ -16,8 +16,7 @@ from zoneinfo import ZoneInfo
 import ephem
 
 from astro import COMPASS_SECTORS, compass_sector
-from config import SEESTAR
-from scoring import culmination_deg, min_alt_for, sector_floor
+from scoring import culmination_deg, max_alt_for, min_alt_for, sector_floor
 
 DARK_SUN_ALT = -12.0
 
@@ -59,7 +58,7 @@ def messier_season(targets: list[dict], site: dict, horizon: dict | None = None,
                 body.compute(obs)
                 alt = math.degrees(body.alt)
                 floor = sector_floor(horizon, compass_sector(math.degrees(body.az)))
-                if floor is not None and max(min_alt, floor) <= alt <= SEESTAR["max_alt_deg"]:
+                if floor is not None and max(min_alt, floor) <= alt <= max_alt_for(tgt):
                     hours += 1
             month_hours.append(hours)
         best = max(range(12), key=lambda i: month_hours[i]) if any(month_hours) else None

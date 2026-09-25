@@ -1,0 +1,10 @@
+name,ngc_name,common_name,type,type_fr,ra_h,dec_deg,size_w_arcmin,size_h_arcmin,mag,filter,messier
+Cr399,,Coathanger,Ast,astérisme,19.4233,20.183,60.00,20.00,3.6,sans,
+Mel20,,Alpha Persei Cluster,OCl,amas ouvert,3.3667,49.000,180.00,180.00,1.2,sans,
+Mel111,,Coma Star Cluster,OCl,amas ouvert,12.4167,26.000,275.00,275.00,1.8,sans,
+Mel25,,Hyades,OCl,amas ouvert,4.4500,15.870,330.00,330.00,0.5,sans,
+Kemble1,,Kemble's Cascade,Ast,astérisme,3.9500,63.070,150.00,10.00,4.0,sans,
+Stock2,,Muscleman Cluster,OCl,amas ouvert,2.2500,59.270,60.00,60.00,4.4,sans,
+Albireo,,Albireo,**,étoile double,19.5120,27.960,0.60,0.60,3.1,sans,
+Mizar,,Mizar et Alcor,**,étoile double,13.3987,54.925,12.00,12.00,2.2,sans,
+EpsLyr,,Double double de la Lyre,**,étoile double,18.7400,39.670,3.50,3.50,4.7,sans,
