@@ -1428,7 +1428,8 @@ a {
 
 .nc-jupiter {
   width: 100%;
-  height: 48px;
+  height: auto;
+  display: block;
   border-radius: 8px;
   background: #07060a;
 }
@@ -1441,8 +1442,18 @@ a {
   fill: #f4f2f7;
 }
 
-.nc-jupiter-label {
-  fill: rgba(240, 236, 250, 0.6);
+.nc-jupiter-label,
+.nc-jupiter-name {
+  fill: rgba(240, 236, 250, 0.75);
+  font-family: var(--font-text);
+}
+
+.nc-jupiter-name {
+  fill: #f3d9a4;
+}
+
+.nc-jupiter-dir {
+  fill: rgba(240, 236, 250, 0.45);
   font-family: var(--font-text);
 }
 
@@ -1455,6 +1466,8 @@ a {
   fill: var(--ink);
 }
 
-[data-theme="night"] .nc-jupiter-label {
+[data-theme="night"] .nc-jupiter-label,
+[data-theme="night"] .nc-jupiter-name,
+[data-theme="night"] .nc-jupiter-dir {
   fill: var(--ink3);
 }

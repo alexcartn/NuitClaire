@@ -16,24 +16,49 @@ function dayLabel(iso: string): string {
 }
 
 /** Jupiter et ses quatre lunes, alignees comme aux jumelles : est a gauche
- * (on regarde vers le sud), une ligne de points de part et d'autre du disque. */
+ * (on regarde vers le sud), une ligne de points de part et d'autre du disque.
+ * Distances a l'echelle ; le texte, lui, garde une taille lisible quelle que
+ * soit l'ecartement des lunes (environ 11 px sur un ecran de telephone). */
 function JupiterMoons({ moons }: { moons: NonNullable<PlanetTonight["moons"]> }) {
-  const span = Math.max(12, ...moons.map((m) => Math.abs(m.x))) + 2;
+  const span = Math.max(12, ...moons.map((m) => Math.abs(m.x))) + 3;
+  const font = span * 0.066;
+  const moonR = Math.max(0.45, font * 0.22);
+  const charW = font * 0.6;
+  // Noms au-dessus du point ; sur une deuxieme ligne, ou dessous (hors du nom
+  // de Jupiter), quand ils toucheraient celui d'une lune voisine.
+  const jupiterHalf = (7 * charW) / 2;
+  const rows: { y: number; end: number; free: (x0: number, x1: number) => boolean }[] = [
+    { y: -font * 0.8, end: -Infinity, free: () => true },
+    { y: -font * 2, end: -Infinity, free: () => true },
+    { y: font * 1.6, end: -Infinity, free: (x0, x1) => x1 < -jupiterHalf - charW || x0 > jupiterHalf + charW },
+  ];
+  const placed = moons
+    .filter((m) => m.visible)
+    .map((m) => ({ ...m, px: -m.x }))
+    .sort((a, b) => a.px - b.px)
+    .map((m) => {
+      const half = (m.name.length * charW) / 2;
+      const tx = Math.min(span - half, Math.max(-span + half, m.px));
+      const row = rows.find((r) => tx - half > r.end + charW && r.free(tx - half, tx + half)) ?? rows[1];
+      row.end = tx + half;
+      return { ...m, tx, ty: row.y };
+    });
+  const top = -font * 3.2;
+  const height = font * 6.2;
   return (
-    <svg viewBox={`${-span} -3 ${2 * span} 6`} className="nc-jupiter" role="img" aria-label="Jupiter et ses lunes">
+    <svg viewBox={`${-span} ${top} ${2 * span} ${height}`} className="nc-jupiter" role="img" aria-label="Jupiter et ses lunes">
       <circle cx={0} cy={0} r={1} className="nc-jupiter-disk" />
-      {moons
-        .filter((m) => m.visible)
-        .map((m) => (
-          <g key={m.name}>
-            <circle cx={-m.x} cy={0} r={0.45} className="nc-jupiter-moon" />
-            <text x={-m.x} y={-1.2} fontSize={1.3} textAnchor="middle" className="nc-jupiter-label">
-              {m.name[0]}
-            </text>
-          </g>
-        ))}
-      <text x={-span + 0.3} y={2.6} fontSize={1.2} className="nc-jupiter-label">E</text>
-      <text x={span - 1.3} y={2.6} fontSize={1.2} className="nc-jupiter-label">O</text>
+      <text x={0} y={font * 1.6} fontSize={font} textAnchor="middle" className="nc-jupiter-name">Jupiter</text>
+      {placed.map((m) => (
+        <g key={m.name}>
+          <circle cx={m.px} cy={0} r={moonR} className="nc-jupiter-moon" />
+          <text x={m.tx} y={m.ty} fontSize={font} textAnchor="middle" className="nc-jupiter-label">
+            {m.name}
+          </text>
+        </g>
+      ))}
+      <text x={-span + font * 0.4} y={top + height - font * 0.4} fontSize={font * 0.9} className="nc-jupiter-dir">← est</text>
+      <text x={span - font * 0.4} y={top + height - font * 0.4} fontSize={font * 0.9} textAnchor="end" className="nc-jupiter-dir">ouest →</text>
     </svg>
   );
 }
@@ -97,10 +122,11 @@ export function NightExtras() {
               </span>
               {p.moons && (
                 <>
-                  <JupiterMoons moons={p.moons} />
                   <span className="nc-caption">
-                    Aux jumelles, calées : les lunes galiléennes en ligne, vers {fmtHM(p.bestTime)}.
+                    Ses quatre grandes lunes vers {fmtHM(p.bestTime)} : aux jumelles bien calées (appuyées sur
+                    un mur, un toit de voiture), des petits points alignés de part et d'autre de la planète.
                   </span>
+                  <JupiterMoons moons={p.moons} />
                 </>
               )}
               {p.ringTiltDeg != null && (
