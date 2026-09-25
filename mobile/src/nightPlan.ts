@@ -44,10 +44,6 @@ export interface PlanOptions {
   maxBlocks?: number;
 }
 
-/** Aux jumelles, un objet se regarde en un quart d'heure, pas en une heure
- * de pose : blocs courts, et plus d'objets dans la nuit. */
-export const BINOCULAR_PLAN: PlanOptions = { blockMin: 15, minBlockMin: 10, maxBlocks: 10 };
-
 export function planNight(rows: PlanInput[], options: PlanOptions = {}): PlanBlock[] {
   const BLOCK = options.blockMin ?? BLOCK_MIN;
   const MIN_BLOCK = options.minBlockMin ?? MIN_BLOCK_MIN;

@@ -11,7 +11,7 @@ import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
 import { fmtH, fmtHM, plural } from "../format";
 import { tap } from "../haptics";
-import type { Instrument, ViewWindow } from "../types";
+import type { ViewWindow } from "../types";
 
 /** '90' -> "1 h 30" ; en-dessous de l'heure, "45 min". */
 function fmtMinutes(total: number): string {
@@ -32,7 +32,7 @@ function fmtExposureDate(iso: string): string {
 }
 
 export function Detail({
-  instrument = "seestar",
+  binoculars = false,
   onOpenSky,
   designation,
   captured,
@@ -51,11 +51,13 @@ export function Detail({
   viewWindow?: ViewWindow;
   onBack: () => void;
   onCaptureChange: () => void;
-  instrument?: Instrument;
+  /** Fiche vue aux jumelles : chemin d'etoiles, cadrage dans leur champ,
+   * sans ce qui touche a la photo. */
+  binoculars?: boolean;
   onOpenSky?: (mode: "carte" | "viseur") => void;
 }) {
-  const fetchDetail = useCallback(() => api.targetDetail(designation), [designation]);
-  const { data, loading, error, reload } = useFetch(fetchDetail, [designation]);
+  const fetchDetail = useCallback(() => api.targetDetail(designation, binoculars), [designation, binoculars]);
+  const { data, loading, error, reload } = useFetch(fetchDetail, [designation, binoculars]);
   const [addedToJournal, setAddedToJournal] = useState(false);
   // Le journal est deja sur l'appareil : l'historique de la cible s'en
   // deduit, sans requete (voir journalRead.targetHistory).
@@ -83,15 +85,13 @@ export function Detail({
     reload();
   };
 
-  // Aux jumelles, l'objectif est visuel : « vu », pas « capture ».
-  const bino = instrument === "jumelles";
+  const bino = binoculars;
 
   const toggleCapture = async () => {
     if (!data?.messierId) return;
     setCapturing(true);
     try {
-      if (bino) await api.updateMessierSeen(data.messierId, !captured.has(data.messierId));
-      else await api.updateMessierCapture(data.messierId, !captured.has(data.messierId));
+      await api.updateMessierCapture(data.messierId, !captured.has(data.messierId));
       tap();
       onCaptureChange();
     } finally {
@@ -132,6 +132,7 @@ export function Detail({
       {data && (
         <>
           <div>
+            {bino && <div className="nc-eyebrow">Aux jumelles</div>}
             <div className="nc-num" style={{ fontSize: "var(--text-xl)", fontWeight: 500, letterSpacing: "-.02em" }}>
               {data.designation}
             </div>
@@ -336,7 +337,8 @@ export function Detail({
           )}
 
           <div style={{ display: "flex", gap: 9 }}>
-            {data.messierId && (
+            {/* Aux jumelles, rien a cocher : l'objectif, c'est la photo. */}
+            {data.messierId && !bino && (
               <button
                 onClick={toggleCapture}
                 disabled={capturing}
@@ -347,14 +349,15 @@ export function Detail({
                   color: captured.has(data.messierId) ? "var(--onaccent)" : "var(--ink)",
                 }}
               >
-                {captured.has(data.messierId)
-                  ? bino ? "Vu ✓" : "Capturé ✓"
-                  : bino ? "Marquer comme vu" : "Marquer comme capturé"}
+                {captured.has(data.messierId) ? "Capturé ✓" : "Marquer comme capturé"}
               </button>
             )}
-            <button onClick={addToJournal} disabled={addedToJournal} className="nc-btn" style={{ flex: "none" }}>
-              {addedToJournal ? "Ajoutée ✓" : "Ajouter au journal"}
-            </button>
+            {/* Le journal suit les sorties Seestar ; aux jumelles, on regarde. */}
+            {!bino && (
+              <button onClick={addToJournal} disabled={addedToJournal} className="nc-btn" style={{ flex: "none" }}>
+                {addedToJournal ? "Ajoutée ✓" : "Ajouter au journal"}
+              </button>
+            )}
           </div>
         </>
       )}

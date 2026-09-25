@@ -3,7 +3,7 @@ import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { useRemembered } from "../useRemembered";
 import { useCompass } from "../useCompass";
-import { fmtHM, targetsCacheKey } from "../format";
+import { fmtHM } from "../format";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
 import { SkyDome, type SkyTarget } from "../sky/SkyDome";
@@ -31,10 +31,8 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   const [oriented, setOriented] = useRemembered("ciel:oriented", false);
   const compass = useCompass();
 
-  const instrument = state?.instrument ?? "seestar";
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const fetchTargets = useCallback(() => api.targets(), [instrument]);
-  const targets = useFetch(fetchTargets, [instrument], targetsCacheKey(instrument));
+  const fetchTargets = useCallback(() => api.targets(), []);
+  const targets = useFetch(fetchTargets, [], "targets");
   const fetchBodies = useCallback(() => api.skyBodies(), []);
   const bodies = useFetch(fetchBodies, [], "sky-bodies");
   // La cible choisie peut ne pas etre dans la liste de ce soir : sa fiche

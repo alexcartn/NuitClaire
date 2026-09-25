@@ -25,7 +25,7 @@ def _settings_out(s: dict) -> dict:
     return {"site": site_to_out(site), "windowMode": s["window_mode"],
             "viewWindow": _view_window_out(s), "alerts": s["alerts"],
             "places": [site_to_out(p) for p in places],
-            "instrument": s["instrument"], "binoculars": binoculars_to_out(binocular_optics(s))}
+            "binoculars": binoculars_to_out(binocular_optics(s))}
 
 
 @router.get("/api/settings", response_model=SettingsOut)
@@ -55,14 +55,14 @@ def update_settings(body: SettingsUpdate) -> dict:
             s["window_mode"] = body.windowMode
         if body.viewWindow is not None:
             s["view_window"] = {"start_hour": body.viewWindow.startHour, "end_hour": body.viewWindow.endHour}
-        if body.instrument is not None:
-            if body.instrument not in ("seestar", "jumelles"):
-                raise HTTPException(422, "instrument doit etre 'seestar' ou 'jumelles'.")
-            s["instrument"] = body.instrument
         if body.binoculars is not None:
             given = {k: v for k, v in body.binoculars.model_dump().items() if v is not None}
             if "fov_deg" in given and not 1 <= given["fov_deg"] <= 15:
                 raise HTTPException(422, "Le champ des jumelles doit etre entre 1 et 15 degres.")
+            if "aperture_mm" in given and not 20 <= given["aperture_mm"] <= 150:
+                raise HTTPException(422, "Le diametre des jumelles doit etre entre 20 et 150 mm.")
+            if "magnification" in given and not 4 <= given["magnification"] <= 40:
+                raise HTTPException(422, "Le grossissement des jumelles doit etre entre 4 et 40.")
             s["binoculars"] = {**s["binoculars"], **given}
         if body.alerts is not None:
             s["alerts"] = {**s["alerts"], **body.alerts}

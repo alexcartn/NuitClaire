@@ -531,20 +531,27 @@ l'a pas pris, et recharge l'etat partage de l'appli.
 
 ### Jumelles
 
-Instrument actif au choix (Reglages, ou la bascule en tete de « Cibles » et « Messier ») :
-Seestar S50, ou jumelles (10x50 et champ de 6,5 deg par defaut, reglables). Aux jumelles
-(`optics.py`) :
+Le Seestar est le seul instrument suivi (listes, objectif Messier, journal). Les jumelles
+l'accompagnent, pour patienter pendant qu'il pose : 10x50 et champ de 6,5 deg par defaut,
+reglables dans Reglages → Jumelles (`optics.py`).
 
-- la liste ne garde que ce qu'elles montrent : magnitude d'objet etendu au plus
-  2 + 5 log D - 2 (8,5 pour 50 mm), taille d'au moins 1', amas et doubles toujours ;
-  plus des classiques absents du catalogue Seestar (`data/binoculars.csv` : Cr 399,
-  Mel 20, Mel 25, Mel 111, cascade de Kemble, Stock 2, Albireo, Mizar, epsilon Lyr) ;
-- cadrage « tient dans le champ », hauteurs de 15 a 90 deg, et une Lune peu genante pour
-  les amas et les doubles (les nebuleuses et galaxies s'effacent toujours) ;
-- plan de la nuit par quarts d'heure ;
-- un Pokedex Messier « vus » a part (`progress.messier_seen`, `PUT /api/messier/{id}/seen`) :
-  vu aux jumelles ne compte pas comme photographie ;
-- dans chaque fiche, le chemin d'etoiles (`starhop.py`, `GET /api/targets/{d}/starhop`) :
+- carte « En attendant le Seestar » sur « Ce soir » (`binocular_now.py`,
+  `GET /api/binoculars/now`) : au plus cinq cibles faciles, pointables maintenant et
+  l'heure qui suit (a la nuit tombee en journee), deux au plus par type. Pendant une
+  sortie, la carte passe en tete et rappelle la cible du Seestar ;
+- ne sont retenus que les objets qu'elles montrent : magnitude d'objet etendu au plus
+  2 + 5 log D - 2 (8,5 pour 50 mm), brillance de surface d'au plus 14,3 mag/arcmin2
+  (M33 oui, M101 non), taille d'au moins 1', amas et doubles toujours ; plus des
+  classiques absents du catalogue Seestar (`data/binoculars.csv` : Cr 399, Mel 20,
+  Mel 25, Mel 111, cascade de Kemble, Stock 2, Albireo, Mizar, epsilon Lyr) ;
+- le classement favorise l'eclat, la hauteur et le contraste, penalise les nebuleuses
+  et, Lune levee, tout ce qui est diffus ; sous un seuil de facilite, la liste reste
+  courte plutot que de proposer des objets introuvables ;
+- le diametre change donc les cibles proposees, le champ le cadrage et le chemin
+  d'etoiles ; le grossissement n'est qu'une etiquette ;
+- un appui ouvre la fiche vue aux jumelles (`GET /api/targets/{d}?instrument=jumelles` :
+  cadrage « tient dans le champ », hauteurs de 15 a 90 deg), sans journal ni capture ;
+- dans cette fiche, le chemin d'etoiles (`starhop.py`, `GET /api/targets/{d}/starhop`) :
   une etoile de depart brillante, des sauts de trois quarts de champ appuyes sur les
   etoiles visibles, et une carte orientee comme le ciel (zenith en haut), avec un cercle
   de la taille du champ a chaque etape. Pour M31 : Mirach, mu And, M31.

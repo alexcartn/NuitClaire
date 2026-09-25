@@ -29,9 +29,6 @@ _DEFAULT_FROZEN = MappingProxyType({
     "horizon": MappingProxyType({"N": True, "NE": True, "E": False, "SE": False,
                                   "S": False, "SW": False, "W": False, "NW": False}),
     "messier_captured": (),
-    # Messier vus aux jumelles : un objectif a part, « vu » n'est pas
-    # « photographie ».
-    "messier_seen": (),
     "exposure_log": MappingProxyType({}),
     # Hauteur minimale (deg) au-dessus de laquelle chaque secteur ouvert est
     # vraiment degage : arbres, toits, collines. 0 = jusqu'a l'horizon.
@@ -44,7 +41,6 @@ def default() -> dict:
     return {
         "horizon": dict(_DEFAULT_FROZEN["horizon"]),
         "messier_captured": list(_DEFAULT_FROZEN["messier_captured"]),
-        "messier_seen": list(_DEFAULT_FROZEN["messier_seen"]),
         "exposure_log": dict(_DEFAULT_FROZEN["exposure_log"]),
         "horizon_alt": dict(_DEFAULT_FROZEN["horizon_alt"]),
     }
@@ -77,8 +73,8 @@ def load(path: Path = PROGRESS_PATH) -> dict:
         horizon_override = {}
     merged["horizon"] = {**_DEFAULT_FROZEN["horizon"], **horizon_override}
 
-    if not isinstance(merged.get("messier_seen"), list):
-        merged["messier_seen"] = []
+    # Ancien Pokedex « vu aux jumelles », abandonne.
+    merged.pop("messier_seen", None)
 
     alt_override = raw.get("horizon_alt")
     if not isinstance(alt_override, dict):

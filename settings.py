@@ -33,9 +33,8 @@ _DEFAULT_FROZEN = MappingProxyType({
                                       "end_hour": VIEW_WINDOW["end_hour"]}),
     "alerts": MappingProxyType({"score": True, "dew": False, "iss": False}),
     "places": (),
-    # "seestar" ou "jumelles" (voir optics.py). Les caracteristiques des
-    # jumelles completent config.BINOCULARS.
-    "instrument": "seestar",
+    # Caracteristiques des jumelles, en complement de config.BINOCULARS
+    # (voir optics.py).
     "binoculars": MappingProxyType({}),
 })
 
@@ -48,7 +47,6 @@ def default() -> dict:
         "view_window": dict(_DEFAULT_FROZEN["view_window"]),
         "alerts": dict(_DEFAULT_FROZEN["alerts"]),
         "places": [],
-        "instrument": "seestar",
         "binoculars": {},
     }
 
@@ -76,8 +74,9 @@ def load(path: Path = SETTINGS_PATH) -> dict:
         alerts_override = {}
     merged["alerts"] = {**_DEFAULT_FROZEN["alerts"], **alerts_override}
 
-    if merged.get("instrument") not in ("seestar", "jumelles"):
-        merged["instrument"] = "seestar"
+    # Ancien reglage « instrument actif » : le Seestar est desormais le seul
+    # instrument suivi, les jumelles l'accompagnent.
+    merged.pop("instrument", None)
     if not isinstance(merged.get("binoculars"), dict):
         merged["binoculars"] = {}
 

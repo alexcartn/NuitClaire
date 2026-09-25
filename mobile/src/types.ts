@@ -11,8 +11,6 @@ export interface ViewWindow {
   endHour: number;
 }
 
-export type Instrument = "seestar" | "jumelles";
-
 /** Jumelles configurees (voir optics.py). */
 export interface Binoculars {
   label: string;
@@ -20,6 +18,33 @@ export interface Binoculars {
   apertureMm: number;
   minAltDeg: number;
   limitMag: number;
+}
+
+/** Une cible facile aux jumelles, pour patienter pendant que le Seestar
+ * pose (voir binocular_now.py). */
+export interface BinocularPick {
+  designation: string;
+  name: string | null;
+  messierId: string | null;
+  type: string;
+  /** Ce qu'on voit dans l'oculaire, en quelques mots. */
+  look: string;
+  mag: number;
+  altDeg: number;
+  azDeg: number;
+  sector: string;
+  rising: boolean;
+  fitsField: boolean;
+  raDeg: number;
+  decDeg: number;
+}
+
+export interface BinocularsNow {
+  /** « maintenant », ou « à la nuit tombée » en journée. */
+  at: string;
+  time: string;
+  binoculars: Binoculars;
+  picks: BinocularPick[];
 }
 
 /** Chemin d'etoiles vers une cible (voir starhop.py). Coordonnees en degres
@@ -44,7 +69,6 @@ export interface Settings {
   alerts: Record<string, boolean>;
   /** Lieux deja utilises, le plus recent d'abord (le lieu actif compris). */
   places: Site[];
-  instrument: Instrument;
   binoculars: Binoculars;
 }
 
@@ -53,10 +77,7 @@ export interface AppState {
   horizon: Record<string, boolean>;
   /** Hauteur (deg) a partir de laquelle chaque secteur ouvert est degage. */
   horizonAlt: Record<string, number>;
-  instrument?: Instrument;
   binoculars?: Binoculars;
-  /** Messier vus aux jumelles (objectif visuel, distinct des captures). */
-  messierSeen?: string[];
   windowMode: string;
   viewWindow: ViewWindow;
   messierCaptured: string[];
@@ -221,7 +242,6 @@ export interface SettingsUpdate {
   windowMode?: "complete" | "habituelle";
   viewWindow?: ViewWindow;
   alerts?: Record<string, boolean>;
-  instrument?: Instrument;
   binoculars?: { magnification?: number; aperture_mm?: number; fov_deg?: number };
 }
 

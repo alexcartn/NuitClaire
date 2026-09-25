@@ -68,13 +68,13 @@ export interface CiblesGroup {
 /** Les Messier encore a capturer d'abord (l'objectif), puis un groupe par
  * type, du plus fourni au moins fourni. L'ordre de l'API (priorite) est
  * garde a l'interieur de chaque groupe. */
-export function groupRows(rows: TargetRow[], captured: Set<string>, missingTitle = "Messier à capturer"): CiblesGroup[] {
+export function groupRows(rows: TargetRow[], captured: Set<string>): CiblesGroup[] {
   const missing = rows.filter((r) => r.messierId && !captured.has(r.messierId));
   const rest = rows.filter((r) => !missing.includes(r));
   const byType = new Map<string, TargetRow[]>();
   for (const r of rest) byType.set(r.type, [...(byType.get(r.type) ?? []), r]);
   const groups: CiblesGroup[] = [];
-  if (missing.length) groups.push({ key: "messier", title: missingTitle, rows: missing });
+  if (missing.length) groups.push({ key: "messier", title: "Messier à capturer", rows: missing });
   [...byType.entries()]
     .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
     .forEach(([type, list]) => groups.push({ key: `type:${type}`, title: type, rows: list }));

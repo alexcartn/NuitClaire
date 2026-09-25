@@ -40,6 +40,8 @@ interface Nav {
   depth: number;
   /** Ecran Ciel : carte ou viseur. */
   skyMode?: "carte" | "viseur";
+  /** Fiche vue aux jumelles, ouverte depuis « En attendant le Seestar ». */
+  binoculars?: boolean;
 }
 
 /** Ecran d'ouverture : "soir" par defaut, ou celui demande par l'URL. Sert
@@ -186,11 +188,12 @@ export default function App() {
     }
   };
 
-  const openTarget = (designation: string) => {
+  const openTarget = (designation: string, binoculars = false) => {
     const current = navRef.current;
     push({
       screen: "detail",
       selected: designation,
+      binoculars,
       backTo: current.screen === "detail" || current.screen === "recherche" ? current.backTo : current.screen,
       depth: current.depth + 1,
     });
@@ -220,9 +223,7 @@ export default function App() {
 
   const fetchState = useCallback(() => api.state(), []);
   const { data: state, reload: reloadState } = useFetch(fetchState, [], "state");
-  // Aux jumelles, l'objectif Messier est visuel : « vu », pas « capture ».
-  const instrument = state?.instrument ?? "seestar";
-  const captured = new Set((instrument === "jumelles" ? state?.messierSeen : state?.messierCaptured) ?? []);
+  const captured = new Set(state?.messierCaptured ?? []);
 
   const { screen, selected } = nav;
 
@@ -242,28 +243,25 @@ export default function App() {
       <div ref={scroller} className="nc-scroll" style={{ flex: 1, overflow: "auto" }}>
         {screen === "soir" && (
           <CeSoir
-            instrument={instrument}
             onGoTargets={() => changeTab("cibles")}
             onSearch={openSearch}
             onOpenSky={() => openSky(null, "carte")}
-            onOpenTarget={openTarget}
+            onOpenTarget={(d) => openTarget(d)}
+            onOpenBinocularTarget={(d) => openTarget(d, true)}
           />
         )}
         {screen === "cibles" && (
           <Cibles
             captured={captured}
-            instrument={instrument}
-            binocularsLabel={state?.binoculars?.label}
-            onInstrumentChange={reloadState}
             windowLabel={windowLabel(state?.windowMode, state?.viewWindow)}
-            onOpenTarget={openTarget}
+            onOpenTarget={(d) => openTarget(d)}
           />
         )}
         {screen === "detail" && selected && (
           <Detail
             designation={selected}
             captured={captured}
-            instrument={instrument}
+            binoculars={nav.binoculars ?? false}
             horizon={state?.horizon}
             horizonAlt={state?.horizonAlt}
             onOpenSky={(mode) => openSky(selected, mode)}
@@ -276,27 +274,24 @@ export default function App() {
         {screen === "messier" && (
           <Messier
             captured={captured}
-            instrument={instrument}
-            binocularsLabel={state?.binoculars?.label}
-            onInstrumentChange={reloadState}
-            onOpenTarget={openTarget}
+            onOpenTarget={(d) => openTarget(d)}
           />
         )}
-        {screen === "journal" && <Journal instrument={instrument} onOpenTarget={openTarget} onCaptureChange={reloadState} />}
+        {screen === "journal" && <Journal onOpenTarget={(d) => openTarget(d)} onCaptureChange={reloadState} />}
         {screen === "ciel" && (
           <Suspense fallback={<div className="nc-screen"><p className="nc-caption">Chargement de la carte…</p></div>}>
             <Ciel
               state={state}
               initialTarget={selected}
               initialMode={nav.skyMode ?? "carte"}
-              onOpenTarget={openTarget}
+              onOpenTarget={(d) => openTarget(d)}
               onBack={back}
             />
           </Suspense>
         )}
         {screen === "recherche" && (
           <Recherche
-            onOpenTarget={openTarget}
+            onOpenTarget={(d) => openTarget(d)}
             onBrowseType={(type) => {
               // « Cibles » s'ouvre deja filtree (voir useRemembered).
               remember("cibles:types", [type]);

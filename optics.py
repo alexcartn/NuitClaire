@@ -1,14 +1,18 @@
-"""Instrument actif : le Seestar S50 (par defaut) ou des jumelles.
+"""Les jumelles, compagnes du Seestar : de quoi regarder pendant qu'il pose.
+
+Le Seestar reste l'instrument suivi partout (listes, objectif Messier). Les
+jumelles n'interviennent que dans la carte « En attendant le Seestar » (voir
+binocular_now.py) et dans la fiche ouverte depuis cette carte.
 
 L'optique voyage avec la cible (`with_optics`) plutot que d'ajouter un
 parametre a chaque fonction de calcul : `scoring.min_alt_for`,
 `scoring.max_alt_for`, la tolerance a la Lune et le cadrage (`rows.py`)
-lisent `target["optics"]`. Sans cle `optics`, c'est le Seestar, comme avant.
+lisent `target["optics"]`. Sans cle `optics`, c'est le Seestar.
 
 Aux jumelles, la question n'est plus « combien de poses » mais « est-ce que
-je le verrai » : la liste ne garde que ce qu'une paire de jumelles montre
-(magnitude, taille), plus quelques classiques qui ne sont pas dans le
-catalogue NGC/IC du Seestar (Cr 399, Mel 20, Albireo...)."""
+je le verrai » : on ne garde que ce qu'une paire de jumelles montre
+(magnitude, brillance de surface), plus quelques classiques qui ne sont pas
+dans le catalogue NGC/IC du Seestar (Cr 399, Mel 20, Albireo...)."""
 import math
 
 from config import BINOCULARS
@@ -30,12 +34,6 @@ def binocular_optics(settings: dict | None = None) -> dict:
             "min_alt_deg": float(b["min_alt_deg"]), "max_alt_deg": float(b["max_alt_deg"])}
 
 
-def optics_from_settings(settings: dict) -> dict | None:
-    """None pour le Seestar (comportement historique), sinon l'optique des
-    jumelles configurees."""
-    return binocular_optics(settings) if settings.get("instrument") == "jumelles" else None
-
-
 def with_optics(tgt: dict, optics: dict | None) -> dict:
     return {**tgt, "optics": optics} if optics else tgt
 
@@ -47,6 +45,20 @@ def visual_limit_mag(aperture_mm: float) -> float:
     return 2 + 5 * math.log10(aperture_mm) - 2
 
 
+# Brillance de surface moyenne (mag/arcmin2) au-dela de laquelle un objet
+# diffus se perd dans le fond du ciel aux jumelles, meme s'il passe la
+# magnitude : M33 (13,9) reste, M101 (14,5) sort.
+SURFACE_BRIGHTNESS_LIMIT = 14.3
+
+
+def surface_brightness(tgt: dict) -> float | None:
+    """Magnitude etalee sur l'ellipse de l'objet, par minute d'arc carree."""
+    mag, w, h = tgt.get("mag"), tgt.get("w"), tgt.get("h")
+    if mag is None or not (w and h):
+        return None
+    return mag + 2.5 * math.log10(math.pi / 4 * w * h)
+
+
 def visible_in_binoculars(tgt: dict, optics: dict) -> bool:
     mag = tgt.get("mag")
     if mag is None or mag > visual_limit_mag(optics["aperture_mm"]):
@@ -56,7 +68,10 @@ def visible_in_binoculars(tgt: dict, optics: dict) -> bool:
     size = max(tgt.get("w") or 0, tgt.get("h") or 0)
     # Plus petit qu'une minute d'arc, un objet etendu se confond avec une
     # etoile a x10.
-    return size >= 1.0
+    if size < 1.0:
+        return False
+    sb = surface_brightness(tgt)
+    return sb is None or sb <= SURFACE_BRIGHTNESS_LIMIT
 
 
 def framing(tgt: dict, size: tuple | None = None) -> str:

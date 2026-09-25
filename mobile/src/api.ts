@@ -1,5 +1,6 @@
 import type {
   AppState,
+  BinocularsNow,
   Feeling,
   ExposureEntry,
   GeocodeResult,
@@ -116,10 +117,13 @@ export const api = {
   planetsTonight: () => get<PlanetTonight[]>("/api/extras/planets"),
   iss: () => get<IssInfo>("/api/extras/iss"),
   starHop: (designation: string) => get<StarHop>(`/api/targets/${encodeURIComponent(designation)}/starhop`),
-  updateMessierSeen: (id: string, seen: boolean) =>
-    request<string[]>("PUT", `/api/messier/${encodeURIComponent(id)}/seen`, { body: { seen } }),
-  targetDetail: (designation: string) =>
-    get<TargetDetail>(`/api/targets/${encodeURIComponent(designation)}`),
+  binocularsNow: () => get<BinocularsNow>("/api/binoculars/now"),
+  /** `binoculars` : la fiche vue aux jumelles (cadrage dans leur champ). */
+  targetDetail: (designation: string, binoculars = false) =>
+    get<TargetDetail>(
+      `/api/targets/${encodeURIComponent(designation)}`,
+      binoculars ? { instrument: "jumelles" } : undefined,
+    ),
 
   sessions: () => get<Sessions>("/api/sessions"),
   // `at` : l'heure de saisie cote client. Une saisie faite hors ligne part

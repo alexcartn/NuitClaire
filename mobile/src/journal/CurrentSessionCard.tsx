@@ -14,9 +14,7 @@ import { Rating } from "./Rating";
 import { Timeline } from "./Timeline";
 
 /** La sortie en cours : cibles, fil de la nuit, ressenti, cloture. */
-export function CurrentSessionCard({ current, places, pendingNotes, captured, binoculars = false, send, onClose, onOpenTarget, onCaptureChange }: {
-  /** Aux jumelles, on propose « vu » (Pokedex visuel) plutot que « capture ». */
-  binoculars?: boolean;
+export function CurrentSessionCard({ current, places, pendingNotes, captured, send, onClose, onOpenTarget, onCaptureChange }: {
   current: CurrentSession;
   /** Messier deja captures (identifiants "31"...), pour proposer la capture
    * quand une cible Messier est cochee faite. */
@@ -55,8 +53,7 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, bi
     setCapturing(id);
     setCaptureError(null);
     try {
-      if (binoculars) await api.updateMessierSeen(id, true);
-      else await api.updateMessierCapture(id, true);
+      await api.updateMessierCapture(id, true);
       tap();
       onCaptureChange();
     } catch {
@@ -167,14 +164,14 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, bi
                 return (
                   <div className="nc-row nc-between nc-notice">
                     <span>
-                      {item.designation} rejoint {binoculars ? "tes Messier vus aux jumelles" : "ton objectif Messier"} ?
+                      {item.designation} rejoint ton objectif Messier ?
                     </span>
                     <button
                       onClick={() => markCaptured(id)}
                       disabled={capturing === id}
                       className="nc-chip nc-chip-active nc-none"
                     >
-                      {capturing === id ? "…" : binoculars ? "Marquer vu" : "Marquer capturé"}
+                      {capturing === id ? "…" : "Marquer capturé"}
                     </button>
                   </div>
                 );

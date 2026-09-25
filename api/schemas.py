@@ -25,7 +25,6 @@ class SettingsOut(BaseModel):
     alerts: dict[str, bool]
     # Lieux deja utilises, le plus recent d'abord (voir settings.remember_place).
     places: list[SiteOut] = []
-    instrument: str = "seestar"
     binoculars: "BinocularsOut | None" = None
 
 
@@ -56,7 +55,6 @@ class BinocularsOut(BaseModel):
 
 class SettingsUpdate(BaseModel):
     site: SiteUpdate | None = None
-    instrument: str | None = None
     binoculars: BinocularsIn | None = None
     windowMode: str | None = None
     viewWindow: ViewWindowUpdate | None = None
@@ -80,10 +78,6 @@ class GeocodeResult(BaseModel):
     lat: float
     lon: float
     displayName: str
-
-
-class MessierSeenUpdate(BaseModel):
-    seen: bool
 
 
 class HorizonUpdate(BaseModel):
@@ -112,10 +106,7 @@ class StateOut(BaseModel):
     site: SiteOut
     horizon: dict[str, bool]
     horizonAlt: dict[str, int]
-    instrument: str = "seestar"
     binoculars: BinocularsOut | None = None
-    # Messier vus aux jumelles (objectif visuel, distinct des captures).
-    messierSeen: list[str] = []
     windowMode: str
     viewWindow: ViewWindowOut
     messierCaptured: list[str]

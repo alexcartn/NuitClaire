@@ -9,7 +9,6 @@ import { Compass } from "../components/Compass";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { Section } from "../components/Section";
 import { AlertsCard } from "../components/AlertsCard";
-import { InstrumentSwitch } from "../components/InstrumentSwitch";
 import { HorizonEditor, horizonSummary } from "../components/HorizonEditor";
 import { COMPASS_SECTORS, type Settings, type Site } from "../types";
 import { fmtDecimalHour, fmtLatLon, plural } from "../format";
@@ -288,21 +287,15 @@ export function Reglages({ onChange }: { onChange: () => void }) {
       {data && (
         <Section
           id="reglages-instrument"
-          title="Instrument"
-          summary={data.instrument === "jumelles" ? `Jumelles ${data.binoculars.label}` : "Seestar S50"}
+          title="Jumelles"
+          summary={data.binoculars.label}
           defaultOpen={false}
         >
-          <InstrumentSwitch
-            instrument={data.instrument}
-            binocularsLabel={data.binoculars.label}
-            onChanged={() => {
-              reloadSettings();
-              onChange();
-            }}
-          />
           <p className="nc-caption" style={{ margin: 0 }}>
-            Aux jumelles : seulement ce qu'elles montrent (magnitude {String(data.binoculars.limitMag).replace(".", ",")} au
-            plus pour un objet étendu), un chemin d'étoiles dans chaque fiche, et un Pokédex Messier « vus » à part.
+            Pour patienter pendant que le Seestar pose : elles choisissent les cibles de « En attendant le Seestar »,
+            sur Ce soir. Le diamètre fixe ce qu'elles montrent (magnitude{" "}
+            {String(data.binoculars.limitMag).replace(".", ",")} au plus pour un objet étendu), le champ règle le
+            cadrage et le chemin d'étoiles. Le grossissement n'est qu'une étiquette.
           </p>
           <div className="nc-grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
             {([

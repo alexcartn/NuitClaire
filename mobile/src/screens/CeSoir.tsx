@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
-import { fmtLatLon, plural, targetsCacheKey } from "../format";
+import { fmtLatLon, plural } from "../format";
+import { useSessions } from "../useSessions";
 import { StaleNotice } from "../components/StaleNotice";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -12,10 +13,11 @@ import { SectorChips } from "../components/SectorChips";
 import { NightStrip } from "../components/NightStrip";
 import { NightPlan } from "../components/NightPlan";
 import { NightExtras } from "../components/NightExtras";
+import { BinocularCard } from "../components/BinocularCard";
 import { CloudChart } from "../components/CloudChart";
 import { WindChart } from "../components/WindChart";
 import { TempDewChart } from "../components/TempDewChart";
-import type { CloudTrend, Instrument } from "../types";
+import type { CloudTrend, CurrentSession } from "../types";
 
 /** Tendance nuages : un mot et une fleche, dans la couleur de l'echelle de
  * qualite. Les pastilles emoji d'avant (vert, jaune, rouge) s'affichaient en
@@ -37,28 +39,36 @@ function todayLabel(): string {
   return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
+/** La cible sur laquelle le Seestar pose : la derniere ajoutee a la sortie
+ * en cours et pas encore cochee faite. */
+function seestarTarget(current: CurrentSession | undefined): string | null {
+  const pending = (current?.items ?? []).filter((i) => !i.done);
+  if (pending.length === 0) return null;
+  return [...pending].sort((a, b) => (a.addedAt < b.addedAt ? 1 : -1))[0].designation;
+}
+
 export function CeSoir({
-  instrument,
   onGoTargets,
   onSearch,
   onOpenSky,
   onOpenTarget,
+  onOpenBinocularTarget,
 }: {
-  instrument: Instrument;
   onGoTargets: () => void;
   onSearch: () => void;
   onOpenSky: () => void;
   onOpenTarget: (designation: string) => void;
+  /** Fiche vue aux jumelles (chemin d'etoiles, viseur). */
+  onOpenBinocularTarget: (designation: string) => void;
 }) {
   const [meteoOpen, setMeteoOpen] = useState(false);
 
   const fetchNight = useCallback(() => api.night(), []);
   const fetchNights = useCallback(() => api.nights(), []);
   const fetchState = useCallback(() => api.state(), []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const fetchTargets = useCallback(() => api.targets(), [instrument]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const fetchMessier = useCallback(() => api.messier(true), [instrument]);
+  const fetchTargets = useCallback(() => api.targets(), []);
+  const fetchMessier = useCallback(() => api.messier(true), []);
+  const sessions = useSessions();
 
   // Cles de cache : la derniere reponse reussie est reaffichee au demarrage,
   // avant meme la requete, pour que l'appli installee montre quelque chose
@@ -66,8 +76,8 @@ export function CeSoir({
   const night = useFetch(fetchNight, [], "night");
   const nights = useFetch(fetchNights, [], "nights");
   const state = useFetch(fetchState, [], "state");
-  const targets = useFetch(fetchTargets, [instrument], targetsCacheKey(instrument));
-  const messier = useFetch(fetchMessier, [instrument], `messier:true:${instrument}`);
+  const targets = useFetch(fetchTargets, [], "targets");
+  const messier = useFetch(fetchMessier, [], "messier:true");
   const stale = (night.error || state.error) && night.data && state.data;
 
   const reloadAll = () => {
@@ -96,8 +106,17 @@ export function CeSoir({
 
   const n = night.data;
   const site = state.data.site;
-  const binoculars = instrument === "jumelles";
-  const captured = new Set((binoculars ? state.data.messierSeen : state.data.messierCaptured) ?? []);
+  const captured = new Set(state.data.messierCaptured ?? []);
+  // Pendant une sortie, les jumelles passent devant : c'est le moment ou
+  // l'on attend a cote du Seestar.
+  const posing = seestarTarget(sessions.data?.current);
+  const binocularCard = (
+    <BinocularCard
+      binocularsLabel={state.data.binoculars?.label}
+      seestarTarget={posing}
+      onOpenTarget={onOpenBinocularTarget}
+    />
+  );
   const uncapturedMessier =
     messier.data?.filter((r) => r.messierId && !captured.has(r.messierId)).length ?? 0;
   // Rien tant que la liste n'est pas la : « 0 cible » pendant le
@@ -136,6 +155,8 @@ export function CeSoir({
           </>
         }
       />
+
+      {posing && binocularCard}
 
       <ScoreCard night={n} />
 
@@ -195,15 +216,16 @@ export function CeSoir({
           </span>
           <span style={{ fontSize: "var(--text-xs)", opacity: 0.75 }}>
             {targetCount != null && messier.data
-              ? `${binoculars ? "aux jumelles, " : ""}dont ${plural(uncapturedMessier, `Messier pas encore ${binoculars ? "vu" : "capturé"}`, `Messier pas encore ${binoculars ? "vus" : "capturés"}`)}`
+              ? `dont ${plural(uncapturedMessier, "Messier pas encore capturé", "Messier pas encore capturés")}`
               : "calcul des créneaux…"}
           </span>
         </span>
         <span style={{ fontSize: "var(--text-md)" }} aria-hidden="true">→</span>
       </button>
 
-      {targets.data && <NightPlan rows={targets.data} binoculars={binoculars} onOpenTarget={onOpenTarget} />}
+      {targets.data && <NightPlan rows={targets.data} onOpenTarget={onOpenTarget} />}
 
+      {!posing && binocularCard}
       <NightExtras />
 
       <div className="nc-card nc-stack">

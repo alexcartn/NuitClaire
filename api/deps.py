@@ -131,7 +131,7 @@ def current_night(site: dict):
 
 
 def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalog: str,
-                   view_window: dict | None = None, optics: dict | None = None) -> list[dict]:
+                   view_window: dict | None = None) -> list[dict]:
     """Equivalent de `app.feasible_rows` : meme forme de ligne (via
     `rows.common_row_fields`). Le mode Habituelle/Nuit complete s'applique
     desormais aux deux catalogues ("targets" ET "messier") -- avant, le suivi
@@ -141,8 +141,7 @@ def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalo
     detail -- voir `scoring.in_observation_window`)."""
     view_window = view_window if view_window is not None else VIEW_WINDOW
     key = (_site_key(site), day, tuple(sorted(horizon.items())), window_mode,
-           view_window["start_hour"], view_window["end_hour"], catalog,
-           tuple(sorted(optics.items())) if optics else None)
+           view_window["start_hour"], view_window["end_hour"], catalog)
     with _rows_lock:
         cached = _rows_cache.get(key)
         if cached is not None:
@@ -153,7 +152,7 @@ def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalo
             result: list[dict] = []
         else:
             view_df = view_window_df(df, window_mode, view_window)
-            targets = _catalog_for(catalog, optics)
+            targets = load_messier() if catalog == "messier" else load_targets()
             result = []
             for tgt in targets:
                 w = target_windows(view_df, tgt, horizon=horizon, site=site)
@@ -171,20 +170,6 @@ def feasible_rows(site: dict, day: date, horizon: dict, window_mode: str, catalo
                     })
         _rows_cache[key] = result
         return result
-
-
-def _catalog_for(catalog: str, optics: dict | None) -> list[dict]:
-    """Objets a evaluer : le catalogue Seestar, ou aux jumelles ce qu'elles
-    montrent vraiment, plus leurs classiques (voir optics.py)."""
-    from catalog import load_binocular_extras
-    from optics import visible_in_binoculars, with_optics
-
-    if catalog == "messier":
-        return [with_optics(t, optics) for t in load_messier()]
-    if not optics:
-        return load_targets()
-    pool = load_targets() + load_binocular_extras()
-    return [with_optics(t, optics) for t in pool if visible_in_binoculars(t, optics)]
 
 
 def current_score_pct(site: dict) -> int | None:
@@ -211,14 +196,11 @@ def cached_wiki_summary(candidates: list[str]) -> dict | None:
         return result
 
 
-def cached_messier_season(site: dict, horizon: dict, optics: dict | None = None) -> list[dict]:
-    from optics import with_optics
+def cached_messier_season(site: dict, horizon: dict) -> list[dict]:
     from season import messier_season
 
-    key = (_site_key(site), tuple(sorted(horizon.items())), date.today().year,
-           tuple(sorted(optics.items())) if optics else None)
+    key = (_site_key(site), tuple(sorted(horizon.items())), date.today().year)
     with _season_lock:
         if key not in _season_cache:
-            targets = [with_optics(t, optics) for t in load_messier()]
-            _season_cache[key] = messier_season(targets, site, horizon)
+            _season_cache[key] = messier_season(load_messier(), site, horizon)
         return _season_cache[key]

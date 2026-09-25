@@ -23,7 +23,5 @@ def get_state() -> dict:
         "windowMode": s["window_mode"],
         "viewWindow": {"startHour": s["view_window"]["start_hour"], "endHour": s["view_window"]["end_hour"]},
         "messierCaptured": prog["messier_captured"],
-        "messierSeen": prog["messier_seen"],
-        "instrument": s["instrument"],
         "binoculars": binoculars_to_out(binocular_optics(s)),
     }
