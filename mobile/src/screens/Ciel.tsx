@@ -174,10 +174,15 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
               </span>
             </div>
           )}
-          <p className="nc-caption" style={{ margin: 0 }}>
-            Tenue au-dessus de la tête : zénith au centre, horizon au bord, est à gauche. Zones grisées : ce
-            que cache votre horizon (Réglages). Carrés : cibles de ce soir.
-          </p>
+          {/* Repliee : utile la premiere fois, encombrante ensuite. */}
+          <details className="nc-caption">
+            <summary style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center" }}>Lire la carte</summary>
+            <p style={{ margin: 0 }}>
+              Tenue au-dessus de la tête : zénith au centre, horizon au bord, est à gauche. Zones grisées : ce
+              que cache votre horizon (Réglages). Carrés : cibles de ce soir, les premières nommées quand la
+              place le permet.
+            </p>
+          </details>
         </>
       ) : compass.orientation ? (
         <>

@@ -43,23 +43,37 @@ def main(src: Path) -> None:
 
 
 
+# Etoiles nommees sur la carte du telephone : les reperes qu'on trouve a
+# l'oeil nu, sous leur nom francais. Une designation (« α UMa ») ne parle
+# pas dehors ; trente noms sur un dome de telephone, c'est illisible.
+MOBILE_NAMES = {
+    "Vega": "Véga", "Altair": "Altaïr", "Deneb": "Deneb", "Arcturus": "Arcturus",
+    "Capella": "Capella", "Aldebaran": "Aldébaran", "Betelgeuse": "Bételgeuse",
+    "Rigel": "Rigel", "Sirius": "Sirius", "Procyon": "Procyon", "Pollux": "Pollux",
+    "Castor": "Castor", "Regulus": "Régulus", "Spica": "Épi", "Antares": "Antarès",
+    "Fomalhaut": "Fomalhaut", "Polaris": "Polaire",
+}
+
+
 def build_mobile_sky() -> None:
     """Version reduite pour la carte du ciel du telephone (mobile/src/sky/
-    skyData.json) : etoiles visibles a l'oeil nu (magnitude 5 au plus),
-    designation pour les plus brillantes, traces des constellations. Calculee
-    sur le telephone, donc disponible hors ligne."""
+    skyData.json) : etoiles visibles a l'oeil nu (magnitude 5 au plus), nom
+    des reperes (MOBILE_NAMES), traces des constellations. Calculee sur le
+    telephone, donc disponible hors ligne."""
     stars = []
     with open(OUT / "stars.csv", encoding="utf-8") as f:
         for r in csv.DictReader(f):
             m = float(r["mag"])
             if m <= 5.0:
                 stars.append([round(float(r["ra_deg"]), 2), round(float(r["dec_deg"]), 2), round(m, 1),
-                              r["desig"] if m <= 3.5 and r["desig"] else ""])
+                              MOBILE_NAMES.get(r["name"], "")])
     lines = [[round(v, 2) for v in seg] for seg in json.loads((OUT / "constellation_lines.json").read_text())]
     target = OUT.parent / "mobile" / "src" / "sky" / "skyData.json"
     target.write_text(json.dumps({"stars": stars, "lines": lines}, ensure_ascii=False, separators=(",", ":")))
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    # Sans argument : ne refait que la carte du telephone, depuis data/.
+    if len(sys.argv) > 1:
+        main(Path(sys.argv[1]))
     build_mobile_sky()

@@ -1223,7 +1223,7 @@ a {
 
 .nc-sky-grid {
   fill: none;
-  stroke: rgba(170, 160, 200, 0.18);
+  stroke: rgba(170, 160, 200, 0.1);
   stroke-width: 1;
 }
 
@@ -1243,12 +1243,22 @@ a {
 }
 
 .nc-sky-const {
-  stroke: rgba(170, 160, 200, 0.35);
+  stroke: rgba(170, 160, 200, 0.2);
   stroke-width: 1;
 }
 
 .nc-sky-star {
   fill: #f4f2f7;
+}
+
+/* Liseré couleur du fond : un nom reste lisible sur un trait de constellation. */
+.nc-sky-label,
+.nc-sky-planet-label,
+.nc-sky-target-label,
+.nc-sky-target-label-sel {
+  stroke: #07060a;
+  stroke-width: 0.012px;
+  paint-order: stroke;
 }
 
 .nc-sky-label,
@@ -1277,7 +1287,7 @@ a {
 
 .nc-sky-target {
   fill: none;
-  stroke: rgba(240, 236, 250, 0.75);
+  stroke: rgba(240, 236, 250, 0.6);
   stroke-width: 1.5;
 }
 
