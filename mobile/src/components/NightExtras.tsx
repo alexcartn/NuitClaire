@@ -39,7 +39,9 @@ function JupiterMoons({ moons }: { moons: NonNullable<PlanetTonight["moons"]> })
 }
 
 /** Lune, planetes et ISS de la nuit : trois sections repliables sur
- * « Ce soir », utiles surtout aux jumelles. Gardees sur l'appareil. */
+ * « Ce soir », utiles surtout aux jumelles. Fermees au depart : le resume
+ * a droite dit l'essentiel, ouvertes elles noyaient l'ecran. Gardees sur
+ * l'appareil. */
 export function NightExtras() {
   const moon = useFetch(useCallback(() => api.moonTonight(), []), [], "extras-moon");
   const planets = useFetch(useCallback(() => api.planetsTonight(), []), [], "extras-planets");
@@ -49,7 +51,7 @@ export function NightExtras() {
   return (
     <>
       {m && (
-        <Section id="soir-lune" title="Lune" summary={`${m.illum} % · ${m.waxing ? "croissante" : "décroissante"}`}>
+        <Section id="soir-lune" title="Lune" defaultOpen={false} summary={`${m.illum} % · ${m.waxing ? "croissante" : "décroissante"}`}>
           <div className="nc-row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
             <MoonPhase illum={m.illum} waxing={m.waxing} />
             <div className="nc-stack-xs" style={{ gap: 2 }}>
@@ -79,7 +81,7 @@ export function NightExtras() {
           id="soir-planetes"
           title="Planètes"
           summary={planets.data.length ? planets.data.map((p) => p.name).join(" · ") : "aucune cette nuit"}
-          defaultOpen={planets.data.length > 0}
+          defaultOpen={false}
         >
           {planets.data.length === 0 && (
             <p className="nc-caption" style={{ margin: 0 }}>Aucune planète assez haute pendant la nuit noire.</p>

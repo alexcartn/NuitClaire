@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { api } from "../api";
 import { useFetch } from "../useFetch";
 import { fmtLatLon, plural } from "../format";
@@ -13,6 +13,7 @@ import { SectorChips } from "../components/SectorChips";
 import { NightStrip } from "../components/NightStrip";
 import { NightPlan } from "../components/NightPlan";
 import { NightExtras } from "../components/NightExtras";
+import { Section } from "../components/Section";
 import { BinocularCard } from "../components/BinocularCard";
 import { CloudChart } from "../components/CloudChart";
 import { WindChart } from "../components/WindChart";
@@ -61,8 +62,6 @@ export function CeSoir({
   /** Fiche vue aux jumelles (chemin d'etoiles, viseur). */
   onOpenBinocularTarget: (designation: string) => void;
 }) {
-  const [meteoOpen, setMeteoOpen] = useState(false);
-
   const fetchNight = useCallback(() => api.night(), []);
   const fetchNights = useCallback(() => api.nights(), []);
   const fetchState = useCallback(() => api.state(), []);
@@ -122,6 +121,7 @@ export function CeSoir({
   // Rien tant que la liste n'est pas la : « 0 cible » pendant le
   // chargement affirmait une nuit vide.
   const targetCount = targets.data?.length ?? null;
+  const openSectors = Object.values(state.data.horizon).filter(Boolean).length;
   const trend = n.cloudTrend ? CLOUD_TREND[n.cloudTrend.direction] : null;
 
   return (
@@ -207,39 +207,10 @@ export function CeSoir({
         />
       </div>
 
-      <button onClick={onGoTargets} className="nc-btn nc-btn-primary nc-cta">
-        <span className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
-          <span style={{ fontSize: "var(--text-md)" }}>
-            {targetCount != null
-              ? `${plural(targetCount, "cible pointable", "cibles pointables")} ce soir`
-              : "Cibles de ce soir"}
-          </span>
-          <span style={{ fontSize: "var(--text-xs)", opacity: 0.75 }}>
-            {targetCount != null && messier.data
-              ? `dont ${plural(uncapturedMessier, "Messier pas encore capturé", "Messier pas encore capturés")}`
-              : "calcul des créneaux…"}
-          </span>
-        </span>
-        <span style={{ fontSize: "var(--text-md)" }} aria-hidden="true">→</span>
-      </button>
-
-      {targets.data && <NightPlan rows={targets.data} onOpenTarget={onOpenTarget} />}
-
-      {!posing && binocularCard}
-      <NightExtras />
-
-      <div className="nc-card nc-stack">
-        <div className="nc-eyebrow">Horizon dégagé</div>
-        <SectorChips horizon={state.data.horizon} horizonAlt={state.data.horizonAlt} />
-      </div>
-
-      <button onClick={() => setMeteoOpen((v) => !v)} className="nc-btn nc-row nc-between" aria-expanded={meteoOpen}>
-        <span>Détails météo</span>
-        <span className="nc-caption">{meteoOpen ? "masquer" : "nuages · rosée · vent"}</span>
-      </button>
-
-      {meteoOpen && (
-        <div className="nc-card nc-stack" style={{ gap: "var(--space-md)" }}>
+      {/* Le detail des chiffres juste au-dessus, replie : on l'ouvre quand
+          la note hesite. */}
+      <Section id="soir-meteo" title="Détails météo" summary="nuages · rosée · vent" defaultOpen={false}>
+        <div className="nc-stack" style={{ gap: "var(--space-md)" }}>
           <div className="nc-stack-xs">
             <div className="nc-eyebrow">Nuages</div>
             {n.cloudTrend && trend ? (
@@ -278,7 +249,34 @@ export function CeSoir({
             Open-Meteo AROME 1,3 km · seeing et transparence 7Timer ASTRO.
           </p>
         </div>
-      )}
+      </Section>
+
+      <button onClick={onGoTargets} className="nc-btn nc-btn-primary nc-cta">
+        <span className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
+          <span style={{ fontSize: "var(--text-md)" }}>
+            {targetCount != null
+              ? `${plural(targetCount, "cible pointable", "cibles pointables")} ce soir`
+              : "Cibles de ce soir"}
+          </span>
+          <span style={{ fontSize: "var(--text-xs)", opacity: 0.75 }}>
+            {targetCount != null && messier.data
+              ? `dont ${plural(uncapturedMessier, "Messier pas encore capturé", "Messier pas encore capturés")}`
+              : "calcul des créneaux…"}
+          </span>
+        </span>
+        <span style={{ fontSize: "var(--text-md)" }} aria-hidden="true">→</span>
+      </button>
+
+      {targets.data && <NightPlan rows={targets.data} onOpenTarget={onOpenTarget} />}
+
+      {/* Pendant une sortie, la carte jumelles est deja en haut. */}
+      <div className="nc-eyebrow" style={{ marginTop: "var(--space-sm)" }}>Aux jumelles et à l'œil nu</div>
+      {!posing && binocularCard}
+      <NightExtras />
+
+      <Section id="soir-horizon" title="Horizon dégagé" summary={`${openSectors}/8 secteurs`} defaultOpen={false}>
+        <SectorChips horizon={state.data.horizon} horizonAlt={state.data.horizonAlt} />
+      </Section>
     </div>
   );
 }
