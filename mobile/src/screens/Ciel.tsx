@@ -33,6 +33,11 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
 
   const fetchTargets = useCallback(() => api.targets(), []);
   const targets = useFetch(fetchTargets, [], "targets");
+  // Meme cle que la carte « En attendant le Seestar » : une seule requete.
+  const binocularsLabel = state?.binoculars?.label;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchBinoculars = useCallback(() => api.binocularsNow(), [binocularsLabel]);
+  const binoculars = useFetch(fetchBinoculars, [binocularsLabel], `binoculars-now:${binocularsLabel ?? ""}`);
   const fetchBodies = useCallback(() => api.skyBodies(), []);
   const bodies = useFetch(fetchBodies, [], "sky-bodies");
   // La cible choisie peut ne pas etre dans la liste de ce soir : sa fiche
@@ -49,12 +54,18 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   const mapTargets: SkyTarget[] = useMemo(() => {
     const rows: TargetRow[] = (targets.data ?? []).slice(0, MAP_TARGETS);
     const list = rows.map((r) => ({ designation: r.designation, raDeg: r.ra * 15, decDeg: r.dec }));
+    // Les cibles jumelles des boutons, meme hors de la liste Seestar.
+    for (const p of binoculars.data?.picks ?? []) {
+      if (!list.some((t) => t.designation === p.designation)) {
+        list.push({ designation: p.designation, raDeg: p.raDeg, decDeg: p.decDeg });
+      }
+    }
     const sel = selectedDetail.data;
     if (sel && !list.some((t) => t.designation === sel.designation)) {
       list.push({ designation: sel.designation, raDeg: sel.ra * 15, decDeg: sel.dec });
     }
     return list;
-  }, [targets.data, selectedDetail.data]);
+  }, [targets.data, binoculars.data, selectedDetail.data]);
 
   const selectedTarget = mapTargets.find((t) => t.designation === selected) ?? null;
   const when = new Date(Date.now() + offsetMin * 60000);
@@ -100,19 +111,27 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
         ))}
       </div>
 
-      {/* Cible : celle venue de la fiche, ou a choisir parmi celles de ce soir. */}
-      <div className="nc-row nc-hscroll">
-        {mapTargets.slice(0, 12).map((t) => (
-          <button
-            key={t.designation}
-            onClick={() => setSelected(t.designation === selected ? null : t.designation)}
-            className={`nc-chip nc-num nc-none ${t.designation === selected ? "nc-chip-active" : ""}`}
-            aria-pressed={t.designation === selected}
-          >
-            {t.designation}
-          </button>
-        ))}
-      </div>
+      {/* Rappel des cibles faciles aux jumelles en ce moment (celles de
+          « En attendant le Seestar ») : un appui la montre sur la carte ou
+          la vise. */}
+      {(binoculars.data?.picks.length ?? 0) > 0 && (
+        <div className="nc-stack-xs">
+          <span className="nc-caption">Faciles aux jumelles {binoculars.data!.at}</span>
+          <div className="nc-row nc-hscroll">
+            {binoculars.data!.picks.map((p) => (
+              <button
+                key={p.designation}
+                onClick={() => setSelected(p.designation === selected ? null : p.designation)}
+                className={`nc-chip nc-none ${p.designation === selected ? "nc-chip-active" : ""}`}
+                aria-pressed={p.designation === selected}
+              >
+                <span className="nc-num">{p.designation}</span>
+                {p.name ? ` · ${p.name}` : ""}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {mode === "carte" ? (
         <>
@@ -179,8 +198,8 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
             <summary style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center" }}>Lire la carte</summary>
             <p style={{ margin: 0 }}>
               Tenue au-dessus de la tête : zénith au centre, horizon au bord, est à gauche. Zones grisées : ce
-              que cache votre horizon (Réglages). Carrés : cibles de ce soir, les premières nommées quand la
-              place le permet.
+              que cache votre horizon (Réglages). Carrés : cibles de ce soir et cibles jumelles, les premières nommées
+              quand la place le permet.
             </p>
           </details>
         </>
