@@ -34,22 +34,25 @@ export interface SectorHorizon {
   alt: number;
 }
 
-/** Couleur d'un secteur : libre, degage au-dessus d'une hauteur, bouche. */
+/** Couleur d'un secteur : libre, degage au-dessus d'une hauteur, bouche.
+ * Les crans de l'echelle de qualite, pleins : attenues par transparence sur
+ * le fond sombre, ils viraient au kaki. Bouche reste neutre, comme les puces
+ * d'horizon (SectorChips) : rien a voir, rien a signaler. */
 export function horizonColor(s: SectorHorizon | undefined): string {
-  if (!s || !s.open) return "var(--bad)";
+  if (!s || !s.open) return "var(--ink3)";
   return s.alt > 0 ? "var(--mid)" : "var(--good)";
 }
 
 /** Secteur de couronne centre sur `angle`, 45 deg moins un petit jour entre
  * voisins pour qu'on distingue deux secteurs de meme couleur. */
-function bandPath(angle: number): string {
-  const a0 = angle - 21;
-  const a1 = angle + 21;
-  const o0 = polar(a0, BAND_OUT);
-  const o1 = polar(a1, BAND_OUT);
+function bandPath(angle: number, outer: number): string {
+  const a0 = angle - 20;
+  const a1 = angle + 20;
+  const o0 = polar(a0, outer);
+  const o1 = polar(a1, outer);
   const i1 = polar(a1, BAND_IN);
   const i0 = polar(a0, BAND_IN);
-  return `M${o0.x} ${o0.y}A${BAND_OUT} ${BAND_OUT} 0 0 1 ${o1.x} ${o1.y}L${i1.x} ${i1.y}A${BAND_IN} ${BAND_IN} 0 0 0 ${i0.x} ${i0.y}Z`;
+  return `M${o0.x} ${o0.y}A${outer} ${outer} 0 0 1 ${o1.x} ${o1.y}L${i1.x} ${i1.y}A${BAND_IN} ${BAND_IN} 0 0 0 ${i0.x} ${i0.y}Z`;
 }
 
 export function Compass({ heading, facing, horizon }: {
@@ -71,15 +74,32 @@ export function Compass({ heading, facing, horizon }: {
       {/* La rose tourne de l'oppose du cap : la direction regardee remonte
           ainsi sous le repere fixe. */}
       <g transform={`rotate(${-heading} ${CENTER} ${CENTER})`}>
+        {/* Le secteur regarde s'epaissit ; les autres restent fins, dans
+            leur couleur pleine. Bouche : un simple trait, pas une alerte. */}
         {horizon &&
-          COMPASS_SECTORS.map((sector, i) => (
-            <path
-              key={`h${sector}`}
-              d={bandPath(i * 45)}
-              fill={horizonColor(horizon[sector])}
-              opacity={sector === facing ? 0.95 : 0.55}
-            />
-          ))}
+          COMPASS_SECTORS.map((sector, i) => {
+            const st = horizon[sector];
+            const outer = sector === facing ? BAND_OUT : BAND_IN + 5;
+            return st?.open ? (
+              <path
+                key={`h${sector}`}
+                d={bandPath(i * 45, outer)}
+                fill={horizonColor(st)}
+                strokeLinejoin="round"
+                stroke={horizonColor(st)}
+                strokeWidth={1.5}
+              />
+            ) : (
+              <path
+                key={`h${sector}`}
+                d={bandPath(i * 45, outer)}
+                fill="none"
+                stroke="var(--ink3)"
+                strokeWidth={1}
+                strokeDasharray="2 3"
+              />
+            );
+          })}
         {COMPASS_SECTORS.map((sector, i) => {
           const angle = i * 45;
           const cardinal = angle % 90 === 0;

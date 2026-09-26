@@ -268,7 +268,7 @@ export function Reglages({ onChange }: { onChange: () => void }) {
             <div className="nc-row nc-caption" style={{ gap: "var(--space-sm)", margin: 0 }}>
               <span><span style={{ color: "var(--good)" }}>●</span> libre</span>
               <span><span style={{ color: "var(--mid)" }}>●</span> dès une hauteur</span>
-              <span><span style={{ color: "var(--bad)" }}>●</span> bouché</span>
+              <span><span style={{ color: "var(--ink3)" }}>◌</span> bouché</span>
             </div>
           </div>
         ) : compass.state === "unsupported" || compass.state === "denied" ? (
