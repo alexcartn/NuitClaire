@@ -36,12 +36,15 @@ export function horizonSummary(profile: Record<string, SectorState>): string {
  * d'une hauteur (arbres, toits, colline). On touche un secteur, puis son
  * palier. Le changement s'affiche tout de suite et revient en arriere, en le
  * disant, si le serveur ne l'a pas pris. */
-export function HorizonEditor({ horizon, horizonAlt, facing, onSaved }: {
+export function HorizonEditor({ horizon, horizonAlt, facing, onSaved, onProfile }: {
   horizon: Record<string, boolean>;
   horizonAlt: Record<string, number>;
   /** Secteur vise par la boussole, s'il y en a une. */
   facing: string | null;
   onSaved: () => void;
+  /** Le profil affiche, changements en cours compris : la boussole le
+   * colore tout de suite, sans attendre le serveur. */
+  onProfile?: (profile: Record<string, SectorState>) => void;
 }) {
   const fromServer = () =>
     Object.fromEntries(COMPASS_SECTORS.map((s) => [s, { open: !!horizon[s], alt: horizonAlt[s] ?? 0 }]));
@@ -50,6 +53,8 @@ export function HorizonEditor({ horizon, horizonAlt, facing, onSaved }: {
   const [error, setError] = useState<string | null>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setProfile(fromServer()), [horizon, horizonAlt]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => onProfile?.(profile), [profile]);
 
   // Sans choix explicite, le secteur vise par la boussole est celui qu'on regle.
   const current = selected ?? facing;

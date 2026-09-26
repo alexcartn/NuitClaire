@@ -5,11 +5,11 @@ import { useTheme } from "../useTheme";
 import { isIOS, promptInstall, usePwa } from "../pwa";
 import { useCompass } from "../useCompass";
 import { sectorFor } from "../compass";
-import { Compass } from "../components/Compass";
+import { Compass, horizonColor } from "../components/Compass";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { Section } from "../components/Section";
 import { AlertsCard } from "../components/AlertsCard";
-import { HorizonEditor, horizonSummary } from "../components/HorizonEditor";
+import { HorizonEditor, horizonSummary, sectorLabel } from "../components/HorizonEditor";
 import { COMPASS_SECTORS, type Settings, type Site } from "../types";
 import { fmtDecimalHour, fmtLatLon, plural } from "../format";
 
@@ -147,6 +147,9 @@ export function Reglages({ onChange }: { onChange: () => void }) {
     }
   };
 
+  // Profil en cours d'edition (voir HorizonEditor) : colore la boussole
+  // des l'appui, avant la reponse du serveur.
+  const [liveProfile, setLiveProfile] = useState<Record<string, { open: boolean; alt: number }> | null>(null);
   const [windowDraft, setWindowDraft] = useState<{ start: string; end: string } | null>(null);
   const [windowError, setWindowError] = useState<string | null>(null);
 
@@ -250,12 +253,22 @@ export function Reglages({ onChange }: { onChange: () => void }) {
             soi-meme, dehors, qu'on regle ces secteurs. */}
         {compass.heading != null && facing ? (
           <div className="nc-stack-xs" style={{ alignItems: "center" }}>
-            <Compass heading={compass.heading} facing={facing} />
+            <Compass heading={compass.heading} facing={facing} horizon={liveProfile ?? profile ?? undefined} />
             <div className="nc-row nc-baseline">
               <span className="nc-num" style={{ fontSize: "var(--text-xl)", color: "var(--accent)" }}>{facing}</span>
               <span className="nc-num" style={{ fontSize: "var(--text-sm)", color: "var(--ink2)" }}>
                 {Math.round(compass.heading)}°
               </span>
+              {(liveProfile ?? profile)?.[facing] && (
+                <span style={{ fontSize: "var(--text-sm)", color: horizonColor((liveProfile ?? profile)![facing]) }}>
+                  {sectorLabel((liveProfile ?? profile)![facing])}
+                </span>
+              )}
+            </div>
+            <div className="nc-row nc-caption" style={{ gap: "var(--space-sm)", margin: 0 }}>
+              <span><span style={{ color: "var(--good)" }}>●</span> libre</span>
+              <span><span style={{ color: "var(--mid)" }}>●</span> dès une hauteur</span>
+              <span><span style={{ color: "var(--bad)" }}>●</span> bouché</span>
             </div>
           </div>
         ) : compass.state === "unsupported" || compass.state === "denied" ? (
@@ -276,6 +289,7 @@ export function Reglages({ onChange }: { onChange: () => void }) {
             horizon={state.horizon}
             horizonAlt={state.horizonAlt ?? {}}
             facing={facing}
+            onProfile={setLiveProfile}
             onSaved={() => {
               reloadState();
               onChange();
