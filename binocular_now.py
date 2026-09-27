@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import ephem
 
 from astro import compass_sector, target_altaz
-from catalog import french_name, load_binocular_extras, load_targets
+from catalog import french_name, load_binocular_extras, load_messier, load_targets
 from optics import MOON_TOLERANT_TYPES, surface_brightness, visible_in_binoculars, visual_limit_mag
 from scoring import sector_floor
 
@@ -77,6 +77,15 @@ def _ease(tgt: dict, alt: float, limit_mag: float, moon_bright: bool) -> float:
     return score
 
 
+def binocular_catalog() -> list[dict]:
+    """Tout ce qui peut passer aux jumelles : le catalogue du Seestar, les
+    Messier qu'il ecarte (trop grands pour son champ : les Pleiades, M40,
+    M73, M102), et les classiques propres aux jumelles. Sans les Messier,
+    les Pleiades, la cible jumelles par excellence, n'etaient jamais
+    proposees."""
+    return load_targets() + load_messier() + load_binocular_extras()
+
+
 def binocular_picks(site: dict, horizon: dict, optics: dict, when: datetime, limit: int = 5) -> list[dict]:
     """Les `limit` cibles les plus faciles a `when` (heure locale naive du
     site), pointables au moins l'heure qui suit."""
@@ -88,7 +97,7 @@ def binocular_picks(site: dict, horizon: dict, optics: dict, when: datetime, lim
 
     seen: set[str] = set()
     candidates = []
-    for tgt in load_targets() + load_binocular_extras():
+    for tgt in binocular_catalog():
         if tgt["name"] in seen or not visible_in_binoculars(tgt, optics):
             continue
         seen.add(tgt["name"])
