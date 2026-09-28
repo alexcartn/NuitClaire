@@ -595,6 +595,21 @@ Trois sections repliables sur « Ce soir » (`components/NightExtras.tsx`), calc
   12 h ; sans elle, la section le dit. Alerte optionnelle « passage visible ce soir »,
   envoyee avec les autres en fin d'apres-midi.
 
+### Cometes et actualites
+
+« Ce soir » affiche une carte Cometes, seulement quand une comete est a portee du Seestar :
+plus brillante que le seuil choisi dans Reglages (magnitude 11 par defaut), a plus de 20deg
+dans un secteur d'horizon degage pendant la nuit. Les orbites viennent du Minor Planet
+Center (`Soft03Cmt.txt`, format XEphem lu tel quel par PyEphem), les magnitudes observees
+de COBS (cobs.si) pour les cometes proches de leur perihelie, sinon la prevision du MPC ;
+l'ecran dit laquelle des deux (`comets.py`, `GET /api/comets`). L'alerte « comete »
+previent une fois par comete, pas chaque nuit.
+
+En bas de « Ce soir », une section Actualites repliee reunit Ciel & Espace, le forum
+Webastro « L'actualite du ciel » et l'image du jour de la NASA (APOD) : titre, date,
+vignette et chapeau tels que les flux RSS les publient, un appui ouvre l'article sur son
+site (`news.py`, `GET /api/news`, flux gardes 6 h).
+
 ### Recherche
 
 Par designation (prefixe : « M3 », « NGC70 ») ou par nom, en francais ou en anglais, sans

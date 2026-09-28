@@ -24,6 +24,7 @@ def _settings_out(s: dict) -> dict:
     places = s["places"] if any(p["name"] == site["name"] for p in s["places"]) else [site] + s["places"]
     return {"site": site_to_out(site), "windowMode": s["window_mode"],
             "viewWindow": _view_window_out(s), "alerts": s["alerts"],
+            "cometMagMax": s["comet_mag_max"],
             "places": [site_to_out(p) for p in places],
             "binoculars": binoculars_to_out(binocular_optics(s))}
 
@@ -66,6 +67,8 @@ def update_settings(body: SettingsUpdate) -> dict:
             s["binoculars"] = {**s["binoculars"], **given}
         if body.alerts is not None:
             s["alerts"] = {**s["alerts"], **body.alerts}
+        if body.cometMagMax is not None:
+            s["comet_mag_max"] = body.cometMagMax
         settings_store.save(s)
 
     return _settings_out(s)

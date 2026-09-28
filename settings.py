@@ -31,7 +31,10 @@ _DEFAULT_FROZEN = MappingProxyType({
     # dict-ci qui fait foi une fois un reglage sauvegarde.
     "view_window": MappingProxyType({"start_hour": VIEW_WINDOW["start_hour"],
                                       "end_hour": VIEW_WINDOW["end_hour"]}),
-    "alerts": MappingProxyType({"score": True, "dew": False, "iss": False}),
+    "alerts": MappingProxyType({"score": True, "dew": False, "iss": False, "comet": False}),
+    # Magnitude au-dela de laquelle une comete n'est pas proposee (voir
+    # comets.py) : 11 convient au Seestar sous un ciel de campagne.
+    "comet_mag_max": 11.0,
     "places": (),
     # Caracteristiques des jumelles, en complement de config.BINOCULARS
     # (voir optics.py).
@@ -46,6 +49,7 @@ def default() -> dict:
         "window_mode": _DEFAULT_FROZEN["window_mode"],
         "view_window": dict(_DEFAULT_FROZEN["view_window"]),
         "alerts": dict(_DEFAULT_FROZEN["alerts"]),
+        "comet_mag_max": _DEFAULT_FROZEN["comet_mag_max"],
         "places": [],
         "binoculars": {},
     }
@@ -83,6 +87,10 @@ def load(path: Path = SETTINGS_PATH) -> dict:
     places = raw.get("places")
     merged["places"] = [p for p in places if isinstance(p, dict) and p.get("name")] \
         if isinstance(places, list) else []
+
+    mag = raw.get("comet_mag_max")
+    merged["comet_mag_max"] = float(mag) if isinstance(mag, (int, float)) and 4 <= mag <= 14 \
+        else _DEFAULT_FROZEN["comet_mag_max"]
 
     view_window_override = raw.get("view_window")
     if not isinstance(view_window_override, dict):

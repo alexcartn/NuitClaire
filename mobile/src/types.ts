@@ -67,6 +67,8 @@ export interface Settings {
   windowMode: "complete" | "habituelle";
   viewWindow: ViewWindow;
   alerts: Record<string, boolean>;
+  /** Magnitude limite des cometes proposees (voir comets.py). */
+  cometMagMax: number;
   /** Lieux deja utilises, le plus recent d'abord (le lieu actif compris). */
   places: Site[];
   binoculars: Binoculars;
@@ -242,6 +244,7 @@ export interface SettingsUpdate {
   windowMode?: "complete" | "habituelle";
   viewWindow?: ViewWindow;
   alerts?: Record<string, boolean>;
+  cometMagMax?: number;
   binoculars?: { magnification?: number; aperture_mm?: number; fov_deg?: number };
 }
 
@@ -390,4 +393,48 @@ export interface Stats {
   /** Les quatre familles, toujours dans cet ordre (absent d'une vieille
    * reponse en cache). */
   byFamily?: FamilyCount[];
+}
+
+/** Une comete visible cette nuit (GET /api/comets, voir comets.py). */
+export interface Comet {
+  name: string;
+  designation: string;
+  mag: number;
+  /** D'ou vient `mag` : les observations (COBS) ou la formule du MPC. */
+  magSource: "observée" | "prévue";
+  predictedMag: number;
+  peakMag: number | null;
+  peakDate: string | null;
+  constellation: string;
+  from: string;
+  to: string;
+  bestTime: string;
+  bestAlt: number;
+  bestAz: number;
+  sector: string;
+  /** Hauteur tout au long de la nuit ; `clear` : assez haute, secteur degage. */
+  curve: { time: string; alt: number; clear: boolean }[];
+}
+
+export interface CometsInfo {
+  available: boolean;
+  reason?: string;
+  observedAvailable?: boolean;
+  magMax: number;
+  comets: Comet[];
+}
+
+export interface NewsItem {
+  title: string;
+  link: string;
+  source: string;
+  date: string | null;
+  summary: string;
+  image: string | null;
+}
+
+export interface NewsInfo {
+  items: NewsItem[];
+  /** Sources injoignables, sans copie en memoire. */
+  missing: string[];
 }

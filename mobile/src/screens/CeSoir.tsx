@@ -14,6 +14,8 @@ import { SectorChips } from "../components/SectorChips";
 import { NightStrip } from "../components/NightStrip";
 import { NightPlan } from "../components/NightPlan";
 import { NightExtras } from "../components/NightExtras";
+import { CometsCard } from "../components/CometsCard";
+import { NewsSection } from "../components/NewsSection";
 import { Section } from "../components/Section";
 import { BinocularCard } from "../components/BinocularCard";
 import { CloudChart } from "../components/CloudChart";
@@ -273,6 +275,8 @@ export function CeSoir({
 
       {targets.data && <NightPlan rows={targets.data} onOpenTarget={onOpenTarget} />}
 
+      <CometsCard />
+
       {/* Pendant une sortie, la carte jumelles est deja en haut. */}
       <div className="nc-eyebrow" style={{ marginTop: "var(--space-sm)" }}>Aux jumelles et à l'œil nu</div>
       {!posing && binocularCard}
@@ -281,6 +285,8 @@ export function CeSoir({
       <Section id="soir-horizon" title="Horizon dégagé" summary={`${openSectors}/8 secteurs`} defaultOpen={false}>
         <SectorChips horizon={state.data.horizon} horizonAlt={state.data.horizonAlt} />
       </Section>
+
+      <NewsSection />
     </div>
   );
 }

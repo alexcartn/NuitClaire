@@ -3,11 +3,13 @@ planifiee (voir GET /api/cron/alerts et vercel.json) : de quoi decider de
 sortir ou de preparer l'anti-buee avant la nuit, pas une surveillance en
 direct. Pur et sans reseau : prend le resume de la nuit, rend les messages.
 
-Trois alertes, activables dans Reglages (`settings.alerts`) :
+Quatre alertes, activables dans Reglages (`settings.alerts`) :
 - "score" : la nuit atteint le seuil des bonnes conditions ;
 - "dew" : l'ecart temperature/point de rosee passe sous le seuil de buee
   a un moment de la fenetre d'observation ;
-- "iss" : la station spatiale passe, visible, ce soir (avant 1 h)."""
+- "iss" : la station spatiale passe, visible, ce soir (avant 1 h) ;
+- "comet" : une comete passe sous le seuil de magnitude choisi et se voit
+  ce soir depuis l'horizon degage -- une fois par comete, pas chaque nuit."""
 import pandas as pd
 
 SCORE_THRESHOLD_PCT = 70
@@ -62,3 +64,22 @@ def iss_message(night_date: str, enabled: dict, passes: list[dict], sent: dict) 
             "body": f"À {best['peak'][11:16]}, {best['peakAlt']}° au plus haut, de {best['startDir']} vers "
                     f"{best['endDir']} ({best['brightness']}).",
             "url": "/", "tag": f"iss-{night_date}"}
+
+
+def comet_messages(night_date: str, enabled: dict, comets: list[dict], sent: dict) -> list[dict]:
+    """Une alerte par comete visible ce soir et jamais encore annoncee (cle
+    `comet:<designation>` dans `sent`) : une comete reste visible des
+    semaines, la rappeler chaque soir deviendrait du bruit."""
+    if not enabled.get("comet"):
+        return []
+    out = []
+    for c in comets:
+        key = f"comet:{c['designation']}"
+        if key in sent:
+            continue
+        mag = f"{c['mag']:.1f}".replace(".", ",")
+        out.append({"alert": key, "title": f"Comète {c['name']} visible",
+                    "body": f"Magnitude {mag} ({c['magSource']}), au plus haut {c['bestAlt']}° vers "
+                            f"{c['sector']} à {c['bestTime'][11:16]}.",
+                    "url": "/", "tag": f"comet-{c['designation']}"})
+    return out

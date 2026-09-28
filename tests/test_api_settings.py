@@ -4,7 +4,8 @@ def test_get_settings_returns_defaults(api_client):
     data = r.json()
     assert data["windowMode"] == "complete"
     assert data["viewWindow"] == {"startHour": 20.0, "endHour": 22.5}
-    assert data["alerts"] == {"score": True, "dew": False, "iss": False}
+    assert data["alerts"] == {"score": True, "dew": False, "iss": False, "comet": False}
+    assert data["cometMagMax"] == 11.0
     assert data["site"]["name"] == "Marson"
     assert data["site"]["tz"] == "Europe/Paris"
 
@@ -36,7 +37,7 @@ def test_put_settings_updates_window_mode_and_alerts(api_client):
     assert r.status_code == 200
     data = r.json()
     assert data["windowMode"] == "habituelle"
-    assert data["alerts"] == {"score": True, "dew": True, "iss": False}  # "score" conserve, non fourni
+    assert data["alerts"] == {"score": True, "dew": True, "iss": False, "comet": False}  # "score" conserve, non fourni
 
     assert api_client.get("/api/settings").json()["windowMode"] == "habituelle"
 
@@ -120,3 +121,8 @@ def test_place_can_be_forgotten_but_not_the_active_one(api_client):
     r = api_client.delete(f"/api/places/{home}")
     assert r.status_code == 200
     assert [p["name"] for p in r.json()["places"]] == ["Col"]
+
+
+def test_put_settings_comet_magnitude(api_client):
+    assert api_client.put("/api/settings", json={"cometMagMax": 9.5}).json()["cometMagMax"] == 9.5
+    assert api_client.put("/api/settings", json={"cometMagMax": 20}).status_code == 422

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import alerts
 import notifications
 import settings as settings_store
-from api.deps import current_night, push_write_lock, site_from_settings
+from api.deps import current_night, get_horizon, push_write_lock, site_from_settings
 from astro import moon_status
 from scoring import night_summary, score_label_fr, view_window_df
 
@@ -127,6 +127,11 @@ def run_alerts(authorization: str | None = Header(default=None)) -> dict:
                                          data["sent"])
                 if msg:
                     messages.append(msg)
+        if s["alerts"].get("comet"):
+            import comets
+
+            found = comets.tonight(site, sel, get_horizon(), s["comet_mag_max"])
+            messages += alerts.comet_messages(night, s["alerts"], found["comets"], data["sent"])
         results = {}
         for msg in messages:
             results[msg["alert"]] = notifications.broadcast(

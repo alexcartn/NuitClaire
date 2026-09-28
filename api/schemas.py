@@ -23,6 +23,7 @@ class SettingsOut(BaseModel):
     windowMode: str
     viewWindow: ViewWindowOut
     alerts: dict[str, bool]
+    cometMagMax: float = 11.0
     # Lieux deja utilises, le plus recent d'abord (voir settings.remember_place).
     places: list[SiteOut] = []
     binoculars: "BinocularsOut | None" = None
@@ -59,6 +60,7 @@ class SettingsUpdate(BaseModel):
     windowMode: str | None = None
     viewWindow: ViewWindowUpdate | None = None
     alerts: dict[str, bool] | None = None
+    cometMagMax: float | None = Field(default=None, ge=4, le=14)
 
 
 class GeocodeRequest(BaseModel):

@@ -1,16 +1,20 @@
 """GET /api/extras/moon, /api/extras/planets, /api/extras/iss -- les extras
 de la nuit (voir extras.py). Lune et planetes gardees une heure (elles ne
 dependent que du lieu et de la date) ; l'ISS depend d'une orbite recuperee
-chez Celestrak."""
+chez Celestrak. GET /api/comets (voir comets.py) et GET /api/news (voir
+news.py) suivent la meme logique : sources externes gardees en memoire, et
+leur absence dite plutot que cachee."""
 import threading
 from datetime import date, datetime, timezone
 
 from cachetools import TTLCache
 from fastapi import APIRouter
 
+import comets
 import extras
+import news
 import settings as settings_store
-from api.deps import site_from_settings
+from api.deps import get_horizon, site_from_settings
 
 router = APIRouter()
 _cache: TTLCache = TTLCache(maxsize=16, ttl=3600)
@@ -51,3 +55,27 @@ def iss() -> dict:
     if not tle:
         return {"available": False, "reason": "Orbite de l'ISS indisponible (Celestrak injoignable).", "passes": []}
     return {"available": True, "passes": extras.iss_passes(tle, site, datetime.now(timezone.utc))}
+
+
+@router.get("/api/comets")
+def comets_tonight() -> dict:
+    s = settings_store.load()
+    site = site_from_settings(s)
+    horizon = get_horizon()
+    day = _night_date(site)
+    key = ("comets", site["lat"], site["lon"], day, tuple(sorted(horizon.items())), s["comet_mag_max"])
+    with _lock:
+        if key in _cache:
+            return _cache[key]
+    result = comets.tonight(site, day, horizon, s["comet_mag_max"])
+    # Une source injoignable ne reste pas en cache une heure : on reessaie
+    # au prochain appel.
+    if result["available"]:
+        with _lock:
+            _cache[key] = result
+    return result
+
+
+@router.get("/api/news")
+def latest_news() -> dict:
+    return news.latest()

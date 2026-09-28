@@ -423,6 +423,41 @@ export function Reglages({ onChange }: { onChange: () => void }) {
         </Section>
       )}
 
+      {data && (
+        <Section
+          id="reglages-cometes"
+          title="Comètes"
+          summary={`mag ≤ ${data.cometMagMax.toFixed(1).replace(".", ",")}`}
+          defaultOpen={false}
+        >
+          <div className="nc-row nc-between">
+            <span style={{ fontSize: "var(--text-sm)" }}>Proposer les comètes jusqu'à la magnitude</span>
+            <div className="nc-row nc-none" style={{ gap: "var(--space-xs)" }}>
+              {([-0.5, 0.5] as const).map((step) => {
+                const next = Math.round((data.cometMagMax + step) * 2) / 2;
+                return (
+                  <button
+                    key={step}
+                    onClick={() => void saveSettings({ cometMagMax: next }, { cometMagMax: next }, "Seuil des comètes")}
+                    disabled={next < 6 || next > 13}
+                    className="nc-btn nc-none"
+                    style={{ minWidth: 44 }}
+                    aria-label={step < 0 ? "Plus brillantes seulement" : "Plus faibles aussi"}
+                  >
+                    {step < 0 ? "−" : "+"}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <p className="nc-caption" style={{ margin: 0 }}>
+            <span className="nc-num" style={{ color: "var(--ink)" }}>{data.cometMagMax.toFixed(1).replace(".", ",")}</span>
+            {" "}: plus le chiffre est grand, plus les comètes proposées sont faibles. 11 convient au Seestar
+            sous un ciel de campagne, 9 ou 10 en ville. Vaut aussi pour l'alerte comète.
+          </p>
+        </Section>
+      )}
+
       <Section id="reglages-affichage" title="Affichage" summary={themeSummary} defaultOpen={false}>
         <div className="nc-row nc-wrap" style={{ gap: "var(--space-xs)" }}>
           {(["system", "light", "dark", "night"] as const).map((t) => {
