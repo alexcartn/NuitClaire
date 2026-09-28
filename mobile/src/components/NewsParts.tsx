@@ -133,6 +133,7 @@ export function NewsRow({ item, since, tonight, onOpenTarget }: {
           {item.kind === "observer" && <span style={{ color: "var(--accent)", fontWeight: 600 }}>À observer · </span>}
           {item.source}
           {item.date ? ` · ${fmtNewsDate(item.date)}` : ""}
+          {item.note ? ` · ${item.note}` : ""}
         </span>
       </span>
     </div>

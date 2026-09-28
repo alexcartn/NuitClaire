@@ -69,3 +69,16 @@ def test_english_sources():
     assert news.kind_of("X", "Astronomers Have Spotted the Youngest Planet Yet", "the telescope saw", False) == "espace"
     assert news._summary("Looking for a sky event this week? Check out our full Sky This Week column. M39 shines.") == "M39 shines."
     assert news._summary("Saturn glows. Continue reading \"The Sky Today\" The post X appeared first on Y.") == "Saturn glows."
+
+
+def test_select_keeps_only_useful_series():
+    def it(title, date):
+        return {"title": title, "date": date, "kind": "observer"}
+    astro = [it("The Sky Today on Monday", "2026-09-28"), it("The Sky Today on Sunday", "2026-09-27"),
+             it("Full Moon calendar", "2026-09-26"), it("The Sky This Week from Sept 25", "2026-09-25")]
+    kept = news.select("Astronomy", astro)
+    assert [i["title"] for i in kept] == ["The Sky Today on Monday", "The Sky This Week from Sept 25"]
+    assert kept[0]["note"] == "heures US (EDT)"
+    sky = [it(f"News {n}", f"2026-09-2{n}") for n in range(5, 0, -1)] + [it("This Week's Sky at a Glance, Sept", "2026-09-20")]
+    assert [i["title"] for i in news.select("Sky & Telescope", sky)] == [
+        "This Week's Sky at a Glance, Sept", "News 5", "News 4", "News 3"]

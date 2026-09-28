@@ -444,6 +444,9 @@ export interface NewsItem {
   image: string | null;
   kind: "observer" | "espace" | "image";
   objects: NewsObject[];
+  /** Avertissement de lecture, ex. « heures US (EDT) » : les puces des
+   * objets, elles, donnent les heures du lieu. */
+  note?: string;
 }
 
 export interface NewsInfo {

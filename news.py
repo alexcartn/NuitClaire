@@ -48,6 +48,18 @@ SUMMARY_CHARS = 220
 # la NASA : une seule, la derniere.
 PER_SOURCE = 6
 PER_SOURCE_LIMIT = {"APOD": 1}
+# Sources dont on ne garde que certaines series, par debut de titre, avec
+# leur nombre ; `None` : tout le reste. Astronomy publie un billet par jour :
+# seuls celui du jour et celui de la semaine servent encore. Chez Sky &
+# Telescope, le ciel de la semaine, et trois nouvelles au plus (surtout de
+# la science, de qualite mais sans rien a observer).
+SERIES: dict[str, list[tuple[str | None, int]]] = {
+    "Astronomy": [("The Sky Today", 1), ("The Sky This Week", 1)],
+    "Sky & Telescope": [("This Week's Sky at a Glance", 1), (None, 3)],
+}
+# Heures donnees dans le fuseau de l'Est americain : les evenements sont les
+# memes vus de France, pas les heures.
+US_TIMES = {"Astronomy": "heures US (EDT)", "Sky & Telescope": "heures US (EDT)"}
 
 _cache: dict[str, tuple[float, list[dict]]] = {}
 _HEADERS = {"User-Agent": "nuitclaire/1.0"}
@@ -246,6 +258,26 @@ def fetch_feed(source: str, url: str, now: float | None = None) -> list[dict] | 
         return cached[1] if cached else None
 
 
+def select(source: str, items: list[dict]) -> list[dict]:
+    """Articles gardes pour une source, deja tries du plus recent au plus
+    ancien (voir SERIES et PER_SOURCE)."""
+    series = SERIES.get(source)
+    if not series:
+        return items[:PER_SOURCE_LIMIT.get(source, PER_SOURCE)]
+    prefixes = [p for p, _ in series if p]
+    out = []
+    for prefix, count in series:
+        if prefix:
+            matching = [i for i in items if i["title"].startswith(prefix)]
+        else:
+            matching = [i for i in items if not any(i["title"].startswith(p) for p in prefixes)]
+        out += matching[:count]
+    for item in out:
+        if source in US_TIMES and item["kind"] == "observer":
+            item["note"] = US_TIMES[source]
+    return out
+
+
 def merge(by_source: dict[str, list[dict]], now: datetime, limit: int = 40) -> list[dict]:
     """Articles recents de toutes les sources, du plus recent au plus
     ancien. Sans date, un article est ecarte : impossible de le ranger, et
@@ -255,7 +287,7 @@ def merge(by_source: dict[str, list[dict]], now: datetime, limit: int = 40) -> l
     for source, items in by_source.items():
         dated = [i for i in items if i["date"] and oldest <= datetime.fromisoformat(i["date"]) <= now + timedelta(days=1)]
         dated.sort(key=lambda i: i["date"], reverse=True)
-        kept += dated[:PER_SOURCE_LIMIT.get(source, PER_SOURCE)]
+        kept += select(source, dated)
     kept.sort(key=lambda i: i["date"], reverse=True)
     return kept[:limit]
 

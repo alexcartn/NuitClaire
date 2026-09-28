@@ -612,7 +612,10 @@ dans « Ce soir » quand un article recent parle d'un objet visible cette nuit, 
 « Dans l'actu » sur la fiche d'un objet cite, et un badge « actu » dans le plan de nuit
 (`newsView.ts`, pur et teste). L'ecran reunit Ciel & Espace, le forum
 Webastro « L'actualite du ciel », Sky & Telescope (le ciel de la semaine et les nouvelles),
-Astronomy (« The Sky Today », le ciel de chaque soir) et l'image du jour de la NASA (APOD) : titre, date,
+Astronomy (« The Sky Today », le ciel de chaque soir) et l'image du jour de la NASA (APOD).
+D'Astronomy, seuls le billet du jour et celui de la semaine sont gardes ; de Sky & Telescope,
+le ciel de la semaine et trois nouvelles au plus. Leurs heures sont americaines (EDT), l'ecran
+le signale ; les puces des objets donnent les heures du lieu : titre, date,
 vignette et chapeau tels que les flux RSS les publient, un appui ouvre l'article sur son
 site (`news.py`, `GET /api/news`, flux gardes 6 h). Les rubriques du magazine papier
 (editorial, critiques, BD) sont ecartees ; chaque article est range « A observer » ou
