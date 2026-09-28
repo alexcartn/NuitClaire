@@ -131,7 +131,7 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
         onOpenTarget={onOpenTarget}
       />
 
-      {stats && <JournalStats stats={stats} />}
+      {stats && <JournalStats stats={stats} onOpenTarget={onOpenTarget} />}
     </div>
   );
 }
