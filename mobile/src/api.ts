@@ -22,6 +22,7 @@ import type {
   TargetRow,
   TargetSuggestion,
 } from "./types";
+import type { WatchMode } from "./useWatchMode";
 
 import { readText, writeText } from "./storage";
 import type { IssInfo, MoonTonight, PlanetTonight, SkyBodies } from "./sky/types";
@@ -124,7 +125,9 @@ export const api = {
   news: (refresh = false) => get<NewsInfo>(refresh ? "/api/news?refresh=true" : "/api/news"),
   skyEvents: () => get<SkyEvent[]>("/api/sky-events"),
   starHop: (designation: string) => get<StarHop>(`/api/targets/${encodeURIComponent(designation)}/starhop`),
-  binocularsNow: () => get<BinocularsNow>("/api/binoculars/now"),
+  /** `oeil` : les memes suggestions, pour l'oeil nu. */
+  binocularsNow: (instrument: WatchMode = "jumelles") =>
+    get<BinocularsNow>("/api/binoculars/now", instrument === "oeil" ? { instrument } : undefined),
   /** `binoculars` : la fiche vue aux jumelles (cadrage dans leur champ). */
   targetDetail: (designation: string, binoculars = false) =>
     get<TargetDetail>(

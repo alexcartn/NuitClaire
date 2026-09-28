@@ -7,7 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from cachetools import TTLCache
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 import extras
 import settings as settings_store
@@ -15,7 +15,7 @@ from api.deps import get_horizon, site_from_settings
 from api.routers.extras import _night_date
 from api.translate import binoculars_to_out
 from binocular_now import binocular_picks
-from optics import binocular_optics
+from optics import binocular_optics, eye_optics
 
 router = APIRouter()
 _cache: TTLCache = TTLCache(maxsize=16, ttl=600)
@@ -23,9 +23,12 @@ _lock = threading.Lock()
 
 
 @router.get("/api/binoculars/now")
-def binoculars_now() -> dict:
+def binoculars_now(instrument: str = Query(default="jumelles", pattern="^(jumelles|oeil)$")) -> dict:
+    """`instrument=oeil` : les memes suggestions pour l'oeil nu (voir
+    optics.EYE)."""
     s = settings_store.load()
-    site, horizon, optics = site_from_settings(s), get_horizon(), binocular_optics(s)
+    optics = eye_optics() if instrument == "oeil" else binocular_optics(s)
+    site, horizon = site_from_settings(s), get_horizon()
     tz = ZoneInfo(site["tz"])
     now = datetime.now(tz)
     dusk, dawn = extras.night_bounds(site, _night_date(site))

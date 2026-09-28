@@ -5,6 +5,7 @@ import { useFetch } from "../useFetch";
 import { useRemembered } from "../useRemembered";
 import { useCompass } from "../useCompass";
 import { useTheme } from "../useTheme";
+import { useWatchMode } from "../useWatchMode";
 import { fmtHM } from "../format";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
@@ -95,11 +96,22 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
 
   const fetchTargets = useCallback(() => api.targets(), []);
   const targets = useFetch(fetchTargets, [], "targets");
+  // Jumelles ou oeil nu : le choix fait sur la carte « En attendant le
+  // Seestar », qui vaut aussi pour les suggestions et le viseur.
+  const [watchMode, setWatchMode] = useWatchMode();
+  const eye = watchMode === "oeil";
   // Meme cle que la carte « En attendant le Seestar » : une seule requete.
   const binocularsLabel = state?.binoculars?.label;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const fetchBinoculars = useCallback(() => api.binocularsNow(), [binocularsLabel]);
-  const binoculars = useFetch(fetchBinoculars, [binocularsLabel], `binoculars-now:${binocularsLabel ?? ""}`);
+  const fetchBinoculars = useCallback(() => api.binocularsNow(watchMode), [binocularsLabel, watchMode]);
+  const binocularsRes = useFetch(
+    fetchBinoculars,
+    [binocularsLabel, watchMode],
+    eye ? "binoculars-now:oeil" : `binoculars-now:${binocularsLabel ?? ""}`,
+  );
+  const binoculars = {
+    data: binocularsRes.data && (binocularsRes.data.binoculars.label === "œil nu") === eye ? binocularsRes.data : null,
+  };
   const fetchBodies = useCallback(() => api.skyBodies(), []);
   const bodiesNow = useFetch(fetchBodies, [], "sky-bodies");
   // A une autre date, la Lune et les planetes y sont redemandees (a l'heure
@@ -293,7 +305,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
           la vise. */}
       {(binoculars.data?.picks.length ?? 0) > 0 && (
         <div className="nc-stack-xs">
-          <span className="nc-caption">Faciles aux jumelles {binoculars.data!.at}</span>
+          <span className="nc-caption">Faciles {eye ? "à l'œil nu" : "aux jumelles"} {binoculars.data!.at}</span>
           <div className="nc-row nc-hscroll">
             {binoculars.data!.picks.map((p) => (
               <button
@@ -463,7 +475,21 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
         </>
       ) : compass.orientation ? (
         <>
+          <div className="nc-segmented" role="radiogroup" aria-label="Regarder">
+            {(["jumelles", "oeil"] as const).map((m) => (
+              <button
+                key={m}
+                role="radio"
+                aria-checked={watchMode === m}
+                onClick={() => setWatchMode(m)}
+                className={watchMode === m ? "nc-segment nc-segment-active" : "nc-segment"}
+              >
+                {m === "jumelles" ? "Jumelles" : "Œil nu"}
+              </button>
+            ))}
+          </div>
           <SkyViewfinder
+            naked={eye}
             orientation={compass.orientation}
             site={site}
             target={selectedTarget}
@@ -475,9 +501,11 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
             bodies={bodiesNow.data}
           />
           <p className="nc-caption" style={{ margin: 0 }}>
-            Tenez le téléphone contre les jumelles, écran vers vous. La boussole se trompe de quelques degrés :
-            dessinez un 8 avec le téléphone pour la calibrer, loin de la voiture. Le chemin d'étoiles de la fiche
-            fait les derniers degrés.
+            {eye
+              ? "Levez le téléphone vers le ciel, écran vers vous : la vue montre ce qui est derrière lui, et nomme étoiles et planètes. Baissez-le pour regarder, votre œil fait le reste. "
+              : "Tenez le téléphone contre les jumelles, écran vers vous. "}
+            La boussole se trompe de quelques degrés : dessinez un 8 avec le téléphone pour la calibrer, loin de la
+            voiture.{eye ? "" : " Le chemin d'étoiles de la fiche fait les derniers degrés."}
           </p>
         </>
       ) : compass.needsPermission ? (

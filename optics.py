@@ -34,6 +34,36 @@ def binocular_optics(settings: dict | None = None) -> dict:
             "min_alt_deg": float(b["min_alt_deg"]), "max_alt_deg": float(b["max_alt_deg"])}
 
 
+# L'oeil nu, comme une optique de plus : pas d'ouverture a regler, mais
+# une limite a lui. Un objet diffus se voit jusque vers la magnitude 5 sous
+# un ciel de campagne (la formule des jumelles donnerait 4,2 pour une
+# pupille de 7 mm : trop severe pour M31 ou M33 par nuit noire, elle
+# ecarterait le Double amas). Plus petit qu'une dizaine de minutes d'arc, un
+# objet etendu n'est qu'une etoile floue ; les doubles ne se separent pas,
+# sauf les deux ecartees de plusieurs minutes d'arc. Le « champ » est celui
+# du regard, pour le viseur.
+EYE = {"kind": "oeil", "label": "œil nu", "fov_deg": 60.0, "aperture_mm": 7.0,
+       "limit_mag": 5.0, "min_size_arcmin": 10.0, "sb_limit": 13.8,
+       "min_alt_deg": 15.0, "max_alt_deg": 90.0,
+       # La marge d'eclat est plus courte qu'aux jumelles : sans ce seuil
+       # abaisse, M42 (magnitude 4) ne passait jamais.
+       "min_ease": 1.0}
+# Separables sans instrument (Mizar et Alcor : 12') ; les autres doubles et
+# les asterismes d'etoiles de magnitude 5 a 9 (la Cascade de Kemble) ne sont
+# qu'aux jumelles, malgre leur magnitude integree.
+EYE_DOUBLES = {"Mizar", "EpsLyr"}
+EYE_SKIP = {"Kemble1"}
+
+
+def eye_optics() -> dict:
+    return dict(EYE)
+
+
+def limit_mag(optics: dict) -> float:
+    """Magnitude integree limite d'un objet etendu pour cette optique."""
+    return optics.get("limit_mag") or visual_limit_mag(optics["aperture_mm"])
+
+
 def with_optics(tgt: dict, optics: dict | None) -> dict:
     return {**tgt, "optics": optics} if optics else tgt
 
@@ -60,18 +90,22 @@ def surface_brightness(tgt: dict) -> float | None:
 
 
 def visible_in_binoculars(tgt: dict, optics: dict) -> bool:
+    """Visible avec cette optique : les jumelles, ou l'oeil nu (`EYE`)."""
     mag = tgt.get("mag")
-    if mag is None or mag > visual_limit_mag(optics["aperture_mm"]):
+    if mag is None or mag > limit_mag(optics):
+        return False
+    eye = optics.get("kind") == "oeil"
+    if eye and (tgt.get("name") in EYE_SKIP or (tgt.get("type") == "**" and tgt.get("name") not in EYE_DOUBLES)):
         return False
     if tgt.get("type") in _POINT_LIKE_TYPES:
         return True
     size = max(tgt.get("w") or 0, tgt.get("h") or 0)
     # Plus petit qu'une minute d'arc, un objet etendu se confond avec une
-    # etoile a x10.
-    if size < 1.0:
+    # etoile a x10 (une dizaine a l'oeil nu).
+    if size < optics.get("min_size_arcmin", 1.0):
         return False
     sb = surface_brightness(tgt)
-    return sb is None or sb <= SURFACE_BRIGHTNESS_LIMIT
+    return sb is None or sb <= optics.get("sb_limit", SURFACE_BRIGHTNESS_LIMIT)
 
 
 def framing(tgt: dict, size: tuple | None = None) -> str:

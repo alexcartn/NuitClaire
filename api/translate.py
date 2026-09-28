@@ -65,7 +65,7 @@ def row_to_target_out(row: dict) -> dict:
 
 
 def binoculars_to_out(optics: dict) -> dict:
-    from optics import visual_limit_mag
+    from optics import limit_mag
 
     return {"label": optics["label"], "fovDeg": optics["fov_deg"], "apertureMm": optics["aperture_mm"],
-            "minAltDeg": optics["min_alt_deg"], "limitMag": round(visual_limit_mag(optics["aperture_mm"]), 1)}
+            "minAltDeg": optics["min_alt_deg"], "limitMag": round(limit_mag(optics), 1)}

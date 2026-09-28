@@ -549,6 +549,12 @@ reglables dans Reglages → Jumelles (`optics.py`).
   courte plutot que de proposer des objets introuvables ;
 - le diametre change donc les cibles proposees, le champ le cadrage et le chemin
   d'etoiles ; le grossissement n'est qu'une etiquette ;
+- un switch Jumelles / Oeil nu sur la carte (`GET /api/binoculars/now?instrument=oeil`,
+  profil `optics.EYE`) : magnitude d'objet etendu au plus 5, taille d'au moins 10',
+  brillance de surface d'au plus 13,8, doubles seulement si l'oeil les separe (Mizar et
+  Alcor, epsilon Lyr), seuil de facilite abaisse pour garder M42. Le choix est garde sur
+  l'appareil et vaut aussi pour l'ecran Ciel : suggestions, et viseur a l'oeil nu (vue
+  de 90 deg au lieu de 64, sans cercle de jumelles, cible « droit devant » a 5 deg pres) ;
 - un appui ouvre la fiche vue aux jumelles (`GET /api/targets/{d}?instrument=jumelles` :
   cadrage « tient dans le champ », hauteurs de 15 a 90 deg), sans journal ni capture ;
 - dans cette fiche, le chemin d'etoiles (`starhop.py`, `GET /api/targets/{d}/starhop`) :

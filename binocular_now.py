@@ -13,7 +13,7 @@ import ephem
 
 from astro import compass_sector, target_altaz
 from catalog import french_name, load_binocular_extras, load_messier, load_targets
-from optics import MOON_TOLERANT_TYPES, surface_brightness, visible_in_binoculars, visual_limit_mag
+from optics import MOON_TOLERANT_TYPES, limit_mag as optics_limit_mag, surface_brightness, visible_in_binoculars
 from scoring import sector_floor
 
 LOOKAHEAD_MIN = 60   # une cible doit rester pointable l'heure qui vient
@@ -90,7 +90,7 @@ def binocular_picks(site: dict, horizon: dict, optics: dict, when: datetime, lim
     """Les `limit` cibles les plus faciles a `when` (heure locale naive du
     site), pointables au moins l'heure qui suit."""
     later = when + timedelta(minutes=LOOKAHEAD_MIN)
-    limit_mag = visual_limit_mag(optics["aperture_mm"])
+    limit_mag = optics_limit_mag(optics)
     moon_alt, moon_illum = _moon(when, site)
     moon_bright = moon_alt > 0 and moon_illum >= 40
     min_alt = optics["min_alt_deg"]
@@ -118,8 +118,9 @@ def binocular_picks(site: dict, horizon: dict, optics: dict, when: datetime, lim
     candidates.sort(key=lambda c: -c[0])
     per_type: dict[str, int] = {}
     out = []
+    min_ease = optics.get("min_ease", MIN_EASE)
     for score, tgt, alt, az, alt_later in candidates:
-        if score < MIN_EASE:
+        if score < min_ease:
             break
         kind = tgt.get("type", "")
         if per_type.get(kind, 0) >= MAX_PER_TYPE:

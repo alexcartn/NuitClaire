@@ -53,3 +53,27 @@ def test_lists_stay_seestar_and_detail_can_switch_to_binoculars(api_client):
 def test_invalid_binoculars_are_refused(api_client):
     assert api_client.put("/api/settings", json={"binoculars": {"fov_deg": 40}}).status_code == 422
     assert api_client.put("/api/settings", json={"binoculars": {"aperture_mm": 500}}).status_code == 422
+
+
+def test_naked_eye_keeps_only_what_the_eye_shows():
+    from optics import eye_optics
+
+    when = datetime(2026, 1, 15, 21, 0)
+    eye = binocular_picks(SITE, OPEN_SKY, eye_optics(), when, limit=40)
+    names = {p["designation"] for p in eye}
+    # Les classiques de l'hiver : Pleiades, Hyades, Orion.
+    assert {"M45", "M42"} <= names
+    assert all(p["mag"] <= 5.0 for p in eye)
+    # Pas de double serree ni d'asterisme d'etoiles faibles.
+    assert not names & {"Albireo", "Kemble1"}
+    # Moins, et plus brillant, qu'aux jumelles.
+    bino = binocular_picks(SITE, OPEN_SKY, binocular_optics(), when, limit=40)
+    assert len(eye) < len(bino)
+
+
+def test_binoculars_now_naked_eye_endpoint(api_client):
+    body = api_client.get("/api/binoculars/now", params={"instrument": "oeil"}).json()
+    assert body["binoculars"]["label"] == "œil nu"
+    assert body["binoculars"]["limitMag"] == 5.0
+    assert all(p["mag"] <= 5.0 for p in body["picks"])
+    assert api_client.get("/api/binoculars/now", params={"instrument": "lunette"}).status_code == 422
