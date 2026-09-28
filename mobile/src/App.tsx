@@ -18,8 +18,7 @@ import { Recherche } from "./screens/Recherche";
 import { Reglages } from "./screens/Reglages";
 import { Journal } from "./screens/Journal";
 import { Actus } from "./screens/Actus";
-import { BodyDetail } from "./screens/BodyDetail";
-import { isBody } from "./solarSystem";
+
 
 // Carte du ciel et viseur : charges a la demande (catalogue d'etoiles
 // compris), pour ne pas alourdir l'ouverture de l'appli. Le service worker
@@ -266,10 +265,7 @@ export default function App() {
             onOpenTarget={(d) => openTarget(d)}
           />
         )}
-        {screen === "detail" && selected && isBody(selected) && (
-          <BodyDetail name={selected} onBack={back} onOpenSky={() => openSky(selected, "carte")} />
-        )}
-        {screen === "detail" && selected && !isBody(selected) && (
+        {screen === "detail" && selected && (
           <Detail
             designation={selected}
             captured={captured}

@@ -638,11 +638,13 @@ Lune du maximum. Les articles dont un objet est visible ce soir passent en tete 
 
 La Lune et les sept planetes se trouvent dans la recherche (nom francais ou anglais, sans
 accents : « sat », « venus ») et dans une rangee « Systeme solaire » de l'ecran de recherche,
-avec leur propre fiche (`bodies.py`, `GET /api/bodies/{nom}`, `screens/BodyDetail.tsx`) :
-creneau de la nuit et courbe de hauteur (horizon degage compris), lever, passage au meridien
-et coucher, magnitude, taille apparente, distance, phase ; la Lune avec les reliefs du
-terminateur et les prochaines nouvelle et pleine Lune, Jupiter avec ses quatre grandes lunes,
-Saturne avec l'inclinaison des anneaux. Les puces « Saturne » des actualites ouvrent cette
+avec la meme fiche que le ciel profond : `GET /api/targets/{nom}` renvoie pour elles la meme
+structure (`bodies.as_target_detail`) et l'ecran est le meme (`screens/Detail.tsx`). Photo (une
+image Wikimedia Commons fixe par astre, verifiee), graphe de hauteur heure par heure, creneau
+exploitable, tableau (magnitude, taille, distance, phase, cadrage), journal d'expo, resume
+Wikipedia ; en plus, dans le bloc de l'astre : lever, passage au meridien et coucher, reliefs du
+terminateur et prochaines phases pour la Lune, les quatre grandes lunes de Jupiter,
+l'inclinaison des anneaux de Saturne, un conseil d'observation. Les puces « Saturne » des actualites ouvrent cette
 fiche. Elles s'ajoutent au journal de session sous leur nom (« saturn » devient « Saturne »),
 depuis leur fiche ou la recherche d'ajout du journal, et la carte du ciel les selectionne
 comme une cible (Uranus et Neptune n'y sont dessinees que choisies : pas a l'oeil nu).

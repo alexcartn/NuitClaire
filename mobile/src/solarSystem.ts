@@ -1,5 +1,5 @@
-/** La Lune et les planetes : pas dans le catalogue, elles ont leur propre
- * fiche (screens/BodyDetail.tsx, GET /api/bodies/{nom}). */
+/** La Lune et les planetes : pas dans le catalogue, mais la meme fiche que
+ * le ciel profond (screens/Detail.tsx, voir bodies.as_target_detail). */
 export const BODY_NAMES = ["Lune", "Mercure", "Vénus", "Mars", "Jupiter", "Saturne", "Uranus", "Neptune"] as const;
 
 const ENGLISH: Record<string, string> = {

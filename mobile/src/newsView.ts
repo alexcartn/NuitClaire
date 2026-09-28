@@ -27,6 +27,7 @@ export interface TargetKey {
 }
 
 export function sameTarget(o: NewsObject, t: TargetKey): boolean {
+  if (o.kind === "planet") return o.designation === t.designation;
   return o.kind === "target"
     && (o.designation === t.designation || Boolean(o.ngc && o.ngc === t.ngc) || Boolean(o.messier && o.messier === t.messierId));
 }

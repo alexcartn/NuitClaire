@@ -248,6 +248,9 @@ class TargetDetailOut(TargetRowOut):
     exposureFreeMin: int
     exposureSessionMin: int
     exposureTotalMin: int
+    # La Lune et les planetes (voir bodies.as_target_detail) : phase,
+    # lever/coucher, lunes, anneaux... Absent pour le ciel profond.
+    body: dict | None = None
 
 
 class NoteContext(BaseModel):

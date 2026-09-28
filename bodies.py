@@ -126,3 +126,88 @@ def detail(name: str, site: dict, day: date, horizon: dict | None = None, step_m
     if name == "Saturne":
         out["ringTiltDeg"] = round(abs(math.degrees(b.earth_tilt)), 1)
     return out
+
+
+# Titres Wikipedia (francais) : « Saturne » seul designe aussi le dieu.
+WIKI_TITLES = {
+    "Lune": "Lune", "Mercure": "Mercure (planète)", "Vénus": "Vénus (planète)",
+    "Mars": "Mars (planète)", "Jupiter": "Jupiter (planète)", "Saturne": "Saturne (planète)",
+    "Uranus": "Uranus (planète)", "Neptune": "Neptune (planète)",
+}
+# Une photo par astre, sur Wikimedia Commons (photos de sondes NASA/ESA pour
+# la plupart), verifiees une a une. Des adresses fixes plutot que l'image
+# de la page Wikipedia demandee a chaque fiche : l'API limite les requetes
+# rapprochees, et une fiche sans image pour ca serait bete.
+_COMMONS = "https://commons.wikimedia.org/wiki/Special:FilePath/{}?width=800"
+IMAGES = {
+    "Lune": "FullMoon2010.jpg",
+    "Mercure": "Mercury_in_color_-_Prockter07_centered.jpg",
+    "Vénus": "Venus-real_color.jpg",
+    "Mars": "OSIRIS_Mars_true_color.jpg",
+    "Jupiter": "Jupiter_in_true_color.jpg",
+    "Saturne": "Saturn_global_view_from_Cassini,_rings_open_Better_Colour.png",
+    "Uranus": "Uranus_as_seen_by_NASA's_Voyager_2_(remastered)_-_JPEG_converted.jpg",
+    "Neptune": "Neptune_Voyager2_color_calibrated.png",
+}
+
+
+def image_url(name: str) -> str:
+    from urllib.parse import quote
+
+    return _COMMONS.format(quote(IMAGES[name])) if name in IMAGES else ""
+
+
+def as_target_detail(name: str, site: dict, frame_times: list, horizon: dict, wiki_summary) -> dict:
+    """La fiche d'un astre dans la forme de celle d'une cible du catalogue
+    (voir GET /api/targets/{designation}) : meme courbe horaire, meme
+    creneau, meme tableau, pour une fiche identique dans l'appli. Ce qui
+    n'a de sens que pour lui (phase, lunes, anneaux, lever et coucher...)
+    est dans `body`."""
+    from astro import fits_in_fov
+    from config import SEESTAR
+    from scoring import sector_floor
+
+    name, en, cls, kind, tip = find(name)
+    tz = ZoneInfo(site["tz"])
+    min_alt, max_alt = SEESTAR["min_alt_deg"], SEESTAR["max_alt_deg"]
+    series, usable = [], []
+    for t in frame_times:
+        when = t.replace(tzinfo=tz) if t.tzinfo is None else t
+        obs = _observer(site, when)
+        b = cls(obs)
+        alt, az = math.degrees(b.alt), math.degrees(b.az)
+        sector = _sector(az)
+        moon_sep = 0.0 if name == "Lune" else math.degrees(float(ephem.separation(b, ephem.Moon(obs))))
+        series.append({"time": t.isoformat(), "alt": round(alt, 1), "az": round(az, 1), "sector": sector,
+                       "moonSep": round(moon_sep, 1)})
+        floor = sector_floor(horizon, sector)
+        dark = math.degrees(ephem.Sun(obs).alt) < -6
+        if dark and floor is not None and max(min_alt, floor) <= alt <= max_alt:
+            usable.append((when, moon_sep))
+    peak = max(series, key=lambda p: p["alt"])
+    mid = _observer(site, frame_times[len(frame_times) // 2].replace(tzinfo=tz))
+    b = cls(mid)
+    size_arcmin = float(b.size) / 60
+    extra = detail(name, site, frame_times[0].date(), horizon)
+    body = {k: extra.get(k) for k in ("kind", "tip", "sizeArcsec", "distanceKm", "distanceAu", "phase", "rise",
+                                       "set", "transit", "terminatorFeatures", "nextFull", "nextNew", "moons",
+                                       "ringTiltDeg", "constellation")}
+    start = usable[0][0].strftime("%H:%M") if usable else None
+    end = usable[-1][0].strftime("%H:%M") if usable else None
+    return {
+        "designation": name, "isMessier": False, "messierId": None, "commonName": en, "ngc": None,
+        "type": kind, "typeCode": "Moon" if name == "Lune" else "Planet", "filter": "Aucun",
+        "start": start, "end": end, "hours": float(len(usable)),
+        "altMaxDeg": peak["alt"], "moonSepDeg": min((m for _, m in usable), default=0.0),
+        "cadrage": fits_in_fov(size_arcmin, size_arcmin), "imageUrl": image_url(name),
+        "ra": round(float(b.ra) * 12 / math.pi, 3), "dec": round(math.degrees(float(b.dec)), 3),
+        "mag": round(float(b.mag), 1), "sizeW": round(size_arcmin, 2), "sizeH": round(size_arcmin, 2),
+        "reasons": [] if usable else [
+            "Jamais assez haut dans un secteur dégagé pendant la nuit noire (ou trop près du Soleil)."],
+        "feasibleTonight": bool(usable),
+        "altitudeSeries": series, "minAltDeg": float(min_alt),
+        "peakSector": peak["sector"], "peakAz": peak["az"], "peakTime": peak["time"],
+        "exposureLowMin": 0, "exposureHighMin": 0,
+        "wiki": wiki_summary([WIKI_TITLES[name]]),
+        "body": body,
+    }

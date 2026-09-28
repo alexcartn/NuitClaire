@@ -147,7 +147,13 @@ def target_detail(designation: str, instrument: str = Query(default="seestar", p
         raise HTTPException(503, "Aucune donnee de nuit disponible pour les prochains jours.")
     target = find_target(designation)
     if not target:
-        raise HTTPException(404, f"Aucun objet trouve pour « {designation} ».")
+        body = bodies.find(designation)
+        if body is None:
+            raise HTTPException(404, f"Aucun objet trouve pour « {designation} ».")
+        # La Lune et les planetes : meme fiche que le ciel profond (voir
+        # bodies.as_target_detail), calculee pour la nuit.
+        out = bodies.as_target_detail(body[0], site, list(day_frame(df, site).index), horizon, cached_wiki_summary)
+        return {**out, **_exposure_fields(out["designation"])}
     if instrument == "jumelles":
         target = with_optics(target, binocular_optics(settings_store.load()))
 
@@ -168,10 +174,6 @@ def target_detail(designation: str, instrument: str = Query(default="seestar", p
     # (`stats.exposure_by_target`), et afficher ici un total plus petit
     # donnait deux chiffres contradictoires pour la meme chose. Le detail
     # reste expose, pour savoir d'ou vient quoi.
-    exposure_log = progress_store.load()["exposure_log"].get(out["designation"], [])
-    free_min = sum(e["minutes"] for e in exposure_log)
-    session_min = sessions_store.exposure_totals(sessions_store.load()).get(out["designation"], 0)
-
     out.update({
         "altitudeSeries": [
             {"time": t.isoformat(), "alt": a["alt"], "az": a["az"], "sector": a["sector"],
@@ -182,12 +184,17 @@ def target_detail(designation: str, instrument: str = Query(default="seestar", p
         "peakSector": peak["sector"], "peakAz": peak["az"], "peakTime": peak_t.isoformat(),
         "exposureLowMin": low, "exposureHighMin": high,
         "wiki": wiki,
-        "exposureLog": exposure_log,
-        "exposureFreeMin": free_min,
-        "exposureSessionMin": session_min,
-        "exposureTotalMin": free_min + session_min,
+        **_exposure_fields(out["designation"]),
     })
     return out
+
+
+def _exposure_fields(designation: str) -> dict:
+    exposure_log = progress_store.load()["exposure_log"].get(designation, [])
+    free_min = sum(e["minutes"] for e in exposure_log)
+    session_min = sessions_store.exposure_totals(sessions_store.load()).get(designation, 0)
+    return {"exposureLog": exposure_log, "exposureFreeMin": free_min,
+            "exposureSessionMin": session_min, "exposureTotalMin": free_min + session_min}
 
 
 @router.get("/api/targets/{designation}/starhop")

@@ -229,6 +229,8 @@ export interface TargetDetail extends TargetRow {
   exposureFreeMin: number;
   exposureSessionMin: number;
   exposureTotalMin: number;
+  /** La Lune et les planetes seulement. */
+  body?: BodyInfo | null;
 }
 
 export const COMPASS_SECTORS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
@@ -468,14 +470,11 @@ export interface SkyEvent {
   objects: string[];
 }
 
-/** Fiche de la Lune ou d'une planete (GET /api/bodies/{nom}, voir bodies.py). */
-export interface BodyDetail {
-  name: string;
-  englishName: string;
+/** Ce qui n'appartient qu'a la Lune et aux planetes, dans leur fiche
+ * (TargetDetail.body, voir bodies.as_target_detail). */
+export interface BodyInfo {
   kind: string;
   tip: string;
-  mag: number;
-  constellation: string;
   sizeArcsec: number;
   distanceKm: number | null;
   distanceAu: number | null;
@@ -484,15 +483,10 @@ export interface BodyDetail {
   rise: string | null;
   set: string | null;
   transit: string | null;
-  visibleFrom: string | null;
-  visibleTo: string | null;
-  bestTime: string;
-  bestAlt: number;
-  bestSector: string;
-  series: { time: string; alt: number; az: number; sector: string; clear: boolean; night: boolean }[];
-  terminatorFeatures?: string[];
-  nextFull?: string;
-  nextNew?: string;
-  moons?: { name: string; x: number; y: number; visible: boolean }[];
-  ringTiltDeg?: number;
+  constellation: string;
+  terminatorFeatures?: string[] | null;
+  nextFull?: string | null;
+  nextNew?: string | null;
+  moons?: { name: string; x: number; y: number; visible: boolean }[] | null;
+  ringTiltDeg?: number | null;
 }

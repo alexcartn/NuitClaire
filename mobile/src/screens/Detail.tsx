@@ -10,11 +10,84 @@ import { InTheNews } from "../components/InTheNews";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
+import { JupiterMoons } from "../components/NightExtras";
+import { MoonPhase } from "../components/MoonPhase";
 import { fmtH, fmtHM, plural } from "../format";
 import { tap } from "../haptics";
-import type { ViewWindow } from "../types";
+import type { BodyInfo, TargetDetail, ViewWindow } from "../types";
 
 /** '90' -> "1 h 30" ; en-dessous de l'heure, "45 min". */
+const dec = (x: number, digits = 1) => x.toFixed(digits).replace(".", ",");
+
+function fmtDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+}
+
+/** Lignes du tableau d'une cible : le ciel profond et, a la meme place,
+ * ce qui a du sens pour la Lune ou une planete (distance, phase ; pas de
+ * filtre ni de temps de pose conseille). */
+function characteristics(data: TargetDetail, bino: boolean): [string, string][] {
+  const b = data.body;
+  const window: [string, string] = ["Fenêtre exploitable", data.start ? `${data.start}–${data.end} (${data.hours} h)` : "Aucune ce soir"];
+  if (b) {
+    return [
+      ["Coordonnées", `${data.ra.toFixed(3)}h / ${data.dec.toFixed(3)}°`],
+      ["Magnitude", data.mag != null ? dec(data.mag) : "inconnue"],
+      ["Taille", b.sizeArcsec >= 120 ? `${dec(b.sizeArcsec / 60)}′` : `${dec(b.sizeArcsec)}″`],
+      ["Distance", b.distanceKm != null ? `${Math.round(b.distanceKm).toLocaleString("fr-FR")} km` : `${dec(b.distanceAu ?? 0, 2)} ua`],
+      ...(data.designation === "Lune" || data.designation === "Mercure" || data.designation === "Vénus"
+        ? [["Éclairée", `${b.phase} %`] as [string, string]] : []),
+      ["Cadrage Seestar", data.cadrage],
+      window,
+      ...(data.designation === "Lune" ? [] : [["Séparation lunaire mini", `${Math.round(data.moonSepDeg)}°`] as [string, string]]),
+    ];
+  }
+  return [
+    ["Coordonnées", `${data.ra.toFixed(3)}h / ${data.dec.toFixed(3)}°`],
+    ["Magnitude", data.mag != null ? data.mag.toFixed(1) : "inconnue"],
+    ["Taille", data.sizeW && data.sizeH ? `${data.sizeW.toFixed(1)}' x ${data.sizeH.toFixed(1)}'` : "inconnue"],
+    [bino ? "Dans les jumelles" : "Cadrage Seestar", data.cadrage],
+    window,
+    ...(bino ? [] : [["Filtre conseillé", data.filter] as [string, string]]),
+    ["Séparation lunaire mini", `${Math.round(data.moonSepDeg)}°`],
+    ...(bino ? [] : [["Temps de pose", `${data.exposureLowMin}–${data.exposureHighMin} min`] as [string, string]]),
+  ];
+}
+
+/** Ce qui n'appartient qu'a l'astre : lever et coucher, sa Lune ou ses
+ * lunes, ses anneaux, et quoi en attendre a l'oculaire. */
+function BodyCard({ name, body, bestTime }: { name: string; body: BodyInfo; bestTime: string }) {
+  return (
+    <div className="nc-card nc-stack-xs">
+      <div className="nc-eyebrow">{name === "Lune" ? "La Lune ce soir" : "Ce soir"}</div>
+      <span className="nc-caption nc-num" style={{ color: "var(--ink)" }}>
+        {[body.rise && `lever ${fmtHM(body.rise)}`, body.transit && `au méridien ${fmtHM(body.transit)}`, body.set && `coucher ${fmtHM(body.set)}`]
+          .filter(Boolean).join(" · ")}
+      </span>
+      {name === "Lune" && body.terminatorFeatures && body.terminatorFeatures.length > 0 && (
+        <span className="nc-caption">Le long du terminateur : {body.terminatorFeatures.join(", ")}.</span>
+      )}
+      {name === "Lune" && body.nextNew && body.nextFull && (
+        <span className="nc-caption nc-num">Nouvelle Lune {fmtDay(body.nextNew)} · pleine Lune {fmtDay(body.nextFull)}</span>
+      )}
+      {body.moons && (
+        <>
+          <span className="nc-caption">Les quatre grandes lunes vers {fmtHM(bestTime)} :</span>
+          <JupiterMoons moons={body.moons} />
+        </>
+      )}
+      {body.ringTiltDeg != null && (
+        <span className="nc-caption">
+          Anneaux inclinés de {dec(body.ringTiltDeg)}° vus d'ici{body.ringTiltDeg < 4 ? " : presque par la tranche, ils se voient à peine" : ""}.
+        </span>
+      )}
+      <div className="nc-divider" />
+      <div className="nc-eyebrow">À l'oculaire</div>
+      <span style={{ fontSize: "var(--text-sm)", lineHeight: 1.45 }}>{body.tip}</span>
+    </div>
+  );
+}
+
 function fmtMinutes(total: number): string {
   const h = Math.floor(total / 60);
   const m = total % 60;
@@ -134,12 +207,22 @@ export function Detail({
         <>
           <div>
             {bino && <div className="nc-eyebrow">Aux jumelles</div>}
-            <div className="nc-num" style={{ fontSize: "var(--text-xl)", fontWeight: 500, letterSpacing: "-.02em" }}>
-              {data.designation}
+            {data.body && <div className="nc-eyebrow">{data.body.kind}</div>}
+            <div className="nc-row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
+              <div className="nc-num" style={{ fontSize: "var(--text-xl)", fontWeight: 500, letterSpacing: "-.02em" }}>
+                {data.designation}
+              </div>
+              {data.body && data.designation === "Lune" && (
+                <MoonPhase
+                  illum={data.body.phase}
+                  waxing={Boolean(data.body.nextFull && data.body.nextNew && data.body.nextFull < data.body.nextNew)}
+                  size={34}
+                />
+              )}
             </div>
             {(data.commonName || (data.ngc && data.ngc !== data.designation)) && (
               <div className="nc-sub">
-                {[data.commonName, data.ngc !== data.designation ? data.ngc : null].filter(Boolean).join(" · ")}
+                {[data.commonName, data.ngc !== data.designation ? data.ngc : null, data.body?.constellation].filter(Boolean).join(" · ")}
               </div>
             )}
           </div>
@@ -154,8 +237,14 @@ export function Detail({
                 e.currentTarget.style.visibility = "hidden";
               }}
               className="nc-strip"
-              style={{ width: "100%", height: 200, borderRadius: 16, border: "1px solid var(--line)", objectFit: "cover", background: "var(--surf2)" }}
+              // Une planete en entier, sur fond noir ; un champ du releve DSS
+              // rempli bord a bord.
+              style={{ width: "100%", height: 200, borderRadius: 16, border: "1px solid var(--line)", objectFit: data.body ? "contain" : "cover", background: data.body ? "#000" : "var(--surf2)" }}
             />
+          )}
+
+          {data.body && data.imageUrl && (
+            <span className="nc-caption" style={{ marginTop: "calc(-1 * var(--space-xs))" }}>Photo : Wikimedia Commons</span>
           )}
 
           <InTheNews designation={data.designation} ngc={data.ngc} messierId={data.messierId} />
@@ -190,16 +279,7 @@ export function Detail({
           </div>
 
           <div className="nc-card" style={{ padding: 0, overflow: "hidden" }}>
-            {[
-              ["Coordonnées", `${data.ra.toFixed(3)}h / ${data.dec.toFixed(3)}°`],
-              ["Magnitude", data.mag != null ? data.mag.toFixed(1) : "inconnue"],
-              ["Taille", data.sizeW && data.sizeH ? `${data.sizeW.toFixed(1)}' x ${data.sizeH.toFixed(1)}'` : "inconnue"],
-              [bino ? "Dans les jumelles" : "Cadrage Seestar", data.cadrage],
-              ["Fenêtre exploitable", data.start ? `${data.start}–${data.end} (${data.hours} h)` : "Aucune ce soir"],
-              ...(bino ? [] : [["Filtre conseillé", data.filter]]),
-              ["Séparation lunaire mini", `${Math.round(data.moonSepDeg)}°`],
-              ...(bino ? [] : [["Temps de pose", `${data.exposureLowMin}–${data.exposureHighMin} min`]]),
-            ].map(([k, v], i, arr) => (
+            {characteristics(data, bino).map(([k, v], i, arr) => (
               <div
                 key={k}
                 style={{
@@ -214,6 +294,8 @@ export function Detail({
               </div>
             ))}
           </div>
+
+          {data.body && <BodyCard name={data.designation} body={data.body} bestTime={data.peakTime} />}
 
           {/* Temps de pose : une affaire de photo, sans objet aux jumelles. */}
           {!bino && (

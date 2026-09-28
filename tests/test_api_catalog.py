@@ -207,7 +207,14 @@ def test_search_suggest_lists_planets_first(api_client):
     assert r.json()[0]["designation"] == "Saturne"
 
 
-def test_body_detail(api_client):
-    assert api_client.get("/api/bodies/Pluton").status_code == 404
-    d = api_client.get("/api/bodies/Lune").json()
-    assert d["name"] == "Lune" and d["series"]
+
+def test_planet_detail_has_the_same_shape_as_a_catalog_target(api_client, monkeypatch):
+    import bodies
+    monkeypatch.setattr(bodies, "image_url", lambda name: "https://example/saturn.jpg")
+    deep = api_client.get("/api/targets/M31").json()
+    planet = api_client.get("/api/targets/Saturne").json()
+    assert set(deep) <= set(planet)
+    assert planet["type"] == "planète" and planet["body"]["ringTiltDeg"] > 0
+    assert len(planet["altitudeSeries"]) == len(deep["altitudeSeries"])
+    assert planet["imageUrl"] == "https://example/saturn.jpg"
+    assert deep.get("body") is None

@@ -8,9 +8,8 @@ import threading
 from datetime import date, datetime, timezone
 
 from cachetools import TTLCache
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-import bodies
 import comets
 import extras
 import news
@@ -90,12 +89,3 @@ def sky_agenda() -> list[dict]:
     site = site_from_settings(settings_store.load())
     return _cached("sky-events", site, lambda st, day: sky_events.upcoming(st, day, 35))
 
-
-@router.get("/api/bodies/{name}")
-def body_detail(name: str) -> dict:
-    """Fiche de la Lune ou d'une planete pour la nuit (voir bodies.py)."""
-    if bodies.find(name) is None:
-        raise HTTPException(404, f"Aucun astre du système solaire nommé « {name} ».")
-    site = site_from_settings(settings_store.load())
-    horizon = get_horizon()
-    return _cached(f"body:{name}:{sorted(horizon.items())}", site, lambda st, day: bodies.detail(name, st, day, horizon))

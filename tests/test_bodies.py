@@ -25,3 +25,8 @@ def test_moon_and_planet_specifics():
     assert bodies.detail("Saturne", SITE, date(2026, 9, 28))["ringTiltDeg"] > 0
     # Mercure, trop pres du Soleil ce soir-la : pas de creneau.
     assert bodies.detail("Mercure", SITE, date(2026, 9, 28))["visibleFrom"] is None
+
+
+def test_every_body_has_a_photo():
+    for name in bodies.WIKI_TITLES:
+        assert bodies.image_url(name).startswith("https://commons.wikimedia.org/wiki/Special:FilePath/")
