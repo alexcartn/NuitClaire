@@ -611,7 +611,8 @@ carte du ciel. Elles remontent aussi la ou elles servent : un encart « A ne pas
 dans « Ce soir » quand un article recent parle d'un objet visible cette nuit, un encart
 « Dans l'actu » sur la fiche d'un objet cite, et un badge « actu » dans le plan de nuit
 (`newsView.ts`, pur et teste). L'ecran reunit Ciel & Espace, le forum
-Webastro « L'actualite du ciel » et l'image du jour de la NASA (APOD) : titre, date,
+Webastro « L'actualite du ciel », Sky & Telescope (le ciel de la semaine et les nouvelles),
+Astronomy (« The Sky Today », le ciel de chaque soir) et l'image du jour de la NASA (APOD) : titre, date,
 vignette et chapeau tels que les flux RSS les publient, un appui ouvre l'article sur son
 site (`news.py`, `GET /api/news`, flux gardes 6 h). Les rubriques du magazine papier
 (editorial, critiques, BD) sont ecartees ; chaque article est range « A observer » ou

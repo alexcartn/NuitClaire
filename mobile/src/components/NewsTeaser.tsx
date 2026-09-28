@@ -77,7 +77,7 @@ export function NewsTeaser({ onOpen }: { onOpen: () => void }) {
             {headline.title}
           </span>
         )}
-        <span className="nc-caption">Ciel &amp; Espace · Webastro · image du jour</span>
+        <span className="nc-caption">Ciel &amp; Espace, Webastro, Sky &amp; Telescope, Astronomy</span>
       </span>
       <span aria-hidden="true" className="nc-none" style={{ fontSize: "var(--text-md)", color: "var(--ink3)" }}>›</span>
     </button>

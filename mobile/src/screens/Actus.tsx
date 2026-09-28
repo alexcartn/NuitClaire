@@ -7,7 +7,8 @@ import { markNewsSeen, newsSeenAt } from "../newsView";
 type Filter = "tout" | "observer" | "espace";
 
 /** Actualites astro en pleine page : Ciel & Espace, le forum Webastro
- * « L'actualite du ciel » et l'image du jour de la NASA (voir news.py).
+ * « L'actualite du ciel », Sky & Telescope, Astronomy et l'image du jour
+ * de la NASA (voir news.py).
  * Ouvert depuis l'apercu de « Ce soir », comme la carte du ciel. */
 export function Actus({ onOpenTarget, onBack }: {
   onOpenTarget: (designation: string) => void;
@@ -41,7 +42,7 @@ export function Actus({ onOpenTarget, onBack }: {
         <NightToggle />
       </div>
       <div>
-        <div className="nc-eyebrow">Ciel &amp; Espace · Webastro · NASA</div>
+        <div className="nc-eyebrow">Ciel &amp; Espace · Webastro · Sky &amp; Telescope · Astronomy</div>
         <div className="nc-title" style={{ marginTop: "var(--space-2xs)" }}>Actualités</div>
       </div>
 
@@ -49,7 +50,7 @@ export function Actus({ onOpenTarget, onBack }: {
       {data && (
         <>
           <div className="nc-row nc-wrap" style={{ gap: "var(--space-xs)" }} role="radiogroup" aria-label="Filtre">
-            {([["tout", "Tout"], ["observer", "À observer"], ["espace", "Espace"]] as const).map(([f, label]) => (
+            {([["tout", "Tout"], ["observer", "À observer"], ["espace", "Science & espace"]] as const).map(([f, label]) => (
               <button
                 key={f}
                 role="radio"

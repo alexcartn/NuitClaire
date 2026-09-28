@@ -33,6 +33,12 @@ FEEDS = [
     ("Ciel & Espace", "https://www.cieletespace.fr/rss.xml"),
     ("Webastro", "https://www.webastro.net/forums/forum/49-lactualit%C3%A9-du-ciel.xml/"),
     ("APOD", "https://apod.nasa.gov/apod.rss"),
+    # En anglais, les deux references de l'observation amateur : le ciel de
+    # la semaine et les vraies nouvelles (Sky & Telescope ; son flux general
+    # est ferme aux robots, pas celui-ci), et le ciel de chaque soir
+    # (Astronomy, « The Sky Today »).
+    ("Sky & Telescope", "https://skyandtelescope.org/astronomy-news/feed/"),
+    ("Astronomy", "https://www.astronomy.com/feed/"),
 ]
 TTL_S = 6 * 3600
 MAX_AGE_DAYS = 60
@@ -40,7 +46,7 @@ SUMMARY_CHARS = 220
 # Articles gardes par source : sans plafond, Ciel & Espace (plusieurs
 # articles par jour) chasserait les sujets de Webastro. L'image du jour de
 # la NASA : une seule, la derniere.
-PER_SOURCE = 8
+PER_SOURCE = 6
 PER_SOURCE_LIMIT = {"APOD": 1}
 
 _cache: dict[str, tuple[float, list[dict]]] = {}
@@ -53,18 +59,28 @@ _APOD_DATE = re.compile(r"ap(\d{2})(\d{2})(\d{2})\.html")
 # Rubriques du magazine papier (Ciel & Espace) : chroniques et critiques,
 # pas des nouvelles du ciel.
 DROPPED_CATEGORIES = {"editorial", "lire, voir", "regard", "bande dessinee", "agenda",
-                      "l'image a remonter le temps"}
+                      "l'image a remonter le temps", "today in the history of astronomy"}
 
 # Mots qui signalent quelque chose a voir soi-meme, et mots de l'actualite
 # spatiale (missions, fusees). Compares sans accents ni majuscules.
 OBSERVE_WORDS = ("supernova", "nova ", "nova,", "comete", "eclipse", "opposition", "occultation",
                  "conjonction", "pluie d'etoiles", "etoiles filantes", "meteore", "aurore",
                  "a observer", "observer ", "a voir", "visible", "ciel du mois", "ciel de ",
-                 "amateur", "jumelles", "telescope", "lunette", "transit", "perihelie")
+                 # Pas « telescope » : il sert autant aux articles de science
+                 # (un telescope spatial decouvre...) qu'a l'observation.
+                 "amateur", "jumelles", "lunette", "transit", "perihelie", "pleine lune",
+                 "comment observer",
+                 # Sources anglaises.
+                 "comet", "conjunction", "meteor", "aurora", "sky at a glance", "sky today",
+                 "sky this week", "tonight", "binocular", "stargaz", "perihelion", "full moon",
+                 "harvest moon", "when to see", "how to see", "naked eye")
 SPACE_WORDS = ("lancement", "decollage", "fusee", "starship", "spacex", "mission", "sonde",
                "astronaute", "satellite", "orbite terrestre", "station spatiale", "artemis",
-               "echantillons", "agence spatiale")
+               "echantillons", "agence spatiale",
+               "launch", "rocket", "spacecraft", "astronaut", "probe ", "space station")
 PLANETS = ("Mercure", "Vénus", "Mars", "Jupiter", "Saturne", "Uranus", "Neptune")
+# Nom anglais -> nom de l'appli (celui des planetes calculees, voir extras.py).
+PLANETS_EN = {"Mercury": "Mercure", "Venus": "Vénus", "Saturn": "Saturne"}
 _DESIGNATION = re.compile(r"(?<![\w/])(M|NGC|IC)\s?(\d{1,4})(?!\w)")
 _COMET = re.compile(r"\b(?:[CP]/\d{4}\s?[A-Z]{1,2}\d{0,3}|\d{1,3}P)(?=[\s/),.;:]|$)")
 MAX_OBJECTS = 3
@@ -110,8 +126,8 @@ def objects_in(text: str) -> list[dict]:
             label = f"M{m[2]}" if m[1] == "M" else f"{m[1]} {m[2]}"
             hits.append((m.start(), {"kind": "target", "designation": target["name"], "label": label,
                                      "messier": target.get("messier"), "ngc": target.get("ngc_name")}))
-    for planet in PLANETS:
-        m = re.search(rf"(?<!\w){planet}(?!\w)", text)
+    for word, planet in [(p, p) for p in PLANETS] + list(PLANETS_EN.items()):
+        m = re.search(rf"(?<!\w){word}(?!\w)", text)
         if m:
             hits.append((m.start(), {"kind": "planet", "designation": planet, "label": planet,
                                      "messier": None, "ngc": None}))
@@ -135,7 +151,15 @@ def _clean(fragment: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(_TAG.sub(" ", html.unescape(fragment)))).strip()
 
 
+# Formules que WordPress ajoute a chaque description.
+_WP_BOILERPLATE = re.compile(r"\s*(Continue reading\b.*|The post .* appeared first on .*)$", re.S)
+# Et la phrase d'appel qui ouvre chaque « Sky Today » d'Astronomy.
+_PROMO = re.compile(r"^Looking for a sky event this week\?\s*Check out our full\s+Sky This Week\s+column\.\s*", re.I)
+
+
 def _summary(text: str) -> str:
+    text = _WP_BOILERPLATE.sub("", text).strip()
+    text = _PROMO.sub("", text).strip()
     if len(text) <= SUMMARY_CHARS:
         return text
     cut = text[:SUMMARY_CHARS].rsplit(" ", 1)[0]
@@ -222,7 +246,7 @@ def fetch_feed(source: str, url: str, now: float | None = None) -> list[dict] | 
         return cached[1] if cached else None
 
 
-def merge(by_source: dict[str, list[dict]], now: datetime, limit: int = 20) -> list[dict]:
+def merge(by_source: dict[str, list[dict]], now: datetime, limit: int = 40) -> list[dict]:
     """Articles recents de toutes les sources, du plus recent au plus
     ancien. Sans date, un article est ecarte : impossible de le ranger, et
     les sujets epingles des forums datent parfois de quinze ans."""

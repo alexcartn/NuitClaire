@@ -60,3 +60,12 @@ def test_apod_page_image(monkeypatch):
     monkeypatch.setattr(news.requests, "get", lambda *a, **k: R())
     news._apod_images.clear()
     assert news.apod_image("https://apod.nasa.gov/apod/ap260924.html") == "https://apod.nasa.gov/apod/image/2609/screen_1000.jpg"
+
+
+def test_english_sources():
+    objs = news.objects_in("Catch Saturn's satellites; M39 in Cygnus, then Venus")
+    assert [o["designation"] for o in objs] == ["Saturne", "M39", "Vénus"]
+    assert news.kind_of("X", "The Sky Today: Neptune at opposition", "", True) == "observer"
+    assert news.kind_of("X", "Astronomers Have Spotted the Youngest Planet Yet", "the telescope saw", False) == "espace"
+    assert news._summary("Looking for a sky event this week? Check out our full Sky This Week column. M39 shines.") == "M39 shines."
+    assert news._summary("Saturn glows. Continue reading \"The Sky Today\" The post X appeared first on Y.") == "Saturn glows."

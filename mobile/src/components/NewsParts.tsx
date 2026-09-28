@@ -66,7 +66,8 @@ export function ObjectChips({ item, tonight, onOpenTarget }: {
 /** Pastille de la source quand l'article n'a pas d'image : un carre gris
  * a chaque ligne n'apprenait rien. */
 export function SourceTile({ source }: { source: string }) {
-  const letters = source === "Ciel & Espace" ? "C&E" : source.slice(0, 2);
+  const letters = ({ "Ciel & Espace": "C&E", "Sky & Telescope": "S&T", Astronomy: "Ast" } as Record<string, string>)[source]
+    ?? source.slice(0, 2);
   return (
     <span
       className="nc-none nc-num"
