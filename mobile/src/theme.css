@@ -1335,27 +1335,26 @@ a {
   opacity: 0.7;
 }
 
+.nc-sky-wrap {
+  position: relative;
+}
+
 /* Carte en plein ecran : fond de nuit, carte aussi grande que l'ecran le
    permet. */
 .nc-sky-full {
   position: fixed;
   inset: 0;
   z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
   height: 100dvh;
-  padding: max(var(--space-sm), env(safe-area-inset-top)) max(var(--space-sm), env(safe-area-inset-right))
-    max(var(--space-sm), env(safe-area-inset-bottom)) max(var(--space-sm), env(safe-area-inset-left));
   background: var(--bg);
   overflow: hidden;
 }
 
-/* La carte prend toute la place restante, en restant carree (le zoom au
-   doigt suppose une carte carree) : le plus petit des deux cotes. */
+/* La carte prend tout l'ecran, en restant carree (le zoom au doigt suppose
+   une carte carree) : le plus petit des deux cotes. */
 .nc-sky-full .nc-sky-wrap {
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   container-type: size;
   display: flex;
   align-items: center;
@@ -1364,6 +1363,59 @@ a {
 
 .nc-sky-full .nc-sky {
   width: min(100cqw, 100cqh);
+}
+
+/* Bouton « vue entiere » du zoom : sous la barre du haut. */
+.nc-sky-full .nc-sky-zoom-reset {
+  top: calc(max(var(--space-sm), env(safe-area-inset-top)) + 44px);
+  right: max(var(--space-sm), env(safe-area-inset-right));
+}
+
+/* Controles par-dessus la carte, sur un voile degrade qui laisse voir le
+   ciel ; les doigts passent a travers le voile, pas a travers les boutons. */
+.nc-sky-full-top,
+.nc-sky-full-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  padding-left: max(var(--space-md), env(safe-area-inset-left));
+  padding-right: max(var(--space-md), env(safe-area-inset-right));
+  pointer-events: none;
+}
+
+.nc-sky-full-top > *,
+.nc-sky-full-bottom > * {
+  pointer-events: auto;
+}
+
+.nc-sky-full-top {
+  top: 0;
+  padding-top: max(var(--space-sm), env(safe-area-inset-top));
+  padding-bottom: var(--space-lg);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 85%, transparent), transparent);
+}
+
+.nc-sky-full-bottom {
+  bottom: 0;
+  padding-top: var(--space-lg);
+  padding-bottom: max(var(--space-sm), env(safe-area-inset-bottom));
+  background: linear-gradient(to top, color-mix(in srgb, var(--bg) 85%, transparent), transparent);
+}
+
+/* En paysage, la place libre est a droite de la carte : les controles y
+   passent au lieu de couvrir le bas du ciel. */
+@media (orientation: landscape) {
+  .nc-sky-full-bottom {
+    left: auto;
+    width: max(220px, calc((100vw - 100dvh) / 2));
+    padding-left: var(--space-sm);
+    background: none;
+  }
+}
+
+.nc-sky-full-bottom .nc-card {
+  background: color-mix(in srgb, var(--surf) 85%, transparent);
 }
 
 .nc-sky-ticks {

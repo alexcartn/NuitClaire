@@ -184,7 +184,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
           {/* Plein ecran : la carte et l'heure seules, par-dessus tout. */}
           <div className={full ? "nc-sky-full" : "nc-stack"}>
             {full && (
-              <div className="nc-row nc-between">
+              <div className="nc-row nc-between nc-sky-full-top">
                 <span className="nc-eyebrow">Carte du ciel</span>
                 <button onClick={() => setFull(false)} className="nc-link nc-link-accent">Fermer</button>
               </div>
@@ -201,53 +201,57 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
               onSelect={(d) => setSelected(d)}
               onPick={setPicked}
             />
-            <div className="nc-stack-xs">
-              <div className="nc-row nc-between">
-                <span className="nc-caption nc-num">
-                  {offsetMin === 0 ? "Maintenant" : `À ${fmtHM(when.toISOString())}`}
-                </span>
-                <span className="nc-row nc-none" style={{ gap: "var(--space-xs)" }}>
-                  <button onClick={() => { if (offsetMin >= 8 * 60) setOffsetMin(0); setPlaying((v) => !v); }} className="nc-link nc-link-accent"
-                    aria-label={playing ? "Arrêter la lecture" : "Faire tourner le ciel"}>
-                    {playing ? "❚❚ Pause" : "▶ Lecture"}
-                  </button>
-                  {offsetMin !== 0 && (
-                    <button onClick={() => { setPlaying(false); setOffsetMin(0); }} className="nc-link">Maintenant</button>
-                  )}
-                  {!full && (
-                    <button onClick={() => setFull(true)} className="nc-link nc-link-accent">Plein écran</button>
-                  )}
-                </span>
+            {/* En plein ecran, l'heure et la fiche flottent sur le bas de la
+                carte au lieu de lui prendre de la hauteur. */}
+            <div className={full ? "nc-stack-xs nc-sky-full-bottom" : "nc-stack"}>
+              <div className="nc-stack-xs">
+                <div className="nc-row nc-between">
+                  <span className="nc-caption nc-num">
+                    {offsetMin === 0 ? "Maintenant" : `À ${fmtHM(when.toISOString())}`}
+                  </span>
+                  <span className="nc-row nc-none" style={{ gap: "var(--space-xs)" }}>
+                    <button onClick={() => { if (offsetMin >= 8 * 60) setOffsetMin(0); setPlaying((v) => !v); }} className="nc-link nc-link-accent"
+                      aria-label={playing ? "Arrêter la lecture" : "Faire tourner le ciel"}>
+                      {playing ? "❚❚ Pause" : "▶ Lecture"}
+                    </button>
+                    {offsetMin !== 0 && (
+                      <button onClick={() => { setPlaying(false); setOffsetMin(0); }} className="nc-link">Maintenant</button>
+                    )}
+                    {!full && (
+                      <button onClick={() => setFull(true)} className="nc-link nc-link-accent">Plein écran</button>
+                    )}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={8 * 60}
+                  step={15}
+                  value={offsetMin}
+                  onChange={(e) => { setPlaying(false); setOffsetMin(Number(e.target.value)); }}
+                  aria-label="Heure affichée"
+                  className="nc-sky-time"
+                />
+                {/* Un repere par heure pleine sous le curseur. */}
+                <div className="nc-sky-ticks nc-num" aria-hidden="true">
+                  {Array.from({ length: 9 }, (_, i) => {
+                    const t = new Date(Date.now() + i * 3_600_000);
+                    return <span key={i}>{i === 0 ? "maint." : `${String(t.getHours()).padStart(2, "0")}h`}</span>;
+                  })}
+                </div>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={8 * 60}
-                step={15}
-                value={offsetMin}
-                onChange={(e) => { setPlaying(false); setOffsetMin(Number(e.target.value)); }}
-                aria-label="Heure affichée"
-                className="nc-sky-time"
-              />
-              {/* Un repere par heure pleine sous le curseur. */}
-              <div className="nc-sky-ticks nc-num" aria-hidden="true">
-                {Array.from({ length: 9 }, (_, i) => {
-                  const t = new Date(Date.now() + i * 3_600_000);
-                  return <span key={i}>{i === 0 ? "maint." : `${String(t.getHours()).padStart(2, "0")}h`}</span>;
-                })}
-              </div>
+              {picked && picked.kind !== "cible" && (
+                <div className="nc-card nc-row nc-between">
+                  <span style={{ fontSize: "var(--text-sm)" }}>
+                    <strong style={{ fontWeight: 600 }}>{picked.name}</strong>
+                    <span className="nc-caption nc-num"> · {picked.detail} · {Math.round(picked.alt)}° · {sectorOf(picked.az)}</span>
+                  </span>
+                  {(picked.kind === "planete" || picked.kind === "lune") && (
+                    <button onClick={() => onOpenTarget(picked.name)} className="nc-chip nc-none">Fiche</button>
+                  )}
+                </div>
+              )}
             </div>
-            {picked && picked.kind !== "cible" && (
-              <div className="nc-card nc-row nc-between">
-                <span style={{ fontSize: "var(--text-sm)" }}>
-                  <strong style={{ fontWeight: 600 }}>{picked.name}</strong>
-                  <span className="nc-caption nc-num"> · {picked.detail} · {Math.round(picked.alt)}° · {sectorOf(picked.az)}</span>
-                </span>
-                {(picked.kind === "planete" || picked.kind === "lune") && (
-                  <button onClick={() => onOpenTarget(picked.name)} className="nc-chip nc-none">Fiche</button>
-                )}
-              </div>
-            )}
           </div>
           {compass.heading != null && (
             <button

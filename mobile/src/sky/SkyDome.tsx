@@ -359,7 +359,7 @@ export function SkyDome({ when, site, horizon, horizonAlt, rotation, bodies, tar
   const viewBox = `${view.cx - vb / 2} ${view.cy - vb / 2} ${vb} ${vb}`;
 
   return (
-    <div className="nc-sky-wrap" style={{ position: "relative" }}>
+    <div className="nc-sky-wrap">
       <svg
         ref={svgRef}
         viewBox={viewBox}
