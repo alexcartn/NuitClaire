@@ -267,7 +267,7 @@ export default function App() {
           />
         )}
         {screen === "detail" && selected && isBody(selected) && (
-          <BodyDetail name={selected} onBack={back} onOpenSky={() => openSky(null, "carte")} />
+          <BodyDetail name={selected} onBack={back} onOpenSky={() => openSky(selected, "carte")} />
         )}
         {screen === "detail" && selected && !isBody(selected) && (
           <Detail

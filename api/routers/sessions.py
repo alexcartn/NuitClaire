@@ -10,6 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
 import sessions as sessions_store
+import bodies
 from catalog import find_target
 from api.deps import current_night, current_score_pct, get_site, sessions_write_lock
 from api.schemas import AddNote, AddSessionItem, CloseSession, OutingSite, SessionsOut, \
@@ -54,14 +55,17 @@ def add_session_item(body: AddSessionItem) -> dict:
     fantome, qui polluerait durablement l'historique et les statistiques. Et
     elle enregistre la forme du catalogue (`m31` -> `M31`, `ic434` ->
     `IC0434`), sans quoi une meme cible se dedoublerait et son temps de pose
-    cumule avec elle."""
+    cumule avec elle. La Lune et les planetes, hors catalogue, sont admises
+    sous leur nom de l'appli (`saturn` -> `Saturne`, voir bodies.py)."""
     site = get_site()
     found = find_target(body.designation)
-    if not found:
+    body_def = None if found else bodies.find(body.designation)
+    if not found and not body_def:
         raise HTTPException(404, f"Aucun objet trouve pour « {body.designation} ».")
+    name = found["name"] if found else body_def[0]
     with sessions_write_lock:
         data = sessions_store.load()
-        sessions_store.add_item(data, found["name"], _written_at(body.at, site),
+        sessions_store.add_item(data, name, _written_at(body.at, site),
                                  current_score_pct(site), site_to_out(site))
         sessions_store.save(data)
         return sessions_to_out(data)

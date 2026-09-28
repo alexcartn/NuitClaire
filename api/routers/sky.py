@@ -18,7 +18,9 @@ from api.deps import site_from_settings
 router = APIRouter()
 
 PLANETS = [("Mercure", ephem.Mercury), ("Vénus", ephem.Venus), ("Mars", ephem.Mars),
-           ("Jupiter", ephem.Jupiter), ("Saturne", ephem.Saturn)]
+           ("Jupiter", ephem.Jupiter), ("Saturne", ephem.Saturn),
+           # Pas a l'oeil nu, mais on les cherche aussi depuis leur fiche.
+           ("Uranus", ephem.Uranus), ("Neptune", ephem.Neptune)]
 
 
 def bodies_at(when: datetime, site: dict) -> dict:

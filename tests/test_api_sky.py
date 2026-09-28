@@ -10,7 +10,7 @@ def test_bodies_positions_are_sane():
     assert 0 <= b["moon"]["raDeg"] < 360 and -30 <= b["moon"]["decDeg"] <= 30
     assert 0 <= b["moon"]["illum"] <= 100
     names = [p["name"] for p in b["planets"]]
-    assert names == ["Mercure", "Vénus", "Mars", "Jupiter", "Saturne"]
+    assert names == ["Mercure", "Vénus", "Mars", "Jupiter", "Saturne", "Uranus", "Neptune"]
     # Les planetes restent pres de l'ecliptique.
     assert all(-30 <= p["decDeg"] <= 30 for p in b["planets"])
     venus = next(p for p in b["planets"] if p["name"] == "Vénus")
@@ -20,4 +20,4 @@ def test_bodies_positions_are_sane():
 def test_api_sky_bodies(api_client):
     r = api_client.get("/api/sky/bodies")
     assert r.status_code == 200
-    assert "moon" in r.json() and len(r.json()["planets"]) == 5
+    assert "moon" in r.json() and len(r.json()["planets"]) == 7

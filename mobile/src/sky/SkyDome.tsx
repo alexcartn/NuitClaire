@@ -110,7 +110,11 @@ export function SkyDome({ when, site, horizon, horizonAlt, rotation, bodies, tar
   const starOpacity = (mag: number) => (mag <= 3 ? 1 : mag <= 4 ? 0.7 : 0.45);
 
   const moonP = bodies ? at(toSky(bodies.moon.raDeg, bodies.moon.decDeg)) : null;
-  const planetPs = (bodies?.planets ?? []).map((pl) => ({ pl, p: at(toSky(pl.raDeg, pl.decDeg)) }));
+  // A l'oeil nu seulement (Uranus, Neptune ne le sont pas), sauf l'astre
+  // choisi depuis sa fiche.
+  const planetPs = (bodies?.planets ?? [])
+    .filter((pl) => pl.mag <= 6 || pl.name === selected)
+    .map((pl) => ({ pl, p: at(toSky(pl.raDeg, pl.decDeg)) }));
   const targetPs = targets.map((t, index) => ({ t, index, p: at(toSky(t.raDeg, t.decDeg)) }));
 
   const sel = targetPs.find((x) => x.t.designation === selected && x.p);

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../api";
+import { isBody } from "../solarSystem";
 import { useFetch } from "../useFetch";
 import { useRemembered } from "../useRemembered";
 import { useCompass } from "../useCompass";
@@ -42,8 +43,10 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   const bodies = useFetch(fetchBodies, [], "sky-bodies");
   // La cible choisie peut ne pas etre dans la liste de ce soir : sa fiche
   // donne ses coordonnees.
+  // La Lune et les planetes n'ont pas de fiche catalogue : leur position
+  // vient de `bodies`, deja chargees pour les dessiner.
   const fetchSelected = useCallback(
-    () => (selected ? api.targetDetail(selected) : Promise.resolve(null)),
+    () => (selected && !isBody(selected) ? api.targetDetail(selected) : Promise.resolve(null)),
     [selected],
   );
   const selectedDetail = useFetch(fetchSelected, [selected], selected ? `sky-target:${selected}` : undefined);
@@ -64,8 +67,12 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
     if (sel && !list.some((t) => t.designation === sel.designation)) {
       list.push({ designation: sel.designation, raDeg: sel.ra * 15, decDeg: sel.dec });
     }
+    if (selected && isBody(selected) && bodies.data) {
+      const b = selected === "Lune" ? bodies.data.moon : bodies.data.planets.find((p) => p.name === selected);
+      if (b) list.push({ designation: selected, raDeg: b.raDeg, decDeg: b.decDeg });
+    }
     return list;
-  }, [targets.data, binoculars.data, selectedDetail.data]);
+  }, [targets.data, binoculars.data, selectedDetail.data, selected, bodies.data]);
 
   const selectedTarget = mapTargets.find((t) => t.designation === selected) ?? null;
   const when = new Date(Date.now() + offsetMin * 60000);

@@ -447,3 +447,10 @@ def test_a_corrected_place_follows_the_outing_to_the_archive(api_client):
 
     closed = api_client.post("/api/sessions/current/close").json()["past"][0]
     assert closed["site"] == ailleurs
+
+
+def test_planets_and_moon_can_join_the_session(api_client):
+    r = api_client.post("/api/sessions/current/items", json={"designation": "saturn"})
+    assert r.status_code == 200
+    assert [i["designation"] for i in r.json()["current"]["items"]] == ["Saturne"]
+    assert api_client.post("/api/sessions/current/items", json={"designation": "Pluton"}).status_code == 404

@@ -643,7 +643,9 @@ creneau de la nuit et courbe de hauteur (horizon degage compris), lever, passage
 et coucher, magnitude, taille apparente, distance, phase ; la Lune avec les reliefs du
 terminateur et les prochaines nouvelle et pleine Lune, Jupiter avec ses quatre grandes lunes,
 Saturne avec l'inclinaison des anneaux. Les puces « Saturne » des actualites ouvrent cette
-fiche. Elles ne s'ajoutent pas encore au journal de session (qui n'accepte que le catalogue).
+fiche. Elles s'ajoutent au journal de session sous leur nom (« saturn » devient « Saturne »),
+depuis leur fiche ou la recherche d'ajout du journal, et la carte du ciel les selectionne
+comme une cible (Uranus et Neptune n'y sont dessinees que choisies : pas a l'oeil nu).
 
 ### Recherche
 

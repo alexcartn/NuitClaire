@@ -1,5 +1,8 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { api } from "../api";
+import { mutate } from "../useSessions";
+import { newOp } from "../sessionQueue";
+import { tap } from "../haptics";
 import { useFetch } from "../useFetch";
 import { fmtHM } from "../format";
 import { ErrorNotice } from "../components/ErrorNotice";
@@ -58,6 +61,14 @@ export function BodyDetail({ name, onBack, onOpenSky }: {
 }) {
   const fetchBody = useCallback(() => api.bodyDetail(name), [name]);
   const { data, loading, error, reload } = useFetch(fetchBody, [name], `body:${name}`);
+  const [added, setAdded] = useState(false);
+  // Par la file du journal, comme depuis une fiche du catalogue : pris en
+  // compte tout de suite, meme hors ligne.
+  const addToJournal = () => {
+    mutate(newOp({ kind: "addItem", designation: name }));
+    tap();
+    setAdded(true);
+  };
 
   return (
     <div className="nc-screen">
@@ -143,7 +154,12 @@ export function BodyDetail({ name, onBack, onOpenSky }: {
             <span style={{ fontSize: "var(--text-sm)", lineHeight: 1.45 }}>{data.tip}</span>
           </div>
 
-          <button onClick={onOpenSky} className="nc-btn">Sur la carte du ciel</button>
+          <div className="nc-row">
+            <button onClick={onOpenSky} className="nc-btn nc-grow">Sur la carte du ciel</button>
+            <button onClick={addToJournal} disabled={added} className="nc-btn nc-grow">
+              {added ? "Ajouté ✓" : "Ajouter au journal"}
+            </button>
+          </div>
         </>
       )}
     </div>

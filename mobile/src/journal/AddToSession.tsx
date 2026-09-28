@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { tap } from "../haptics";
 import { localNoteId, parseTargetPrefix } from "../sessionQueue";
+import { matchBody } from "../solarSystem";
 import type { SessionOpBody } from "../sessionQueue";
 import type { SessionItem, TargetRow } from "../types";
 
@@ -19,6 +20,8 @@ export function AddToSession({ items, send }: {
 }) {
   const [targetQuery, setTargetQuery] = useState("");
   const [targetResults, setTargetResults] = useState<TargetRow[] | null>(null);
+  // La Lune et les planetes, hors catalogue : reconnues ici, sans requete.
+  const [bodyResult, setBodyResult] = useState<string | null>(null);
   const [searchingTarget, setSearchingTarget] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const [freeNoteDraft, setFreeNoteDraft] = useState("");
@@ -26,6 +29,12 @@ export function AddToSession({ items, send }: {
 
   const searchTargets = async () => {
     if (!targetQuery.trim()) return;
+    const body = matchBody(targetQuery);
+    setBodyResult(body);
+    if (body) {
+      setTargetResults([]);
+      return;
+    }
     setSearchingTarget(true);
     setSearchError(false);
     try {
@@ -41,6 +50,7 @@ export function AddToSession({ items, send }: {
     send({ kind: "addItem", designation });
     tap();
     setTargetResults(null);
+    setBodyResult(null);
     setTargetQuery("");
   };
 
@@ -84,7 +94,7 @@ export function AddToSession({ items, send }: {
         <input
           value={targetQuery}
           onChange={(e) => setTargetQuery(e.target.value)}
-          placeholder="Cible : M31, NGC7380…"
+          placeholder="Cible : M31, NGC7380, Saturne…"
           aria-label="Désignation de la cible à ajouter"
           className="nc-input nc-num"
         />
@@ -95,7 +105,16 @@ export function AddToSession({ items, send }: {
       {searchError && <div className="nc-notice">Recherche impossible pour l'instant (pas de réseau ?).</div>}
       {targetResults && (
         <div className="nc-stack-xs">
-          {targetResults.length === 0 && (
+          {bodyResult && (
+            <div className="nc-row">
+              <span className="nc-none" style={{ fontSize: "var(--text-sm)", width: 80 }}>{bodyResult}</span>
+              <span className="nc-caption nc-grow nc-ellipsis">{bodyResult === "Lune" ? "satellite naturel" : "planète"}</span>
+              <button onClick={() => addTarget(bodyResult)} className="nc-btn nc-btn-sm nc-none">
+                Ajouter
+              </button>
+            </div>
+          )}
+          {targetResults.length === 0 && !bodyResult && (
             <p className="nc-caption" style={{ margin: 0 }}>Aucun objet trouvé pour « {targetQuery} ».</p>
           )}
           {targetResults.map((r) => (
