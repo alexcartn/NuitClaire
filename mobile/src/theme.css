@@ -1344,14 +1344,26 @@ a {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  padding: max(var(--space-md), env(safe-area-inset-top)) var(--space-md) max(var(--space-md), env(safe-area-inset-bottom));
+  height: 100dvh;
+  padding: max(var(--space-sm), env(safe-area-inset-top)) max(var(--space-sm), env(safe-area-inset-right))
+    max(var(--space-sm), env(safe-area-inset-bottom)) max(var(--space-sm), env(safe-area-inset-left));
   background: var(--bg);
-  overflow: auto;
+  overflow: hidden;
+}
+
+/* La carte prend toute la place restante, en restant carree (le zoom au
+   doigt suppose une carte carree) : le plus petit des deux cotes. */
+.nc-sky-full .nc-sky-wrap {
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .nc-sky-full .nc-sky {
-  max-width: min(100%, calc(100vh - 200px));
-  margin: 0 auto;
+  width: min(100cqw, 100cqh);
 }
 
 .nc-sky-ticks {

@@ -32,6 +32,26 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   const [offsetMin, setOffsetMin] = useState(0);
   const [picked, setPicked] = useState<SkyPick | null>(null);
   const [full, setFull] = useState(false);
+  // Plein ecran du navigateur en plus (barre d'adresse et barre d'etat
+  // masquees) quand il le permet ; sinon (iPhone dans Safari) la carte
+  // couvre seulement la page. Quitter par le geste retour ou Echap referme.
+  useEffect(() => {
+    if (!full) return;
+    const root = document.documentElement;
+    if (!document.fullscreenElement && root.requestFullscreen) {
+      root.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+    }
+    let entered = false;
+    const onChange = () => {
+      if (document.fullscreenElement) entered = true;
+      else if (entered) setFull(false);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+  }, [full]);
   const [playing, setPlaying] = useState(false);
   // Lecture : le ciel tourne, un quart d'heure toutes les 120 ms, jusqu'au
   // bout de la nuit.
