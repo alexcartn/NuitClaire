@@ -128,3 +128,79 @@ const SECTORS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 export function sectorOf(az: number): string {
   return SECTORS[Math.round((((az % 360) + 360) % 360) / 45) % 8];
 }
+
+/** Comme `domeProject`, sans rien couper sous l'horizon (jusqu'a -85 deg) :
+ * pour les contours de la Voie lactee, que la carte rogne ensuite au cercle
+ * de l'horizon. */
+export function domeProjectFree(p: AltAz, rotation = 0): { x: number; y: number } {
+  const alt = Math.max(-85, p.alt);
+  const r = Math.tan(((90 - alt) / 2) * RAD);
+  const a = (p.az - rotation) * RAD;
+  return { x: -r * Math.sin(a), y: -r * Math.cos(a) };
+}
+
+/** Position du Soleil (ascension droite, declinaison, degres), formule
+ * simplifiee de l'Astronomical Almanac : a 0,01 deg pres, bien assez pour
+ * la lueur du crepuscule et le cote eclaire de la Lune. */
+export function sunRaDec(date: Date): { ra: number; dec: number } {
+  const n = julianDate(date) - 2451545.0;
+  const L = (280.46 + 0.9856474 * n) % 360;
+  const g = ((357.528 + 0.9856003 * n) % 360) * RAD;
+  const lambda = (L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * RAD;
+  const eps = (23.439 - 0.0000004 * n) * RAD;
+  const ra = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda)) * DEG;
+  const dec = Math.asin(Math.sin(eps) * Math.sin(lambda)) * DEG;
+  return { ra: ((ra % 360) + 360) % 360, dec };
+}
+
+// Couleur d'une etoile selon son indice B-V : des bleues (Rigel, -0,03) aux
+// orangees (Antares, Betelgeuse, 1,8). Teintes adoucies : sur un ecran, des
+// couleurs franches feraient guirlande.
+const BV_COLORS: [number, [number, number, number]][] = [
+  [-0.4, [170, 191, 255]], [0.0, [202, 215, 255]], [0.4, [248, 247, 255]],
+  [0.6, [255, 244, 234]], [0.8, [255, 232, 206]], [1.2, [255, 210, 161]], [1.8, [255, 180, 120]],
+];
+
+export function bvColor(bv: number): string {
+  const x = Math.max(-0.4, Math.min(1.8, bv));
+  let i = 0;
+  while (i < BV_COLORS.length - 2 && x > BV_COLORS[i + 1][0]) i++;
+  const [x0, c0] = BV_COLORS[i];
+  const [x1, c1] = BV_COLORS[i + 1];
+  const t = (x - x0) / (x1 - x0);
+  const c = c0.map((v, k) => Math.round(v + (c1[k] - v) * t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+/** Hauteur de l'horizon masque dans la direction `az`, interpolee entre les
+ * huit secteurs (la hauteur de chacun vaut en son milieu) : une silhouette
+ * continue plutot que huit marches. Un secteur bouche compte pour null. */
+export function horizonFloor(az: number, horizon: Record<string, boolean>, horizonAlt: Record<string, number>): number | null {
+  const a = ((az % 360) + 360) % 360;
+  const i = Math.floor(a / 45);
+  const t = (a - i * 45) / 45;
+  const s0 = SECTORS[i];
+  const s1 = SECTORS[(i + 1) % 8];
+  if (!horizon[s0] && !horizon[s1]) return null;
+  if (!horizon[s0]) return t > 0.5 ? horizonAlt[s1] ?? 0 : null;
+  if (!horizon[s1]) return t < 0.5 ? horizonAlt[s0] ?? 0 : null;
+  const h0 = horizonAlt[s0] ?? 0;
+  const h1 = horizonAlt[s1] ?? 0;
+  // Raccord en cosinus : pas d'angle vif entre deux secteurs.
+  const k = (1 - Math.cos(t * Math.PI)) / 2;
+  return h0 + (h1 - h0) * k;
+}
+
+export type SkySymbol = "galaxy" | "open" | "globular" | "planetary" | "nebula" | "other";
+
+/** Symboles des atlas : ellipse pour une galaxie, cercle pointille pour un
+ * amas ouvert, cercle barre pour un globulaire, carre pour une nebuleuse. */
+export function symbolOf(kind?: string): SkySymbol {
+  const k = (kind ?? "").toLowerCase();
+  if (k === "g" || k.includes("galax")) return "galaxy";
+  if (k === "gcl" || k.includes("globul")) return "globular";
+  if (k === "ocl" || k === "*ass" || k.includes("amas") || k.includes("astérisme") || k.includes("association")) return "open";
+  if (k === "pn" || k.includes("planétaire")) return "planetary";
+  if (["neb", "hii", "rfn", "snr", "cl+n", "emn"].includes(k) || k.includes("nébuleuse") || k.includes("rémanent") || k.includes("région")) return "nebula";
+  return "other";
+}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { isBody } from "../solarSystem";
 import { useFetch } from "../useFetch";
@@ -7,7 +7,8 @@ import { useCompass } from "../useCompass";
 import { fmtHM } from "../format";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
-import { SkyDome, type SkyTarget } from "../sky/SkyDome";
+import { SkyDome, type SkyPick, type SkyTarget } from "../sky/SkyDome";
+import { SkyLegend } from "../sky/SkyLegend";
 import { SkyViewfinder } from "../sky/SkyViewfinder";
 import { altAz, lstDeg, sectorOf } from "../sky/sky";
 import type { AppState, TargetRow } from "../types";
@@ -29,6 +30,24 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   const [mode, setMode] = useState<"carte" | "viseur">(initialMode);
   const [selected, setSelected] = useState<string | null>(initialTarget);
   const [offsetMin, setOffsetMin] = useState(0);
+  const [picked, setPicked] = useState<SkyPick | null>(null);
+  const [full, setFull] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  // Lecture : le ciel tourne, un quart d'heure toutes les 120 ms, jusqu'au
+  // bout de la nuit.
+  useEffect(() => {
+    if (!playing) return;
+    const id = window.setInterval(() => {
+      setOffsetMin((m) => {
+        if (m >= 8 * 60) {
+          setPlaying(false);
+          return m;
+        }
+        return m + 15;
+      });
+    }, 120);
+    return () => window.clearInterval(id);
+  }, [playing]);
   const [oriented, setOriented] = useRemembered("ciel:oriented", false);
   const compass = useCompass();
 
@@ -56,16 +75,16 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
 
   const mapTargets: SkyTarget[] = useMemo(() => {
     const rows: TargetRow[] = (targets.data ?? []).slice(0, MAP_TARGETS);
-    const list = rows.map((r) => ({ designation: r.designation, raDeg: r.ra * 15, decDeg: r.dec }));
+    const list: SkyTarget[] = rows.map((r) => ({ designation: r.designation, raDeg: r.ra * 15, decDeg: r.dec, kind: r.typeCode || r.type }));
     // Les cibles jumelles des boutons, meme hors de la liste Seestar.
     for (const p of binoculars.data?.picks ?? []) {
       if (!list.some((t) => t.designation === p.designation)) {
-        list.push({ designation: p.designation, raDeg: p.raDeg, decDeg: p.decDeg });
+        list.push({ designation: p.designation, raDeg: p.raDeg, decDeg: p.decDeg, kind: p.type });
       }
     }
     const sel = selectedDetail.data;
     if (sel && !list.some((t) => t.designation === sel.designation)) {
-      list.push({ designation: sel.designation, raDeg: sel.ra * 15, decDeg: sel.dec });
+      list.push({ designation: sel.designation, raDeg: sel.ra * 15, decDeg: sel.dec, kind: sel.typeCode || sel.type });
     }
     if (selected && isBody(selected) && bodies.data) {
       const b = selected === "Lune" ? bodies.data.moon : bodies.data.planets.find((p) => p.name === selected);
@@ -142,36 +161,73 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
 
       {mode === "carte" ? (
         <>
-          <SkyDome
-            when={when}
-            site={site}
-            horizon={state.horizon}
-            horizonAlt={state.horizonAlt ?? {}}
-            rotation={rotation}
-            bodies={bodies.data}
-            targets={mapTargets}
-            selected={selected}
-            onSelect={(d) => setSelected(d)}
-          />
-          <div className="nc-stack-xs">
-            <div className="nc-row nc-between">
-              <span className="nc-caption nc-num">
-                {offsetMin === 0 ? "Maintenant" : `À ${fmtHM(when.toISOString())}`}
-              </span>
-              {offsetMin !== 0 && (
-                <button onClick={() => setOffsetMin(0)} className="nc-link">Maintenant</button>
-              )}
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={8 * 60}
-              step={15}
-              value={offsetMin}
-              onChange={(e) => setOffsetMin(Number(e.target.value))}
-              aria-label="Heure affichée"
-              className="nc-sky-time"
+          {/* Plein ecran : la carte et l'heure seules, par-dessus tout. */}
+          <div className={full ? "nc-sky-full" : "nc-stack"}>
+            {full && (
+              <div className="nc-row nc-between">
+                <span className="nc-eyebrow">Carte du ciel</span>
+                <button onClick={() => setFull(false)} className="nc-link nc-link-accent">Fermer</button>
+              </div>
+            )}
+            <SkyDome
+              when={when}
+              site={site}
+              horizon={state.horizon}
+              horizonAlt={state.horizonAlt ?? {}}
+              rotation={rotation}
+              bodies={bodies.data}
+              targets={mapTargets}
+              selected={selected}
+              onSelect={(d) => setSelected(d)}
+              onPick={setPicked}
             />
+            <div className="nc-stack-xs">
+              <div className="nc-row nc-between">
+                <span className="nc-caption nc-num">
+                  {offsetMin === 0 ? "Maintenant" : `À ${fmtHM(when.toISOString())}`}
+                </span>
+                <span className="nc-row nc-none" style={{ gap: "var(--space-xs)" }}>
+                  <button onClick={() => { if (offsetMin >= 8 * 60) setOffsetMin(0); setPlaying((v) => !v); }} className="nc-link nc-link-accent"
+                    aria-label={playing ? "Arrêter la lecture" : "Faire tourner le ciel"}>
+                    {playing ? "❚❚ Pause" : "▶ Lecture"}
+                  </button>
+                  {offsetMin !== 0 && (
+                    <button onClick={() => { setPlaying(false); setOffsetMin(0); }} className="nc-link">Maintenant</button>
+                  )}
+                  {!full && (
+                    <button onClick={() => setFull(true)} className="nc-link nc-link-accent">Plein écran</button>
+                  )}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={8 * 60}
+                step={15}
+                value={offsetMin}
+                onChange={(e) => { setPlaying(false); setOffsetMin(Number(e.target.value)); }}
+                aria-label="Heure affichée"
+                className="nc-sky-time"
+              />
+              {/* Un repere par heure pleine sous le curseur. */}
+              <div className="nc-sky-ticks nc-num" aria-hidden="true">
+                {Array.from({ length: 9 }, (_, i) => {
+                  const t = new Date(Date.now() + i * 3_600_000);
+                  return <span key={i}>{i === 0 ? "maint." : `${String(t.getHours()).padStart(2, "0")}h`}</span>;
+                })}
+              </div>
+            </div>
+            {picked && picked.kind !== "cible" && (
+              <div className="nc-card nc-row nc-between">
+                <span style={{ fontSize: "var(--text-sm)" }}>
+                  <strong style={{ fontWeight: 600 }}>{picked.name}</strong>
+                  <span className="nc-caption nc-num"> · {picked.detail} · {Math.round(picked.alt)}° · {sectorOf(picked.az)}</span>
+                </span>
+                {(picked.kind === "planete" || picked.kind === "lune") && (
+                  <button onClick={() => onOpenTarget(picked.name)} className="nc-chip nc-none">Fiche</button>
+                )}
+              </div>
+            )}
           </div>
           {compass.heading != null && (
             <button
@@ -200,13 +256,15 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
               </span>
             </div>
           )}
+          <SkyLegend />
           {/* Repliee : utile la premiere fois, encombrante ensuite. */}
           <details className="nc-caption">
             <summary style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center" }}>Lire la carte</summary>
             <p style={{ margin: 0 }}>
-              Tenue au-dessus de la tête : zénith au centre, horizon au bord, est à gauche. Zones grisées : ce
-              que cache votre horizon (Réglages). Carrés : cibles de ce soir et cibles jumelles, les premières nommées
-              quand la place le permet.
+              Tenue au-dessus de la tête : zénith au centre, horizon au bord, est à gauche. En ombre, la cime de
+              vos arbres et toits ; hachuré, un secteur bouché (Réglages). Pincez pour zoomer, glissez pour vous
+              déplacer, touchez une étoile ou une planète pour la nommer ; double-appui pour revenir à la vue
+              entière.
             </p>
           </details>
         </>
@@ -217,7 +275,11 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
             site={site}
             target={selectedTarget}
             targetLabel={selectedTarget?.designation ?? null}
+            targetKind={selectedTarget?.kind}
             fovDeg={fov}
+            horizon={state.horizon}
+            horizonAlt={state.horizonAlt ?? {}}
+            bodies={bodies.data}
           />
           <p className="nc-caption" style={{ margin: 0 }}>
             Tenez le téléphone contre les jumelles, écran vers vous. La boussole se trompe de quelques degrés :

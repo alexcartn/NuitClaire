@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { altAz, domeProject, gmstDeg, guidance, guidanceText, lstDeg, pointing, separation, sectorOf, viewProject } from "./sky.ts";
+import { altAz, bvColor, domeProject, domeProjectFree, gmstDeg, guidance, guidanceText, horizonFloor, lstDeg, pointing, separation, sectorOf, sunRaDec, symbolOf, viewProject } from "./sky.ts";
 
 const near = (a: number, b: number, tol = 0.5) => assert.ok(Math.abs(a - b) <= tol, `${a} ≈ ${b}`);
 
@@ -62,4 +62,43 @@ test("guidage : ecart et consigne en clair", () => {
   near(separation({ alt: 0, az: 0 }, { alt: 90, az: 0 }), 90, 1e-9);
   assert.equal(sectorOf(359), "N");
   assert.equal(sectorOf(225), "SW");
+});
+
+test("le Soleil a l'equinoxe de septembre, et au solstice d'ete", () => {
+  const sep = sunRaDec(new Date(Date.UTC(2026, 8, 23, 0, 0, 0)));
+  near(sep.dec, 0, 0.6);
+  near(sep.ra, 180, 1);
+  near(sunRaDec(new Date(Date.UTC(2026, 5, 21, 12, 0, 0))).dec, 23.44, 0.1);
+});
+
+test("couleurs des etoiles : bleutees, blanches, orangees", () => {
+  assert.equal(bvColor(-1), bvColor(-0.4));
+  assert.equal(bvColor(1.85), "rgb(255,180,120)");
+  assert.equal(bvColor(0.4), "rgb(248,247,255)");
+});
+
+test("silhouette d'horizon continue entre les secteurs", () => {
+  const open = { N: true, NE: true, E: true, SE: true, S: true, SW: true, W: true, NW: true };
+  const alt = { S: 20 };
+  assert.equal(horizonFloor(180, open, alt), 20);
+  near(horizonFloor(157.5, open, alt)!, 10, 0.01);
+  assert.equal(horizonFloor(90, open, alt), 0);
+  assert.equal(horizonFloor(0, { ...open, N: false }, alt), null);
+});
+
+test("projection libre : identique au-dessus de l'horizon, prolongee dessous", () => {
+  const p = { alt: 30, az: 120 };
+  const a = domeProject(p)!;
+  const b = domeProjectFree(p);
+  near(a.x, b.x, 1e-9);
+  assert.ok(Math.hypot(domeProjectFree({ alt: -20, az: 0 }).x, domeProjectFree({ alt: -20, az: 0 }).y) > 1);
+});
+
+test("symboles d'atlas, depuis le code du catalogue ou le type en clair", () => {
+  assert.equal(symbolOf("G"), "galaxy");
+  assert.equal(symbolOf("amas ouvert"), "open");
+  assert.equal(symbolOf("GCl"), "globular");
+  assert.equal(symbolOf("PN"), "planetary");
+  assert.equal(symbolOf("HII"), "nebula");
+  assert.equal(symbolOf(undefined), "other");
 });

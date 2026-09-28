@@ -6,7 +6,9 @@ pour les cartes du chemin d'etoiles (starhop.py).
     python scripts/build_stars.py package/data
 
 Etoiles jusqu'a la magnitude 6 (~5000) : ce que l'oeil voit sous un ciel
-correct, et les reperes d'un chemin aux jumelles."""
+correct, et les reperes d'un chemin aux jumelles. Avec leur indice de
+couleur (B-V), les noms francais des constellations et le contour de la
+Voie lactee, pour la carte du ciel du telephone."""
 import csv
 import json
 import sys
@@ -24,13 +26,13 @@ def main(src: Path) -> None:
     names = json.loads((src / "starnames.json").read_text())
     with open(OUT / "stars.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["hip", "ra_deg", "dec_deg", "mag", "name", "desig"])
+        w.writerow(["hip", "ra_deg", "dec_deg", "mag", "name", "desig", "bv"])
         for s in stars:
             lon, lat = s["geometry"]["coordinates"]
             info = names.get(str(s["id"]), {})
             desig = f"{info['desig']} {info['c']}".strip() if info.get("desig") and info.get("c") else ""
             w.writerow([s["id"], round(ra_deg(lon), 4), round(lat, 4), s["properties"]["mag"],
-                        info.get("name", ""), desig])
+                        info.get("name", ""), desig, s["properties"].get("bv", "")])
     lines = json.loads((src / "constellations.lines.json").read_text())["features"]
     segments = []
     for c in lines:
@@ -38,7 +40,35 @@ def main(src: Path) -> None:
             for (a, b) in zip(line, line[1:]):
                 segments.append([round(ra_deg(a[0]), 3), round(a[1], 3), round(ra_deg(b[0]), 3), round(b[1], 3)])
     (OUT / "constellation_lines.json").write_text(json.dumps(segments, separators=(",", ":")))
-    print(f"{len(stars)} etoiles, {len(segments)} segments")
+
+    # Noms des constellations (francais) et point ou poser l'etiquette.
+    names = [
+        {"id": c["id"], "fr": c["properties"].get("fr") or c["properties"]["name"],
+         "ra": round(ra_deg(c["geometry"]["coordinates"][0]), 2), "dec": round(c["geometry"]["coordinates"][1], 2),
+         "rank": int(c["properties"].get("rank", 3))}
+        for c in json.loads((src / "constellations.json").read_text())["features"]
+    ]
+    (OUT / "constellation_names.json").write_text(json.dumps(names, ensure_ascii=False, separators=(",", ":")))
+
+    # Voie lactee : cinq niveaux de luminosite (ol1, le plus etendu et le plus
+    # pale, a ol5, le coeur), contours alleges a un point tous les ~0,8 deg.
+    levels = []
+    for f in json.loads((src / "mw.json").read_text())["features"]:
+        rings = []
+        for poly in f["geometry"]["coordinates"]:
+            for ring in poly:
+                kept, last = [], None
+                for lon, lat in ring:
+                    pt = (round(ra_deg(lon), 1), round(lat, 1))
+                    if last is None or abs(pt[0] - last[0]) + abs(pt[1] - last[1]) >= 0.8:
+                        kept.append(pt)
+                        last = pt
+                if len(kept) >= 4:
+                    rings.append([v for pt in kept for v in pt])
+        levels.append(rings)
+    (OUT / "milkyway.json").write_text(json.dumps(levels, separators=(",", ":")))
+    print(f"{len(stars)} etoiles, {len(segments)} segments, {len(names)} constellations, "
+          f"{sum(len(r) for lv in levels for r in lv) // 2} points de Voie lactee")
 
 
 
@@ -65,11 +95,15 @@ def build_mobile_sky() -> None:
         for r in csv.DictReader(f):
             m = float(r["mag"])
             if m <= 5.0:
+                bv = round(float(r["bv"]), 2) if r.get("bv") else 0.6
                 stars.append([round(float(r["ra_deg"]), 2), round(float(r["dec_deg"]), 2), round(m, 1),
-                              MOBILE_NAMES.get(r["name"], "")])
+                              MOBILE_NAMES.get(r["name"], ""), bv])
     lines = [[round(v, 2) for v in seg] for seg in json.loads((OUT / "constellation_lines.json").read_text())]
+    constellations = json.loads((OUT / "constellation_names.json").read_text())
+    milkyway = json.loads((OUT / "milkyway.json").read_text())
     target = OUT.parent / "mobile" / "src" / "sky" / "skyData.json"
-    target.write_text(json.dumps({"stars": stars, "lines": lines}, ensure_ascii=False, separators=(",", ":")))
+    target.write_text(json.dumps({"stars": stars, "lines": lines, "constellations": constellations,
+                                  "milkyway": milkyway}, ensure_ascii=False, separators=(",", ":")))
 
 
 if __name__ == "__main__":

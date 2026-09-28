@@ -565,19 +565,33 @@ npm d3-celestial (BSD-3-Clause, (c) 2015 Olaf Frohn, donnees Hipparcos ; licence
 
 Ecran « Ciel », ouvert depuis « Ce soir » (etoile en haut a droite) ou depuis une fiche
 (« Sur la carte du ciel », « Viseur »). Tout se calcule sur le telephone (`src/sky/sky.ts`,
-teste) : temps sideral, hauteur et azimut, projections ; les 1627 etoiles a l'oeil nu et
-les constellations sont embarquees (`src/sky/skyData.json`, genere par
-`scripts/build_stars.py`), et le module est charge a la demande. Seules la Lune et les
-planetes viennent du serveur (`GET /api/sky/bodies`, PyEphem), gardees sur l'appareil.
+teste) : temps sideral, hauteur et azimut, projections ; les 1627 etoiles a l'oeil nu
+avec leur couleur (indice B-V), les traces et noms francais des constellations et le contour
+de la Voie lactee en cinq niveaux sont embarques (`src/sky/skyData.json`, genere par
+`scripts/build_stars.py` depuis les donnees de d3-celestial, BSD-3), et le module est charge
+a la demande. Seules la Lune et les planetes viennent du serveur (`GET /api/sky/bodies`,
+PyEphem), gardees sur l'appareil ; le Soleil est calcule sur place (lueur du crepuscule, cote
+eclaire de la Lune).
 
-- Carte : le ciel entier en dome (zenith au centre, horizon au bord, est a gauche), Lune,
-  planetes, cibles de ce soir, et ce que cache l'horizon (secteurs bouches, arbres a leur
-  hauteur). Heure reglable jusqu'a 8 h plus tard ; option pour tourner avec la boussole.
+- Carte : le ciel entier en dome (zenith au centre, horizon au bord, est a gauche). Voie
+  lactee, etoiles a leur couleur avec un halo pour les brillantes, noms des constellations,
+  Lune dessinee dans sa phase (cote eclaire vers le Soleil), planetes a leur couleur, cibles
+  en symboles d'atlas (ellipse : galaxie, cercle pointille : amas ouvert, cercle barre :
+  globulaire, carre : nebuleuse) avec leur legende. L'horizon masque est une silhouette
+  continue a la hauteur des arbres et toits ; un secteur bouche est hachure. Lueur bleutee
+  du crepuscule du cote du Soleil tant qu'il n'est pas a -18 deg. Pincer pour zoomer,
+  glisser pour se deplacer, double-appui pour la vue entiere ; toucher une etoile, une
+  planete ou la Lune la nomme (la fiche s'ouvre pour les astres). Plein ecran ; heure
+  reglable jusqu'a 8 h plus tard, avec reperes horaires et lecture ; option pour tourner
+  avec la boussole.
 - Viseur : le telephone tenu contre les jumelles, le dos vers le ciel. Direction visee
-  deduite de l'orientation complete (alpha, beta, gamma), ciel autour de la visee, champ
-  des jumelles au centre, consigne « 12° a droite, 8° plus haut » et vibration une fois
-  dans l'axe. Une boussole de telephone se trompe de 5 a 10 deg : le viseur amene dans la
-  region, le chemin d'etoiles de la fiche fait le reste.
+  deduite de l'orientation complete (alpha, beta, gamma). Bande de cap en haut, ciel sombre
+  au-dessus de la vraie ligne d'horizon (arbres compris), sol en ombre dessous, reperes de
+  hauteur a 30 et 60 deg, etoiles a leur couleur, Lune et planetes, champ des jumelles a
+  sa vraie taille ; la cible y apparait avec son symbole et son nom, sinon un chevron au
+  bord donne la direction et l'ecart. Consigne « 12° a droite, 8° plus haut » et vibration
+  une fois dans l'axe. Une boussole de telephone se trompe de 5 a 10 deg : le viseur amene
+  dans la region, le chemin d'etoiles de la fiche fait le reste.
 
 ### Lune, planetes, station spatiale
 
