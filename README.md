@@ -743,7 +743,8 @@ Vercel separes sur le meme repo GitHub :
 Stockage des fonctions (limite gratuite de Vercel) : seul `master` se deploie, les branches
 de travail `claude/*` non (`git.deploymentEnabled` dans les deux `vercel.json`) ;
 `.vercelignore` ecarte de la fonction API ce qui ne lui sert pas (tests, docs, scripts,
-appli mobile, ancienne interface Streamlit). Garder une retention courte des deploiements
+ancienne interface Streamlit) ; ses regles sont ancrees a la racine (`/tests/`) et ne
+touchent jamais `mobile/`, que le projet de l'appli construit. Garder une retention courte des deploiements
 (reglage du projet Vercel).
 
 ## Sources

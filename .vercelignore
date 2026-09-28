@@ -1,17 +1,13 @@
-# Fichiers inutiles a la fonction API (projet Vercel a la racine du depot) :
-# moins de choses copiees a chaque deploiement. L'appli mobile a son propre
-# projet Vercel, a la racine de mobile/.
-tests/
-docs/
-scripts/
-mobile/
-supabase/
-.devcontainer/
-.pytest_cache/
-__pycache__/
-Dockerfile
-.dockerignore
-app.py
-components.py
-requirements-dev.txt
-*.md
+# Fichiers inutiles a la fonction API. Regles ancrees a la racine du depot
+# (« / » en tete) : Vercel peut lire ce fichier pour les deux projets, et le
+# projet de l'appli, dont la racine est mobile/, ne doit rien y perdre.
+/tests/
+/docs/
+/scripts/
+/supabase/
+/.devcontainer/
+/Dockerfile
+/.dockerignore
+/app.py
+/components.py
+/requirements-dev.txt
