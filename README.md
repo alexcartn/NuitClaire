@@ -608,7 +608,14 @@ previent une fois par comete, pas chaque nuit.
 En bas de « Ce soir », une section Actualites repliee reunit Ciel & Espace, le forum
 Webastro « L'actualite du ciel » et l'image du jour de la NASA (APOD) : titre, date,
 vignette et chapeau tels que les flux RSS les publient, un appui ouvre l'article sur son
-site (`news.py`, `GET /api/news`, flux gardes 6 h).
+site (`news.py`, `GET /api/news`, flux gardes 6 h). Les rubriques du magazine papier
+(editorial, critiques, BD) sont ecartees ; chaque article est range « A observer » ou
+« Espace » par mots-cles, et les objets cites (M31, NGC 7331, Saturne, une comete) sont
+reperes dans le texte : l'appli dit s'ils sont visibles ce soir, a partir des cibles,
+planetes et cometes deja calculees, et ouvre la fiche des objets du catalogue. L'image
+du jour de la NASA est affichee en grand (image de la page du jour, la vignette du flux
+etant trop petite). L'en-tete replie annonce le nombre d'articles parus depuis la
+derniere ouverture de la section.
 
 ### Recherche
 

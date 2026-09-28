@@ -424,6 +424,17 @@ export interface CometsInfo {
   comets: Comet[];
 }
 
+/** Objet cite dans un article, repere par le serveur (voir news.objects_in). */
+export interface NewsObject {
+  kind: "target" | "planet" | "comet";
+  /** Nom du catalogue (ouvre la fiche), de la planete ou de la comete. */
+  designation: string;
+  /** Tel qu'ecrit dans l'article : « NGC 7331 ». */
+  label: string;
+  messier: string | null;
+  ngc: string | null;
+}
+
 export interface NewsItem {
   title: string;
   link: string;
@@ -431,6 +442,8 @@ export interface NewsItem {
   date: string | null;
   summary: string;
   image: string | null;
+  kind: "observer" | "espace" | "image";
+  objects: NewsObject[];
 }
 
 export interface NewsInfo {

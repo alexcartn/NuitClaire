@@ -286,7 +286,7 @@ export function CeSoir({
         <SectorChips horizon={state.data.horizon} horizonAlt={state.data.horizonAlt} />
       </Section>
 
-      <NewsSection />
+      <NewsSection onOpenTarget={onOpenTarget} />
     </div>
   );
 }

@@ -26,3 +26,37 @@ def test_merge_drops_old_items_and_caps_sources():
     items = news.parse_rss("X", RSS)
     merged = news.merge({"X": items}, datetime(2026, 9, 28, 12, tzinfo=timezone.utc))
     assert [i["title"] for i in merged] == ["Saturne à l'opposition", "Andromeda"]
+
+
+def test_objects_found_in_text_order_and_resolved_in_catalog():
+    objs = news.objects_in("Neptune passe avant Saturne ; supernova dans NGC 7331, pres de M 31 et de XYZ 12, comete C/2025 A1")
+    assert [o["label"] for o in objs] == ["Neptune", "Saturne", "NGC 7331"]
+    assert objs[2]["designation"] == "NGC7331"
+    assert news.objects_in("la comete 12P/Pons-Brooks")[0]["designation"] == "12P"
+
+
+def test_kind_and_caps():
+    assert news.kind_of("X", "Une supernova dans NGC 7331", "", True) == "observer"
+    assert news.kind_of("X", "Starship decolle", "la mission emporte des satellites", False) == "espace"
+    assert news.kind_of("APOD", "M31", "", True) == "image"
+    assert news.fix_caps("COMMUNION SOLENNELLE") == "Communion solennelle"
+    assert news.fix_caps("Pluton à l'opposition") == "Pluton à l'opposition"
+
+
+def test_magazine_columns_are_dropped():
+    xml = """<rss><channel>
+    <item><title>Edito</title><link>https://ex.fr/e</link><category>Éditorial</category>
+    <pubDate>Mon, 28 Sep 2026 09:39:00 +0200</pubDate></item>
+    <item><title>Nova</title><link>https://ex.fr/n</link><category>Actualité</category>
+    <pubDate>Mon, 28 Sep 2026 09:39:00 +0200</pubDate></item></channel></rss>"""
+    assert [i["title"] for i in news.parse_rss("X", xml)] == ["Nova"]
+
+
+def test_apod_page_image(monkeypatch):
+    class R:
+        text = '<a href="image/2609/big.jpg"><IMG SRC="image/2609/screen_1000.jpg" alt="x"></a>'
+        def raise_for_status(self):
+            pass
+    monkeypatch.setattr(news.requests, "get", lambda *a, **k: R())
+    news._apod_images.clear()
+    assert news.apod_image("https://apod.nasa.gov/apod/ap260924.html") == "https://apod.nasa.gov/apod/image/2609/screen_1000.jpg"
