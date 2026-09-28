@@ -436,7 +436,8 @@ Pour brancher Supabase (Postgres) a la place, sans rien changer au code appelant
 
 Des que ces deux variables sont presentes, `db.py` bascule automatiquement les trois
 stores sur Supabase (voir `db.enabled()`) ; absentes, comportement inchange (fichiers
-locaux). `pip install -r api/requirements-api.txt` installe le client `supabase`.
+locaux). `db.py` parle directement a l'API REST de Supabase (deux requetes, via `requests`) :
+pas de paquet `supabase` a installer.
 
 ### Navigation, prochaines nuits, plan de nuit
 
@@ -738,6 +739,12 @@ Vercel separes sur le meme repo GitHub :
    `api/main.py`), et `NUITCLAIRE_API_TOKEN` (conseille, voir "Code d'acces de l'API").
 2. Projet mobile -- Root Directory : `mobile/` (config deja dans `mobile/vercel.json`).
    Variable d'environnement : `VITE_API_BASE` = URL du projet API ci-dessus.
+
+Stockage des fonctions (limite gratuite de Vercel) : seul `master` se deploie, les branches
+de travail `claude/*` non (`git.deploymentEnabled` dans les deux `vercel.json`) ;
+`.vercelignore` ecarte de la fonction API ce qui ne lui sert pas (tests, docs, scripts,
+appli mobile, ancienne interface Streamlit). Garder une retention courte des deploiements
+(reglage du projet Vercel).
 
 ## Sources
 - Open-Meteo, modele AROME Meteo-France (1.3 km) : nuages par couche, vent, rosee, pluie

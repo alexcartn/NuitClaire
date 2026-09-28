@@ -13,9 +13,10 @@ contrairement a Railway/Fly.io, ou les fichiers JSON locaux suffisaient
 jusqu'ici (voir Dockerfile)."""
 import os
 
+import requests
+
 _TABLE = "app_state"
-_client = None
-_client_error: Exception | None = None
+_TIMEOUT_S = 10
 
 
 def enabled() -> bool:
@@ -31,46 +32,38 @@ def _key() -> str | None:
     return os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
 
 
-def _get_client():
-    """Cree (et met en cache) le client Supabase. Leve une erreur explicite
-    plutot que de retomber silencieusement sur le fichier local si les
-    identifiants sont presents mais que le client ne peut pas etre construit
-    -- une erreur bruyante au demarrage vaut mieux qu'une perte de donnees
-    silencieuse en production serverless (fichier local ecrit sur un disque
-    ephemere, jamais relu)."""
-    global _client, _client_error
-    if _client is not None:
-        return _client
-    if _client_error is not None:
-        raise _client_error
-    try:
-        from supabase import create_client
-    except ImportError as exc:
-        _client_error = RuntimeError(
-            "SUPABASE_URL/SUPABASE_KEY sont definies mais le paquet 'supabase' "
-            "n'est pas installe (pip install -r api/requirements-api.txt)."
-        )
-        raise _client_error from exc
-    try:
-        _client = create_client(_url(), _key())
-    except Exception as exc:
-        _client_error = exc
-        raise
-    return _client
+def _endpoint() -> str:
+    return f"{_url().rstrip('/')}/rest/v1/{_TABLE}"
+
+
+def _headers() -> dict:
+    # L'API REST de Supabase (PostgREST), appelee directement : deux
+    # requetes suffisent, et le paquet `supabase` pesait ~25 Mo de plus dans
+    # chaque deploiement Vercel (authentification, temps reel, stockage...,
+    # dont on ne se sert pas).
+    key = _key()
+    return {"apikey": key, "Authorization": f"Bearer {key}"}
 
 
 def load_blob(store: str) -> dict | None:
     """Lit le blob JSON associe a `store` ('settings'/'sessions'/'progress').
     Retourne None si aucune ligne n'existe encore pour ce store (premiere
     utilisation), pour que l'appelant puisse retomber sur ses valeurs par
-    defaut comme il le ferait pour un fichier absent."""
-    client = _get_client()
-    resp = client.table(_TABLE).select("data").eq("store", store).limit(1).execute()
-    rows = resp.data or []
+    defaut comme il le ferait pour un fichier absent. Une erreur (reseau,
+    identifiants) leve plutot que de retomber en silence sur un fichier
+    local : en serverless, il serait ecrit sur un disque ephemere, jamais
+    relu."""
+    r = requests.get(_endpoint(), headers=_headers(), timeout=_TIMEOUT_S,
+                     params={"select": "data", "store": f"eq.{store}", "limit": 1})
+    r.raise_for_status()
+    rows = r.json() or []
     return rows[0]["data"] if rows else None
 
 
 def save_blob(store: str, data: dict) -> None:
-    """Ecrit (upsert) le blob JSON associe a `store`."""
-    client = _get_client()
-    client.table(_TABLE).upsert({"store": store, "data": data}).execute()
+    """Ecrit (upsert sur la cle primaire `store`) le blob JSON associe a
+    `store`."""
+    r = requests.post(_endpoint(), timeout=_TIMEOUT_S, params={"on_conflict": "store"},
+                      headers={**_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"},
+                      json={"store": store, "data": data})
+    r.raise_for_status()

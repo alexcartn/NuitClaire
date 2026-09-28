@@ -8,5 +8,4 @@ cachetools
 requests
 pandas
 ephem
-supabase
 pywebpush
