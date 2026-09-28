@@ -13,7 +13,7 @@ import {
   yearGrid,
 } from "../statsView";
 import { fmtExposure } from "./format";
-import type { PastSession, Stats } from "../types";
+import type { Family, FamilyCount, PastSession, Stats } from "../types";
 
 type Measure = "outings" | "captures";
 
@@ -68,6 +68,7 @@ export function JournalStats({ stats, year, past, captured, onOpenTarget }: {
             />
           </div>
           <MonthChart stats={stats} year={year} now={now} />
+          {stats.byFamily && <FamilySplit families={stats.byFamily} />}
           <NightsHeatmap past={past} year={year} />
           <MessierLine past={past} captured={captured} year={year} />
           <DurationChart past={past} year={year} />
@@ -112,7 +113,7 @@ function shortDate(isoDate: string): string {
 function ChartHead({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="nc-row nc-between" style={{ minHeight: 32 }}>
-      <span className="nc-caption">{title}</span>
+      <span className="nc-caption" style={{ whiteSpace: "nowrap" }}>{title}</span>
       {children}
     </div>
   );
@@ -245,6 +246,89 @@ function MonthChart({ stats, year, now }: { stats: Stats; year: number; now: Dat
         {monthLabel(b.month)} : {plural(b.outings, "sortie", "sorties")} ·{" "}
         {plural(b.captures, "cible capturée", "cibles capturées")}
       </Readout>
+    </div>
+  );
+}
+
+const FAMILY_LABEL: Record<Family, string> = {
+  galaxies: "Galaxies",
+  nebuleuses: "Nébuleuses",
+  amas: "Amas",
+  autres: "Autres",
+};
+// Une seule teinte, l'accent, en quatre intensites : le mode nuit n'a que du
+// rouge, et chaque famille est de toute facon nommee dans la legende.
+const FAMILY_OPACITY: Record<Family, number> = { galaxies: 1, nebuleuses: 0.68, amas: 0.42, autres: 0.24 };
+
+type FamilyMeasure = "targets" | "captured" | "exposureMin";
+
+/** Ce que l'on observe : une barre partagee entre les familles d'objets,
+ * et sous elle la legende chiffree. */
+function FamilySplit({ families }: { families: FamilyCount[] }) {
+  const [measure, setMeasure] = useState<FamilyMeasure>("targets");
+  const total = families.reduce((sum, f) => sum + f[measure], 0);
+  if (families.every((f) => f.targets === 0)) return null;
+  const fmt = (v: number) => (measure === "exposureMin" ? fmtExposure(v) : String(v));
+  const shown = families.filter((f) => f[measure] > 0);
+  return (
+    <div className="nc-stack-xs">
+      <ChartHead title="Types d'objets">
+        <div className="nc-segmented" role="radiogroup" aria-label="Mesure" style={{ width: 210 }}>
+          {([["targets", "Cibles"], ["captured", "Capturées"], ["exposureMin", "Expo"]] as const).map(([m, label]) => (
+            <button
+              key={m}
+              role="radio"
+              aria-checked={measure === m}
+              onClick={() => setMeasure(m)}
+              className={measure === m ? "nc-segment nc-segment-active" : "nc-segment"}
+              style={{ minHeight: 32 }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </ChartHead>
+      {total === 0 ? (
+        <Readout>Rien à répartir pour l'instant.</Readout>
+      ) : (
+        <>
+          <div
+            role="img"
+            aria-label={shown.map((f) => `${FAMILY_LABEL[f.family]} ${fmt(f[measure])}`).join(", ")}
+            style={{ display: "flex", gap: 2, height: 14 }}
+          >
+            {shown.map((f, i) => (
+              <span
+                key={f.family}
+                style={{
+                  flex: f[measure],
+                  minWidth: 4,
+                  background: "var(--accent)",
+                  opacity: FAMILY_OPACITY[f.family],
+                  borderRadius: `${i === 0 ? 4 : 0}px ${i === shown.length - 1 ? 4 : 0}px ${i === shown.length - 1 ? 4 : 0}px ${i === 0 ? 4 : 0}px`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
+            {families.map((f) => (
+              <div key={f.family} className="nc-row" style={{ gap: 6, fontSize: "var(--text-sm)", minWidth: 0 }}>
+                <span
+                  className="nc-none"
+                  style={{ width: 10, height: 10, borderRadius: 2, background: "var(--accent)", opacity: FAMILY_OPACITY[f.family] }}
+                />
+                <span className="nc-grow nc-ellipsis">{FAMILY_LABEL[f.family]}</span>
+                <span className="nc-num nc-none" style={{ color: "var(--ink2)" }}>
+                  {fmt(f[measure])}
+                </span>
+                <span className="nc-num nc-none" style={{ color: "var(--ink3)", width: "4ch", textAlign: "right" }}>
+                  {Math.round((f[measure] / total) * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

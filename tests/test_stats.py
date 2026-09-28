@@ -112,6 +112,10 @@ def test_compute_on_empty_journal():
         "successfulOutings": 0, "avgScoreSuccessful": None,
         "avgRating": None, "ratedOutings": 0, "outingsBySite": [],
         "exposureByTarget": [], "totalExposureMin": 0,
+        "byFamily": [
+            {"family": f, "targets": 0, "captured": 0, "exposureMin": 0}
+            for f in ("galaxies", "nebuleuses", "amas", "autres")
+        ],
     }
 
 
@@ -153,3 +157,24 @@ def test_compute_restricted_to_a_year():
         {"designation": "M13", "totalMin": 25}, {"designation": "M27", "totalMin": 10},
     ]
     assert compute(data, progress_data)["totalExposureMin"] == 90
+
+
+def test_by_family_groups_targets_from_the_catalog():
+    data = default()
+    add_item(data, "M31", NOW, score_now=70)      # galaxie
+    add_item(data, "M42", NOW, score_now=70)      # amas + nebuleuse, rangee en nebuleuse
+    add_item(data, "M13", NOW, score_now=70)      # amas globulaire
+    add_item(data, "XYZ 1", NOW, score_now=70)    # inconnue du catalogue
+    set_item_exposure(data, "M31", 40)
+    from sessions import toggle_item
+    toggle_item(data, "M31")
+    close_session(data, NOW.date(), NOW)
+    progress_data = progress.add_exposure(progress.default(), "M42", 15, NOW)
+
+    families = {f["family"]: f for f in compute(data, progress_data)["byFamily"]}
+
+    assert list(families) == ["galaxies", "nebuleuses", "amas", "autres"]
+    assert families["galaxies"] == {"family": "galaxies", "targets": 1, "captured": 1, "exposureMin": 40}
+    assert families["nebuleuses"]["targets"] == 1 and families["nebuleuses"]["exposureMin"] == 15
+    assert families["amas"]["targets"] == 1
+    assert families["autres"]["targets"] == 1

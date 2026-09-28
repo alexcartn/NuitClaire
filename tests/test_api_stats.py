@@ -6,6 +6,10 @@ def test_stats_empty_journal(api_client):
         "successfulOutings": 0, "avgScoreSuccessful": None,
         "avgRating": None, "ratedOutings": 0, "outingsBySite": [],
         "exposureByTarget": [], "totalExposureMin": 0,
+        "byFamily": [
+            {"family": f, "targets": 0, "captured": 0, "exposureMin": 0}
+            for f in ("galaxies", "nebuleuses", "amas", "autres")
+        ],
     }
 
 

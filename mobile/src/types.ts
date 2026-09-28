@@ -366,6 +366,16 @@ export interface SiteCount {
   lastDate: string;
 }
 
+export type Family = "galaxies" | "nebuleuses" | "amas" | "autres";
+
+export interface FamilyCount {
+  family: Family;
+  /** Cibles distinctes pointees dans l'annee. */
+  targets: number;
+  captured: number;
+  exposureMin: number;
+}
+
 export interface Stats {
   totalOutings: number;
   outingsByMonth: MonthCount[];
@@ -377,4 +387,7 @@ export interface Stats {
   outingsBySite: SiteCount[];
   exposureByTarget: TargetExposure[];
   totalExposureMin: number;
+  /** Les quatre familles, toujours dans cet ordre (absent d'une vieille
+   * reponse en cache). */
+  byFamily?: FamilyCount[];
 }

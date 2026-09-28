@@ -4,7 +4,9 @@ viennent de ce que l'utilisateur a deja saisi (sessions cloturees, cibles
 cochees, temps d'expo) : aucune moyenne ou estimation fabriquee au-dela des
 agregations elementaires (compter, sommer, moyenner) decrites ci-dessous."""
 from collections import Counter
+from functools import lru_cache
 
+import catalog
 import progress as progress_store
 import sessions as sessions_store
 
@@ -114,6 +116,49 @@ def exposure_by_target(sessions_data: dict, progress_data: dict, year: int | Non
     )
 
 
+# Familles d'objets pour la repartition des statistiques, dans un ordre fixe
+# (la couleur d'une famille ne doit pas changer d'une annee a l'autre). Les
+# codes sont ceux des CSV du catalogue (voir scripts/build_catalog.py). Un
+# amas + nebuleuse (M8, M16, M42...) se photographie comme une nebuleuse.
+FAMILIES = ("galaxies", "nebuleuses", "amas", "autres")
+_FAMILY_OF_TYPE = {
+    "G": "galaxies",
+    "PN": "nebuleuses", "Neb": "nebuleuses", "EmN": "nebuleuses", "HII": "nebuleuses",
+    "RfN": "nebuleuses", "SNR": "nebuleuses", "Cl+N": "nebuleuses",
+    "OCl": "amas", "GCl": "amas", "*Ass": "amas",
+}
+
+
+@lru_cache(maxsize=2048)
+def family_of(designation: str) -> str:
+    """Famille d'une cible d'apres le catalogue ; "autres" pour une double,
+    un asterisme, ou une designation que le catalogue ne connait pas."""
+    target = catalog.find_target(designation)
+    return _FAMILY_OF_TYPE.get(target["type"], "autres") if target else "autres"
+
+
+def by_family(past: list[dict], exposure: list[dict]) -> list[dict]:
+    """Cibles pointees, capturees et minutes d'expo par famille, les quatre
+    toujours presentes (a zero au besoin). Une cible pointee sur plusieurs
+    sorties ne compte qu'une fois ; l'expo reprend `exposure_by_target`,
+    journal libre compris."""
+    pointed: set[str] = set()
+    captured: set[str] = set()
+    for p in past:
+        for designation, item in (p.get("items") or {}).items():
+            pointed.add(designation)
+            if item.get("done"):
+                captured.add(designation)
+    out = {f: {"family": f, "targets": 0, "captured": 0, "exposureMin": 0} for f in FAMILIES}
+    for designation in pointed:
+        out[family_of(designation)]["targets"] += 1
+    for designation in captured:
+        out[family_of(designation)]["captured"] += 1
+    for e in exposure:
+        out[family_of(e["designation"])]["exposureMin"] += e["totalMin"]
+    return [out[f] for f in FAMILIES]
+
+
 def compute(sessions_data: dict, progress_data: dict, year: int | None = None) -> dict:
     """Agrege toutes les statistiques en un seul appel -- forme consommee
     telle quelle par l'API (`GET /api/stats`) et par les deux frontends
@@ -134,4 +179,5 @@ def compute(sessions_data: dict, progress_data: dict, year: int | None = None) -
         "avgScoreSuccessful": avg_score,
         "exposureByTarget": exposure,
         "totalExposureMin": sum(e["totalMin"] for e in exposure),
+        "byFamily": by_family(past, exposure),
     }

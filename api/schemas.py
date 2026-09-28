@@ -415,6 +415,14 @@ class SiteCountOut(BaseModel):
     lastDate: str
 
 
+class FamilyCountOut(BaseModel):
+    # "galaxies" | "nebuleuses" | "amas" | "autres", voir stats.FAMILIES.
+    family: str
+    targets: int
+    captured: int
+    exposureMin: int
+
+
 class StatsOut(BaseModel):
     totalOutings: int
     avgRating: float | None = None
@@ -426,6 +434,7 @@ class StatsOut(BaseModel):
     avgScoreSuccessful: float | None
     exposureByTarget: list[TargetExposureOut]
     totalExposureMin: int
+    byFamily: list[FamilyCountOut] = []
 
 
 SettingsOut.model_rebuild()
