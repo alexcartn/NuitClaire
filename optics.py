@@ -59,6 +59,11 @@ def eye_optics() -> dict:
     return dict(EYE)
 
 
+# A l'oeil nu, on se repere en poings tendus a bout de bras : une dizaine de
+# degres. C'est le pas du chemin d'etoiles sans instrument.
+EYE_HOP_DEG = 10.0
+
+
 def limit_mag(optics: dict) -> float:
     """Magnitude integree limite d'un objet etendu pour cette optique."""
     return optics.get("limit_mag") or visual_limit_mag(optics["aperture_mm"])
@@ -112,6 +117,10 @@ def framing(tgt: dict, size: tuple | None = None) -> str:
     """Cadrage lisible selon l'instrument de la cible. `size` (largeur,
     hauteur en arcmin) prime sur celle de la cible quand elle est donnee."""
     optics = tgt.get("optics")
+    # A l'oeil nu, le « champ » est tout le ciel : ce qui compte, c'est de
+    # savoir si l'objet s'y voit.
+    if optics and optics.get("kind") == "oeil":
+        return "se voit sous un ciel noir" if visible_in_binoculars(tgt, optics) else "trop faible : aux jumelles"
     w, h = size if size is not None else (tgt.get("w"), tgt.get("h"))
     if not (w and h):
         return "taille inconnue"

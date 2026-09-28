@@ -53,3 +53,11 @@ def test_api_star_hop(api_client):
     assert r.status_code == 200
     assert r.json()["anchor"].startswith("Mirach")
     assert api_client.get("/api/targets/XYZ999/starhop").status_code == 404
+
+
+def test_fists_wording():
+    from starhop import _fists
+    assert _fists(4, 10) == "un demi-poing"
+    assert _fists(10, 10) == "un poing"
+    assert _fists(16, 10) == "un poing et demi"
+    assert _fists(31, 10) == "3 poings"

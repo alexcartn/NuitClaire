@@ -5,6 +5,7 @@ import { applyUpdate, usePwa } from "./pwa";
 import { readCache, readText, writeText } from "./storage";
 import { windowLabel } from "./format";
 import { remember } from "./useRemembered";
+import { getWatchMode } from "./useWatchMode";
 import { autoNightAction } from "./autoNight";
 import { autoEnterNight, autoLeaveNight, useTheme } from "./useTheme";
 import type { Night, Screen } from "./types";
@@ -44,6 +45,8 @@ interface Nav {
   skyMode?: "carte" | "viseur";
   /** Fiche vue aux jumelles, ouverte depuis « En attendant le Seestar ». */
   binoculars?: boolean;
+  /** Meme fiche, a l'oeil nu (le switch de « En attendant le Seestar »). */
+  eye?: boolean;
 }
 
 /** Ecran d'ouverture : "soir" par defaut, ou celui demande par l'URL. Sert
@@ -196,6 +199,9 @@ export default function App() {
       screen: "detail",
       selected: designation,
       binoculars,
+      // Le mode du switch au moment d'ouvrir : la fiche le garde ensuite,
+      // meme si on le change ailleurs entre-temps.
+      eye: binoculars && getWatchMode() === "oeil",
       backTo: current.screen === "detail" || current.screen === "recherche" || current.screen === "actus" ? current.backTo : current.screen,
       depth: current.depth + 1,
     });
@@ -270,6 +276,7 @@ export default function App() {
             designation={selected}
             captured={captured}
             binoculars={nav.binoculars ?? false}
+            eye={nav.eye ?? false}
             horizon={state?.horizon}
             horizonAlt={state?.horizonAlt}
             onOpenSky={(mode) => openSky(selected, mode)}

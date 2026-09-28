@@ -13,6 +13,11 @@ function read(): WatchMode {
   return readText(KEY) === "oeil" ? "oeil" : "jumelles";
 }
 
+/** Le mode en cours, hors d'un composant (a l'ouverture d'une fiche). */
+export function getWatchMode(): WatchMode {
+  return read();
+}
+
 export function setWatchMode(mode: WatchMode): void {
   writeText(KEY, mode === "oeil" ? "oeil" : null);
   listeners.forEach((l) => l());

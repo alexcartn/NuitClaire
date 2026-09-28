@@ -151,10 +151,22 @@ def _fmt(v: float) -> str:
     return f"{v:.1f}".replace(".", ",")
 
 
-def star_hop(target: dict, fov_deg: float, when: datetime, site: dict) -> dict:
+def _fists(deg: float, fist_deg: float) -> str:
+    """Un ecart en poings tendus, arrondi au demi-poing : « un demi-poing »,
+    « un poing et demi », « 3 poings »."""
+    n = max(0.5, round(deg / fist_deg * 2) / 2)
+    whole, half = int(n), n % 1 == 0.5
+    if whole == 0:
+        return "un demi-poing"
+    words = "un poing" if whole == 1 else f"{whole} poings"
+    return f"{words} et demi" if half else words
+
+
+def star_hop(target: dict, fov_deg: float, when: datetime, site: dict, eye: bool = False) -> dict:
     """Chemin et carte pour `target` (catalogue : ra en heures, dec en
     degres), aux jumelles de champ `fov_deg`, oriente comme le ciel a
-    l'instant `when` (datetime avec fuseau)."""
+    l'instant `when` (datetime avec fuseau). `eye` : a l'oeil nu, `fov_deg`
+    est la largeur d'un poing tendu et les ecarts se disent en poings."""
     t_ra, t_dec = target["ra"] * 15, target["dec"]
     plan = plan_hops(t_ra, t_dec, fov_deg)
     pts = plan["points"]
@@ -188,11 +200,13 @@ def star_hop(target: dict, fov_deg: float, when: datetime, site: dict) -> dict:
     anchor = plan["anchor"]
     steps.append(f"Trouvez {star_label(anchor)} à l'œil nu (magnitude {_fmt(anchor['mag'])}).")
     if plan["distance_deg"] < 0.5 * fov_deg:
-        steps.append(f"{name} est dans le même champ : centrez les jumelles dessus.")
+        steps.append(f"{name} est tout près : à moins d'un demi-poing." if eye
+                     else f"{name} est dans le même champ : centrez les jumelles dessus.")
     for i in range(1, len(pts)) if plan["distance_deg"] >= 0.5 * fov_deg else []:
         (x1, y1), (x2, y2) = placed[i - 1], placed[i]
         deg = separation(pts[i - 1]["ra"], pts[i - 1]["dec"], pts[i]["ra"], pts[i]["dec"])
-        span = f"{round(deg)}° ({_fmt(deg / fov_deg)} champ{'s' if deg / fov_deg >= 2 else ''})"
+        span = (f"{round(deg)}° ({_fists(deg, fov_deg)})" if eye
+                else f"{round(deg)}° ({_fmt(deg / fov_deg)} champ{'s' if deg / fov_deg >= 2 else ''})")
         where = _direction(x2 - x1, y2 - y1)
         if pts[i].get("target"):
             steps.append(f"{span} {where} : {name}.")

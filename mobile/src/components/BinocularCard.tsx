@@ -7,8 +7,8 @@ import { ErrorNotice } from "./ErrorNotice";
 /** « En attendant le Seestar » : quelques cibles faciles aux jumelles, ou a
  * l'oeil nu (le switch), bien placees maintenant (voir binocular_now.py).
  * Pas de suivi, pas de « vu » : de quoi patienter a cote du Seestar. Un
- * appui ouvre la fiche vue aux jumelles, avec son chemin d'etoiles et le
- * viseur. */
+ * appui ouvre la fiche vue aux jumelles, ou a l'oeil nu selon le switch,
+ * avec son chemin d'etoiles et le viseur. */
 export function BinocularCard({ binocularsLabel, seestarTarget, onOpenTarget }: {
   /** « 10x50 » : change quand on modifie les jumelles dans Reglages, et
    * la liste avec. */

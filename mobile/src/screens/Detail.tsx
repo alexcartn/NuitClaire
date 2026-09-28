@@ -26,7 +26,7 @@ function fmtDay(iso: string): string {
 /** Lignes du tableau d'une cible : le ciel profond et, a la meme place,
  * ce qui a du sens pour la Lune ou une planete (distance, phase ; pas de
  * filtre ni de temps de pose conseille). */
-function characteristics(data: TargetDetail, bino: boolean): [string, string][] {
+function characteristics(data: TargetDetail, bino: boolean, eye = false): [string, string][] {
   const b = data.body;
   const window: [string, string] = ["Fenêtre exploitable", data.start ? `${data.start}–${data.end} (${data.hours} h)` : "Aucune ce soir"];
   if (b) {
@@ -46,7 +46,7 @@ function characteristics(data: TargetDetail, bino: boolean): [string, string][] 
     ["Coordonnées", `${data.ra.toFixed(3)}h / ${data.dec.toFixed(3)}°`],
     ["Magnitude", data.mag != null ? data.mag.toFixed(1) : "inconnue"],
     ["Taille", data.sizeW && data.sizeH ? `${data.sizeW.toFixed(1)}' x ${data.sizeH.toFixed(1)}'` : "inconnue"],
-    [bino ? "Dans les jumelles" : "Cadrage Seestar", data.cadrage],
+    [eye ? "À l'œil nu" : bino ? "Dans les jumelles" : "Cadrage Seestar", data.cadrage],
     window,
     ...(bino ? [] : [["Filtre conseillé", data.filter] as [string, string]]),
     ["Séparation lunaire mini", `${Math.round(data.moonSepDeg)}°`],
@@ -107,6 +107,7 @@ function fmtExposureDate(iso: string): string {
 
 export function Detail({
   binoculars = false,
+  eye = false,
   onOpenSky,
   designation,
   captured,
@@ -128,10 +129,14 @@ export function Detail({
   /** Fiche vue aux jumelles : chemin d'etoiles, cadrage dans leur champ,
    * sans ce qui touche a la photo. */
   binoculars?: boolean;
+  /** Fiche vue a l'oeil nu (avec `binoculars`) : le cadrage dit si l'objet
+   * se voit, le chemin d'etoiles avance en poings tendus. */
+  eye?: boolean;
   onOpenSky?: (mode: "carte" | "viseur") => void;
 }) {
-  const fetchDetail = useCallback(() => api.targetDetail(designation, binoculars), [designation, binoculars]);
-  const { data, loading, error, reload } = useFetch(fetchDetail, [designation, binoculars]);
+  const instrument = binoculars ? (eye ? "oeil" : "jumelles") : "seestar";
+  const fetchDetail = useCallback(() => api.targetDetail(designation, instrument), [designation, instrument]);
+  const { data, loading, error, reload } = useFetch(fetchDetail, [designation, instrument]);
   const [addedToJournal, setAddedToJournal] = useState(false);
   // Le journal est deja sur l'appareil : l'historique de la cible s'en
   // deduit, sans requete (voir journalRead.targetHistory).
@@ -206,7 +211,7 @@ export function Detail({
       {data && (
         <>
           <div>
-            {bino && <div className="nc-eyebrow">Aux jumelles</div>}
+            {bino && <div className="nc-eyebrow">{eye ? "À l'œil nu" : "Aux jumelles"}</div>}
             {data.body && <div className="nc-eyebrow">{data.body.kind}</div>}
             <div className="nc-row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
               <div className="nc-num" style={{ fontSize: "var(--text-xl)", fontWeight: 500, letterSpacing: "-.02em" }}>
@@ -249,7 +254,7 @@ export function Detail({
 
           <InTheNews designation={data.designation} ngc={data.ngc} messierId={data.messierId} />
 
-          {bino && <StarHopCard designation={designation} />}
+          {bino && <StarHopCard designation={designation} eye={eye} />}
           {onOpenSky && (
             <div className="nc-row">
               <button onClick={() => onOpenSky("carte")} className="nc-btn nc-grow">Sur la carte du ciel</button>
@@ -279,7 +284,7 @@ export function Detail({
           </div>
 
           <div className="nc-card" style={{ padding: 0, overflow: "hidden" }}>
-            {characteristics(data, bino).map(([k, v], i, arr) => (
+            {characteristics(data, bino, eye).map(([k, v], i, arr) => (
               <div
                 key={k}
                 style={{

@@ -18,7 +18,7 @@ from api.translate import row_to_target_out
 from astro import fits_in_fov
 from catalog import find_target, french_name, load_messier, search_by_name, search_prefix
 from imagery import dss_image_url
-from optics import binocular_optics, with_optics
+from optics import EYE_HOP_DEG, binocular_optics, eye_optics, with_optics
 from rows import day_frame, filter_label, row_from_search
 from scoring import discovery_sort_key, min_alt_for, recommended_exposure_minutes, target_altitude_series
 from wiki import wiki_title_candidates
@@ -137,10 +137,11 @@ def search_suggest(q: str = Query(min_length=1), limit: int = Query(default=8, g
 
 
 @router.get("/api/targets/{designation}", response_model=TargetDetailOut)
-def target_detail(designation: str, instrument: str = Query(default="seestar", pattern="^(seestar|jumelles)$")) -> dict:
+def target_detail(designation: str, instrument: str = Query(default="seestar", pattern="^(seestar|jumelles|oeil)$")) -> dict:
     """Fiche d'une cible. `instrument=jumelles` : la fiche ouverte depuis
     « En attendant le Seestar » (cadrage dans le champ des jumelles, hauteur
-    minimale et tolerance a la Lune de l'oeil)."""
+    minimale et tolerance a la Lune de l'oeil). `instrument=oeil` : la meme,
+    a l'oeil nu (le cadrage dit si l'objet s'y voit, voir optics.EYE)."""
     site, horizon = get_site(), get_horizon()
     sel, df, _ = current_night(site)
     if sel is None:
@@ -156,6 +157,8 @@ def target_detail(designation: str, instrument: str = Query(default="seestar", p
         return {**out, **_exposure_fields(out["designation"])}
     if instrument == "jumelles":
         target = with_optics(target, binocular_optics(settings_store.load()))
+    elif instrument == "oeil":
+        target = with_optics(target, eye_optics())
 
     row = row_from_search(target, df, horizon, site)
     out = row_to_target_out(row)
@@ -198,10 +201,11 @@ def _exposure_fields(designation: str) -> dict:
 
 
 @router.get("/api/targets/{designation}/starhop")
-def target_star_hop(designation: str) -> dict:
-    """Chemin d'etoiles aux jumelles configurees (voir starhop.py). Carte
-    orientee comme le ciel maintenant si la cible est levee, sinon a l'heure
-    ou elle culmine cette nuit."""
+def target_star_hop(designation: str, instrument: str = Query(default="jumelles", pattern="^(jumelles|oeil)$")) -> dict:
+    """Chemin d'etoiles aux jumelles configurees (voir starhop.py), ou a
+    l'oeil nu en poings tendus (`EYE_HOP_DEG`). Carte orientee comme le ciel
+    maintenant si la cible est levee, sinon a l'heure ou elle culmine cette
+    nuit."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
@@ -221,4 +225,5 @@ def target_star_hop(designation: str) -> dict:
         up_now = [t for t, a in series["alt"].items() if abs((t - now_naive).total_seconds()) <= 1800 and a > 10]
         if not up_now:
             when = series["alt"].idxmax().to_pydatetime().replace(tzinfo=tz)
-    return star_hop(target, binocular_optics(s)["fov_deg"], when, site)
+    fov = EYE_HOP_DEG if instrument == "oeil" else binocular_optics(s)["fov_deg"]
+    return star_hop(target, fov, when, site, eye=instrument == "oeil")

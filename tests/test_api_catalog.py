@@ -218,3 +218,14 @@ def test_planet_detail_has_the_same_shape_as_a_catalog_target(api_client, monkey
     assert len(planet["altitudeSeries"]) == len(deep["altitudeSeries"])
     assert planet["imageUrl"] == "https://example/saturn.jpg"
     assert deep.get("body") is None
+
+
+def test_naked_eye_detail_and_star_hop(api_client):
+    m31 = api_client.get("/api/targets/M31", params={"instrument": "oeil"}).json()
+    assert m31["cadrage"] == "se voit sous un ciel noir"
+    assert m31["minAltDeg"] == 15
+    m57 = api_client.get("/api/targets/M57", params={"instrument": "oeil"}).json()
+    assert m57["cadrage"] == "trop faible : aux jumelles"
+    hop = api_client.get("/api/targets/M31/starhop", params={"instrument": "oeil"}).json()
+    assert hop["fovDeg"] == 10
+    assert "poing" in " ".join(hop["steps"]) and "champ" not in " ".join(hop["steps"])

@@ -124,15 +124,18 @@ export const api = {
   comets: () => get<CometsInfo>("/api/comets"),
   news: (refresh = false) => get<NewsInfo>(refresh ? "/api/news?refresh=true" : "/api/news"),
   skyEvents: () => get<SkyEvent[]>("/api/sky-events"),
-  starHop: (designation: string) => get<StarHop>(`/api/targets/${encodeURIComponent(designation)}/starhop`),
+  /** `oeil` : le chemin a l'oeil nu, en poings tendus (10 deg). */
+  starHop: (designation: string, instrument: WatchMode = "jumelles") =>
+    get<StarHop>(`/api/targets/${encodeURIComponent(designation)}/starhop`, instrument === "oeil" ? { instrument } : undefined),
   /** `oeil` : les memes suggestions, pour l'oeil nu. */
   binocularsNow: (instrument: WatchMode = "jumelles") =>
     get<BinocularsNow>("/api/binoculars/now", instrument === "oeil" ? { instrument } : undefined),
-  /** `binoculars` : la fiche vue aux jumelles (cadrage dans leur champ). */
-  targetDetail: (designation: string, binoculars = false) =>
+  /** `jumelles` : la fiche vue aux jumelles (cadrage dans leur champ) ;
+   * `oeil` : a l'oeil nu (le cadrage dit si l'objet s'y voit). */
+  targetDetail: (designation: string, instrument: "seestar" | WatchMode = "seestar") =>
     get<TargetDetail>(
       `/api/targets/${encodeURIComponent(designation)}`,
-      binoculars ? { instrument: "jumelles" } : undefined,
+      instrument !== "seestar" ? { instrument } : undefined,
     ),
 
   sessions: () => get<Sessions>("/api/sessions"),

@@ -557,6 +557,10 @@ reglables dans Reglages → Jumelles (`optics.py`).
   de 90 deg au lieu de 64, sans cercle de jumelles, cible « droit devant » a 5 deg pres) ;
 - un appui ouvre la fiche vue aux jumelles (`GET /api/targets/{d}?instrument=jumelles` :
   cadrage « tient dans le champ », hauteurs de 15 a 90 deg), sans journal ni capture ;
+  en mode oeil nu, la meme fiche a l'oeil nu (`?instrument=oeil`) : titre « A l'oeil nu »,
+  verdict a la place du cadrage (« se voit sous un ciel noir » ou « trop faible : aux
+  jumelles »), et chemin d'etoiles en poings tendus (`?instrument=oeil` sur starhop : pas
+  de 10 deg, ecarts dits « un demi-poing », « un poing et demi ») ;
 - dans cette fiche, le chemin d'etoiles (`starhop.py`, `GET /api/targets/{d}/starhop`) :
   une etoile de depart brillante, des sauts de trois quarts de champ appuyes sur les
   etoiles visibles, et une carte orientee comme le ciel (zenith en haut), avec un cercle
