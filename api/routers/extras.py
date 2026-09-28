@@ -84,7 +84,7 @@ def latest_news(refresh: bool = False) -> dict:
 
 @router.get("/api/sky-events")
 def sky_agenda() -> list[dict]:
-    """Agenda des 30 prochains jours (voir sky_events.py), garde une heure :
+    """Agenda des 5 prochaines semaines (voir sky_events.py), garde une heure :
     il ne depend que du lieu et de la date."""
     site = site_from_settings(settings_store.load())
-    return _cached("sky-events", site, lambda st, day: sky_events.upcoming(st, day, 30))
+    return _cached("sky-events", site, lambda st, day: sky_events.upcoming(st, day, 35))
