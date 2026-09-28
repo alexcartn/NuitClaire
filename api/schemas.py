@@ -335,6 +335,9 @@ class PastSessionOut(BaseModel):
     targets: list[str]
     note: str
     closedAt: str
+    # Ouverture de la sortie (heure locale du site), absente des plus
+    # anciennes : sert a la duree des sorties dans les statistiques.
+    openedAt: str | None = None
     # Cibles de la sortie, dans leur detail (coches, temps de pose, note de
     # satisfaction, notes horodatees) : `targets` n'en donne que les noms, ce
     # qui ne suffit pas pour relire une nuit ni pour retrouver l'historique

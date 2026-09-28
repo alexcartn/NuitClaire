@@ -135,3 +135,21 @@ def test_outings_without_a_place_are_not_filed_under_an_invented_one():
     # Sorties anterieures a la conservation du lieu.
     past = [{"date": "2026-09-20", "site": None}, {"date": "2026-08-12"}]
     assert outings_by_site(past) == []
+
+
+def test_compute_restricted_to_a_year():
+    data = default()
+    for closed_at, exposure in ((datetime(2025, 12, 30, 23, 0), 40), (datetime(2026, 3, 4, 23, 0), 25)):
+        add_item(data, "M13", closed_at - timedelta(hours=2), score_now=70)
+        set_item_exposure(data, "M13", exposure)
+        close_session(data, closed_at.date(), closed_at)
+    progress_data = progress.add_exposure(progress.default(), "M27", 15, datetime(2025, 6, 1, 22, 0))
+    progress.add_exposure(progress_data, "M27", 10, datetime(2026, 5, 1, 22, 0))
+
+    stats_2026 = compute(data, progress_data, 2026)
+    assert stats_2026["totalOutings"] == 1
+    assert stats_2026["outingsByMonth"] == [{"month": "2026-03", "count": 1}]
+    assert stats_2026["exposureByTarget"] == [
+        {"designation": "M13", "totalMin": 25}, {"designation": "M27", "totalMin": 10},
+    ]
+    assert compute(data, progress_data)["totalExposureMin"] == 90

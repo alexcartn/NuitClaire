@@ -115,8 +115,11 @@ function Outing({ outing: p, places, reopenBlocked, reopening, onSave, onReopen,
 
 /** Les sorties cloturees, rangees comme le calendrier Messier : l'annee,
  * douze mois avec leur nombre de sorties, puis celles du mois touche. */
-export function PastOutings({ data, places, sessionActive, pendingCount, reopening, reopenError, onSave, onReopen, onOpenTarget }: {
+export function PastOutings({ data, year, onYear, places, sessionActive, pendingCount, reopening, reopenError, onSave, onReopen, onOpenTarget }: {
   data: Sessions;
+  /** Annee affichee, partagee avec les statistiques (voir screens/Journal). */
+  year: number;
+  onYear: (year: number) => void;
   places: Site[];
   sessionActive: boolean;
   pendingCount: number;
@@ -128,11 +131,10 @@ export function PastOutings({ data, places, sessionActive, pendingCount, reopeni
 }) {
   const latest = latestMonth(data.past);
   const years = outingYears(data.past);
-  const [year, setYear] = useRemembered("journal:year", latest?.year ?? new Date().getFullYear());
   const [month, setMonth] = useRemembered("journal:month", latest?.month ?? new Date().getMonth() + 1);
   if (data.past.length === 0) return null;
 
-  const shownYear = years.includes(year) ? year : years[0];
+  const shownYear = year;
   const months = outingsByMonth(data.past, shownYear);
   const list = months[month - 1];
   const reopenBlocked = sessionActive
@@ -142,7 +144,7 @@ export function PastOutings({ data, places, sessionActive, pendingCount, reopeni
       : null;
 
   const pickYear = (y: number) => {
-    setYear(y);
+    onYear(y);
     // Le mois le plus recent de l'annee choisie, pour ne pas tomber sur un vide.
     const ms = outingsByMonth(data.past, y);
     const last = [...ms.keys()].reverse().find((m) => ms[m].length > 0);

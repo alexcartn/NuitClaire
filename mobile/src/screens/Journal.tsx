@@ -5,6 +5,8 @@ import { applyServer, mutate, refresh, useSessions } from "../useSessions";
 import { closeOp, newOp } from "../sessionQueue";
 import type { SessionOpBody } from "../sessionQueue";
 import { knownSites } from "../journalRead";
+import { latestMonth, outingYears } from "../journalView";
+import { useRemembered } from "../useRemembered";
 import { useWakeLock } from "../useWakeLock";
 import { plural } from "../format";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -23,12 +25,20 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
   onCaptureChange: () => void;
 }) {
   const { data, loading, loadError, pendingCount, pendingNotes, syncError, syncCount } = useSessions();
-  const fetchStats = useCallback(() => api.stats(), []);
+  // Annee choisie dans le calendrier des sorties : les statistiques la
+  // suivent, d'ou son etat ici plutot que dans PastOutings.
+  const years = outingYears(data?.past ?? []);
+  const [year, setYear] = useRemembered(
+    "journal:year",
+    latestMonth(data?.past ?? [])?.year ?? new Date().getFullYear(),
+  );
+  const shownYear = years.includes(year) ? year : (years[0] ?? year);
+  const fetchStats = useCallback(() => api.stats(shownYear), [shownYear]);
   // Le lieu configure : c'est justement celui qu'on vient de poser dans
   // Reglages en rentrant, et qui n'est encore dans aucune sortie.
   const fetchState = useCallback(() => api.state(), []);
   const { data: appState, reload: reloadAppState } = useFetch(fetchState, [], "state");
-  const { data: stats, reload: reloadStats } = useFetch(fetchStats, []);
+  const { data: stats, reload: reloadStats } = useFetch(fetchStats, [fetchStats]);
   const [reopening, setReopening] = useState<string | null>(null);
   const [reopenError, setReopenError] = useState<string | null>(null);
 
@@ -121,6 +131,8 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
 
       <PastOutings
         data={data}
+        year={shownYear}
+        onYear={setYear}
         places={places}
         sessionActive={sessionActive}
         pendingCount={pendingCount}
@@ -131,7 +143,15 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
         onOpenTarget={onOpenTarget}
       />
 
-      {stats && <JournalStats stats={stats} onOpenTarget={onOpenTarget} />}
+      {stats && (
+        <JournalStats
+          stats={stats}
+          year={shownYear}
+          past={past}
+          captured={appState?.messierCaptured ?? []}
+          onOpenTarget={onOpenTarget}
+        />
+      )}
     </div>
   );
 }

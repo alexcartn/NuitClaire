@@ -49,3 +49,11 @@ def test_stats_combines_session_and_free_target_exposure(api_client):
         {"designation": "M13", "totalMin": 35}, {"designation": "M27", "totalMin": 10},
     ]
     assert data["totalExposureMin"] == 45
+
+
+def test_stats_year_filter(api_client):
+    api_client.post("/api/sessions/current/items", json={"designation": "M13"})
+    api_client.post("/api/sessions/current/close")
+
+    assert api_client.get("/api/stats?year=1999").json()["totalOutings"] == 0
+    assert api_client.get("/api/stats").json()["totalOutings"] == 1

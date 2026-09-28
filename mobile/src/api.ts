@@ -164,7 +164,7 @@ export const api = {
   reopenSession: (closedAt: string) =>
     request<Sessions>("POST", `/api/sessions/past/${encodeURIComponent(closedAt)}/reopen`),
 
-  stats: () => get<Stats>("/api/stats"),
+  stats: (year?: number) => get<Stats>(year ? `/api/stats?year=${year}` : "/api/stats"),
 
   pushKey: () => get<{ publicKey: string }>("/api/push/key"),
   pushSubscribe: (subscription: PushSubscriptionJSON) =>

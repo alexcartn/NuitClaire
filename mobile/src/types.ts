@@ -334,6 +334,9 @@ export interface PastSession {
   targets: string[];
   note: string;
   closedAt: string;
+  /** Ouverture de la sortie, heure locale du site. Absente des plus
+   * anciennes. */
+  openedAt?: string | null;
   /** Cibles de la sortie, dans leur detail. Vide sur les sorties anterieures
    * a leur conservation. */
   items: SessionItem[];

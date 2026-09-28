@@ -79,29 +79,50 @@ def outings_by_site(past: list[dict]) -> list[dict]:
             for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
 
 
-def exposure_by_target(sessions_data: dict, progress_data: dict) -> list[dict]:
+def _in_year(iso: str | None, year: int | None) -> bool:
+    return year is None or (iso or "")[:4] == str(year)
+
+
+def exposure_by_target(sessions_data: dict, progress_data: dict, year: int | None = None) -> list[dict]:
     """Minutes d'expo cumulees par cible, deux sources sommees : le temps
     saisi par session (sessions.exposure_totals) et le journal d'expo libre
     par cible (progress.exposure_totals, voir progress.py) -- une meme
     cible peut avoir des entrees dans les deux, ca s'additionne. Triees par
-    temps decroissant puis designation."""
-    totals = sessions_store.exposure_totals(sessions_data)
-    for designation, minutes in progress_store.exposure_totals(progress_data).items():
-        totals[designation] = totals.get(designation, 0) + minutes
+    temps decroissant puis designation.
+
+    Avec `year`, seules comptent les sorties de cette annee, la session en
+    cours si elle y a ete ouverte, et les entrees libres horodatees dans
+    cette annee."""
+    if year is None:
+        totals = sessions_store.exposure_totals(sessions_data)
+        for designation, minutes in progress_store.exposure_totals(progress_data).items():
+            totals[designation] = totals.get(designation, 0) + minutes
+    else:
+        current = sessions_data["current"]
+        filtered = {
+            "current": current if _in_year(current.get("openedAt"), year) else {**current, "items": {}},
+            "past": [p for p in sessions_data["past"] if _in_year(p["date"], year)],
+        }
+        totals = sessions_store.exposure_totals(filtered)
+        for designation, entries in progress_data["exposure_log"].items():
+            minutes = sum(e["minutes"] for e in entries if _in_year(e.get("at"), year))
+            if minutes:
+                totals[designation] = totals.get(designation, 0) + minutes
     return sorted(
         ({"designation": d, "totalMin": m} for d, m in totals.items()),
         key=lambda x: (-x["totalMin"], x["designation"]),
     )
 
 
-def compute(sessions_data: dict, progress_data: dict) -> dict:
+def compute(sessions_data: dict, progress_data: dict, year: int | None = None) -> dict:
     """Agrege toutes les statistiques en un seul appel -- forme consommee
     telle quelle par l'API (`GET /api/stats`) et par les deux frontends
-    (onglet/ecran Journal)."""
-    past = sessions_data["past"]
+    (onglet/ecran Journal). `year` restreint tout a une annee, celle
+    choisie dans le calendrier du journal ; sans elle, tout l'historique."""
+    past = [p for p in sessions_data["past"] if _in_year(p["date"], year)]
     avg_score, nb_successful = avg_score_successful(past)
     rating, nb_rated = avg_rating(past)
-    exposure = exposure_by_target(sessions_data, progress_data)
+    exposure = exposure_by_target(sessions_data, progress_data, year)
     return {
         "totalOutings": len(past),
         "avgRating": rating,
