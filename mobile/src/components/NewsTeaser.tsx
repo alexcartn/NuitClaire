@@ -14,7 +14,7 @@ export function MustSeeCard({ onOpenTarget }: { onOpenTarget: (designation: stri
     <div className="nc-card nc-stack-xs" style={{ borderColor: "var(--accent)" }}>
       <div className="nc-eyebrow" style={{ color: "var(--accent)" }}>À ne pas manquer</div>
       {picks.map(({ item, object, visibility }) => {
-        const open = object.kind === "target" ? () => onOpenTarget(object.designation) : undefined;
+        const open = object.kind !== "comet" ? () => onOpenTarget(object.designation) : undefined;
         return (
           <div key={object.designation} className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
             <a href={item.link} target="_blank" rel="noopener noreferrer"

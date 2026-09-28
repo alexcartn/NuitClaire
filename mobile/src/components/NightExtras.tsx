@@ -18,7 +18,7 @@ function dayLabel(iso: string): string {
  * (on regarde vers le sud), une ligne de points de part et d'autre du disque.
  * Distances a l'echelle ; le texte, lui, garde une taille lisible quelle que
  * soit l'ecartement des lunes (environ 11 px sur un ecran de telephone). */
-function JupiterMoons({ moons }: { moons: NonNullable<PlanetTonight["moons"]> }) {
+export function JupiterMoons({ moons }: { moons: NonNullable<PlanetTonight["moons"]> }) {
   const span = Math.max(12, ...moons.map((m) => Math.abs(m.x))) + 3;
   const font = span * 0.066;
   const moonR = Math.max(0.45, font * 0.22);

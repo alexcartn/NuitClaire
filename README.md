@@ -634,6 +634,17 @@ Lune du maximum. Les articles dont un objet est visible ce soir passent en tete 
 « Visible ce soir ») ; l'ecran dit quand les flux ont ete lus et permet de les relire
 (`?refresh=true`, au plus une fois par 10 minutes).
 
+### Lune et planetes
+
+La Lune et les sept planetes se trouvent dans la recherche (nom francais ou anglais, sans
+accents : « sat », « venus ») et dans une rangee « Systeme solaire » de l'ecran de recherche,
+avec leur propre fiche (`bodies.py`, `GET /api/bodies/{nom}`, `screens/BodyDetail.tsx`) :
+creneau de la nuit et courbe de hauteur (horizon degage compris), lever, passage au meridien
+et coucher, magnitude, taille apparente, distance, phase ; la Lune avec les reliefs du
+terminateur et les prochaines nouvelle et pleine Lune, Jupiter avec ses quatre grandes lunes,
+Saturne avec l'inclinaison des anneaux. Les puces « Saturne » des actualites ouvrent cette
+fiche. Elles ne s'ajoutent pas encore au journal de session (qui n'accepte que le catalogue).
+
 ### Recherche
 
 Par designation (prefixe : « M3 », « NGC70 ») ou par nom, en francais ou en anglais, sans

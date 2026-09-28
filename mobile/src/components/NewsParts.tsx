@@ -49,8 +49,9 @@ export function ObjectChips({ item, tonight, onOpenTarget }: {
           border: "1px solid var(--line)", background: "var(--surf)", color: "var(--ink)",
           fontSize: "var(--text-xs)", minHeight: 32,
         } as const;
-        // Seuls les objets du catalogue ont une fiche.
-        return o.kind === "target" ? (
+        // Les objets du catalogue et les planetes ont une fiche ; pas les
+        // cometes.
+        return o.kind !== "comet" ? (
           <button key={o.designation} onClick={() => onOpenTarget(o.designation)} style={{ ...style, cursor: "pointer" }}>
             {content}
             <span aria-hidden="true" style={{ color: "var(--ink3)", marginLeft: 2 }}>›</span>

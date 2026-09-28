@@ -15,6 +15,7 @@ import type {
   CometsInfo,
   NewsInfo,
   SkyEvent,
+  BodyDetail,
   Site,
   StarHop,
   Stats,
@@ -122,6 +123,7 @@ export const api = {
   comets: () => get<CometsInfo>("/api/comets"),
   news: (refresh = false) => get<NewsInfo>(refresh ? "/api/news?refresh=true" : "/api/news"),
   skyEvents: () => get<SkyEvent[]>("/api/sky-events"),
+  bodyDetail: (name: string) => get<BodyDetail>(`/api/bodies/${encodeURIComponent(name)}`),
   starHop: (designation: string) => get<StarHop>(`/api/targets/${encodeURIComponent(designation)}/starhop`),
   binocularsNow: () => get<BinocularsNow>("/api/binoculars/now"),
   /** `binoculars` : la fiche vue aux jumelles (cadrage dans leur champ). */

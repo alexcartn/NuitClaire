@@ -5,6 +5,7 @@ appelle les memes fonctions partagees), plus une fiche detail qui assemble
 en un seul appel ce qui, cote Streamlit, est reparti entre
 `feasible_rows`/`_row_from_search` (liste) et `_target_detail_dialog`
 (modale) : altitude series, temps de pose indicatif, resume Wikipedia."""
+import bodies
 from fastapi import APIRouter, HTTPException, Query
 
 import progress as progress_store
@@ -123,7 +124,9 @@ def search_suggest(q: str = Query(min_length=1), limit: int = Query(default=8, g
     # « andromede », « whirlpool ».
     found = search_prefix(q, limit=limit)
     names = [t for t in search_by_name(q, limit=limit) if t["name"] not in {f["name"] for f in found}]
-    return [
+    # La Lune et les planetes d'abord : « sa » doit donner Saturne avant
+    # les objets du catalogue qui commencent par ces lettres.
+    return bodies.search(q) + [
         {
             "designation": tgt["name"], "isMessier": bool(tgt.get("messier")),
             "messierId": tgt.get("messier"), "commonName": tgt.get("common_name") or "",

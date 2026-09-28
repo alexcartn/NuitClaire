@@ -467,3 +467,32 @@ export interface SkyEvent {
   visible: boolean | null;
   objects: string[];
 }
+
+/** Fiche de la Lune ou d'une planete (GET /api/bodies/{nom}, voir bodies.py). */
+export interface BodyDetail {
+  name: string;
+  englishName: string;
+  kind: string;
+  tip: string;
+  mag: number;
+  constellation: string;
+  sizeArcsec: number;
+  distanceKm: number | null;
+  distanceAu: number | null;
+  /** Fraction eclairee, en %. */
+  phase: number;
+  rise: string | null;
+  set: string | null;
+  transit: string | null;
+  visibleFrom: string | null;
+  visibleTo: string | null;
+  bestTime: string;
+  bestAlt: number;
+  bestSector: string;
+  series: { time: string; alt: number; az: number; sector: string; clear: boolean; night: boolean }[];
+  terminatorFeatures?: string[];
+  nextFull?: string;
+  nextNew?: string;
+  moons?: { name: string; x: number; y: number; visible: boolean }[];
+  ringTiltDeg?: number;
+}

@@ -200,3 +200,14 @@ def test_search_suggest_matches_names_after_designations(api_client):
     assert "M31" in [r["designation"] for r in rows]
     m31 = next(r for r in rows if r["designation"] == "M31")
     assert m31["frenchName"] == "Galaxie d'Andromède"
+
+
+def test_search_suggest_lists_planets_first(api_client):
+    r = api_client.get("/api/search/suggest", params={"q": "sat"})
+    assert r.json()[0]["designation"] == "Saturne"
+
+
+def test_body_detail(api_client):
+    assert api_client.get("/api/bodies/Pluton").status_code == 404
+    d = api_client.get("/api/bodies/Lune").json()
+    assert d["name"] == "Lune" and d["series"]

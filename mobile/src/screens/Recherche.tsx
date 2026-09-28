@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { readCache, readJson, writeJson } from "../storage";
+import { BODY_NAMES } from "../solarSystem";
 import { plural } from "../format";
 import { TabIcon } from "../components/TabIcon";
 import type { TargetRow, TargetSuggestion } from "../types";
@@ -154,7 +155,7 @@ export function Recherche({
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="M31, NGC7000, Orion, Andromède…"
+            placeholder="M31, NGC7000, Andromède, Saturne…"
             aria-label="Désignation ou nom de l'objet"
             className="nc-input"
             style={{ borderColor: "var(--accent)", borderRadius: 13, padding: "13px 44px 13px 14px", fontSize: "var(--text-md)", width: "100%" }}
@@ -180,8 +181,8 @@ export function Recherche({
 
       {empty && (
         <p className="nc-caption" style={{ margin: 0 }}>
-          Une désignation (M31, NGC7000, IC434) ou un nom, en français ou en anglais (Orion, Tourbillon,
-          Whirlpool).
+          Une désignation (M31, NGC7000, IC434), un nom en français ou en anglais (Orion, Tourbillon,
+          Whirlpool), ou la Lune et les planètes (Saturne, Jupiter).
         </p>
       )}
 
@@ -212,6 +213,19 @@ export function Recherche({
 
       {(empty || suggestions?.length === 0) && (
         <>
+          {empty && (
+            <div className="nc-stack-xs">
+              <div className="nc-eyebrow">Système solaire</div>
+              <div className="nc-row nc-hscroll" style={{ gap: "var(--space-xs)" }}>
+                {BODY_NAMES.map((b) => (
+                  <button key={b} onClick={() => selectTarget(b)} className="nc-chip nc-none">
+                    {b}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {empty && recent.length > 0 && (
             <div className="nc-stack-xs">
               <div className="nc-eyebrow">Récemment cherché</div>
