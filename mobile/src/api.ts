@@ -14,6 +14,7 @@ import type {
   SettingsUpdate,
   CometsInfo,
   NewsInfo,
+  SkyEvent,
   Site,
   StarHop,
   Stats,
@@ -119,7 +120,8 @@ export const api = {
   planetsTonight: () => get<PlanetTonight[]>("/api/extras/planets"),
   iss: () => get<IssInfo>("/api/extras/iss"),
   comets: () => get<CometsInfo>("/api/comets"),
-  news: () => get<NewsInfo>("/api/news"),
+  news: (refresh = false) => get<NewsInfo>(refresh ? "/api/news?refresh=true" : "/api/news"),
+  skyEvents: () => get<SkyEvent[]>("/api/sky-events"),
   starHop: (designation: string) => get<StarHop>(`/api/targets/${encodeURIComponent(designation)}/starhop`),
   binocularsNow: () => get<BinocularsNow>("/api/binoculars/now"),
   /** `binoculars` : la fiche vue aux jumelles (cadrage dans leur champ). */

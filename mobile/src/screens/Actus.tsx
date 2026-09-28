@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
 import { NewsRow, PictureOfTheDay, useNews, useTonight } from "../components/NewsParts";
-import { markNewsSeen, newsSeenAt } from "../newsView";
+import { SkyAgenda } from "../components/SkyAgenda";
+import { api } from "../api";
+import { markNewsSeen, newsSeenAt, orderForTonight, sinceLabel, visibleTonight } from "../newsView";
 
-type Filter = "tout" | "observer" | "espace";
+type Filter = "tout" | "ce-soir" | "observer" | "espace";
 
 /** Actualites astro en pleine page : Ciel & Espace, le forum Webastro
  * « L'actualite du ciel », Sky & Telescope, Astronomy et l'image du jour
@@ -14,7 +16,19 @@ export function Actus({ onOpenTarget, onBack }: {
   onOpenTarget: (designation: string) => void;
   onBack: () => void;
 }) {
-  const { data, error } = useNews();
+  const { data, error, reload } = useNews();
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      // Le serveur relit les flux (au plus une fois par 10 min), puis
+      // l'ecran recharge sa copie.
+      await api.news(true);
+      reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const tonight = useTonight();
   const [filter, setFilter] = useState<Filter>("tout");
   // Derniere lecture, lue avant d'etre remplacee : les points « nouveau »
@@ -25,12 +39,15 @@ export function Actus({ onOpenTarget, onBack }: {
   const items = data?.items ?? [];
   const picture = items.find((i) => i.kind === "image");
   const articles = items.filter((i) => i.kind !== "image");
-  // A observer en tete ; l'ordre des dates est garde dans chaque groupe.
-  const shown =
-    filter === "tout"
-      ? [...articles.filter((i) => i.kind === "observer"), ...articles.filter((i) => i.kind !== "observer")]
-      : articles.filter((i) => i.kind === filter);
-  const count = (f: Filter) => (f === "tout" ? articles.length : articles.filter((i) => i.kind === f).length);
+  // Ce qui se voit ce soir d'abord, puis le reste a observer, puis la
+  // science ; par date dans chaque groupe.
+  const ordered = orderForTonight(articles, tonight);
+  const pick = (f: Filter) =>
+    f === "tout" ? ordered
+      : f === "ce-soir" ? ordered.filter((i) => visibleTonight(i, tonight))
+        : ordered.filter((i) => i.kind === f);
+  const shown = pick(filter);
+  const count = (f: Filter) => pick(f).length;
 
   return (
     <div className="nc-screen">
@@ -44,13 +61,23 @@ export function Actus({ onOpenTarget, onBack }: {
       <div>
         <div className="nc-eyebrow">Ciel &amp; Espace · Webastro · Sky &amp; Telescope · Astronomy</div>
         <div className="nc-title" style={{ marginTop: "var(--space-2xs)" }}>Actualités</div>
+        {data?.fetchedAt && (
+          <div className="nc-row" style={{ gap: "var(--space-xs)" }}>
+            <span className="nc-caption">Mis à jour {sinceLabel(data.fetchedAt, new Date())}</span>
+            <button onClick={() => void refresh()} disabled={refreshing} className="nc-link nc-link-accent" style={{ minHeight: 36 }}>
+              {refreshing ? "Actualisation…" : "Actualiser"}
+            </button>
+          </div>
+        )}
       </div>
+
+      <SkyAgenda />
 
       {!data && <p className="nc-caption">{error ? "Actualités injoignables." : "Chargement…"}</p>}
       {data && (
         <>
-          <div className="nc-row nc-wrap" style={{ gap: "var(--space-xs)" }} role="radiogroup" aria-label="Filtre">
-            {([["tout", "Tout"], ["observer", "À observer"], ["espace", "Science & espace"]] as const).map(([f, label]) => (
+          <div className="nc-row nc-hscroll" style={{ gap: "var(--space-xs)" }} role="radiogroup" aria-label="Filtre">
+            {([["tout", "Tout"], ["ce-soir", "Visible ce soir"], ["observer", "À observer"], ["espace", "Science & espace"]] as const).map(([f, label]) => (
               <button
                 key={f}
                 role="radio"

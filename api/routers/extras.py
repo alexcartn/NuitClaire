@@ -13,6 +13,7 @@ from fastapi import APIRouter
 import comets
 import extras
 import news
+import sky_events
 import settings as settings_store
 from api.deps import get_horizon, site_from_settings
 
@@ -77,5 +78,13 @@ def comets_tonight() -> dict:
 
 
 @router.get("/api/news")
-def latest_news() -> dict:
-    return news.latest()
+def latest_news(refresh: bool = False) -> dict:
+    return news.latest(refresh)
+
+
+@router.get("/api/sky-events")
+def sky_agenda() -> list[dict]:
+    """Agenda des 30 prochains jours (voir sky_events.py), garde une heure :
+    il ne depend que du lieu et de la date."""
+    site = site_from_settings(settings_store.load())
+    return _cached("sky-events", site, lambda st, day: sky_events.upcoming(st, day, 30))

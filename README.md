@@ -624,6 +624,14 @@ reperes dans le texte : l'appli dit s'ils sont visibles ce soir, a partir des ci
 planetes et cometes deja calculees, et ouvre la fiche des objets du catalogue. L'image
 du jour de la NASA est affichee en grand (image de la page du jour, la vignette du flux
 etant trop petite). Les articles parus depuis la derniere visite de l'ecran sont marques « nouveau ».
+L'ecran s'ouvre sur un agenda des 30 prochains jours calcule pour le lieu (`sky_events.py`,
+`GET /api/sky-events`) : nouvelle et pleine Lune, eclipses de Lune (distance de la Lune au
+centre de l'ombre a la pleine Lune ; pas d'eclipses de Soleil, dont la visibilite locale
+demande un calcul que PyEphem ne fait pas), oppositions, rapprochements Lune-planete et
+planete-planete donnes au meilleur moment observable, pluies d'etoiles filantes avec la
+Lune du maximum. Les articles dont un objet est visible ce soir passent en tete (filtre
+« Visible ce soir ») ; l'ecran dit quand les flux ont ete lus et permet de les relire
+(`?refresh=true`, au plus une fois par 10 minutes).
 
 ### Recherche
 

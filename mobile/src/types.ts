@@ -453,4 +453,17 @@ export interface NewsInfo {
   items: NewsItem[];
   /** Sources injoignables, sans copie en memoire. */
   missing: string[];
+  /** Lecture la plus ancienne des flux affiches. */
+  fetchedAt: string | null;
+}
+
+/** Un evenement de l'agenda du ciel (GET /api/sky-events, voir sky_events.py). */
+export interface SkyEvent {
+  date: string;
+  kind: "lune" | "eclipse" | "planete" | "rapprochement" | "meteores";
+  title: string;
+  detail: string;
+  /** Visible d'ici ; null pour les phases de la Lune. */
+  visible: boolean | null;
+  objects: string[];
 }

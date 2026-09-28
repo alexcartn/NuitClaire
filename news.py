@@ -41,6 +41,9 @@ FEEDS = [
     ("Astronomy", "https://www.astronomy.com/feed/"),
 ]
 TTL_S = 6 * 3600
+# Un rafraichissement demande ne relit pas un flux lu il y a moins de
+# 10 minutes : appuyer dix fois ne doit pas bombarder les sites.
+MIN_REFRESH_S = 600
 MAX_AGE_DAYS = 60
 SUMMARY_CHARS = 220
 # Articles gardes par source : sans plafond, Ciel & Espace (plusieurs
@@ -242,10 +245,10 @@ def parse_rss(source: str, xml_text: str | bytes) -> list[dict]:
     return out
 
 
-def fetch_feed(source: str, url: str, now: float | None = None) -> list[dict] | None:
+def fetch_feed(source: str, url: str, now: float | None = None, force: bool = False) -> list[dict] | None:
     now = time.time() if now is None else now
     cached = _cache.get(source)
-    if cached and now - cached[0] < TTL_S:
+    if cached and now - cached[0] < (MIN_REFRESH_S if force else TTL_S):
         return cached[1]
     try:
         r = requests.get(url, timeout=10, headers=_HEADERS)
@@ -308,11 +311,14 @@ def apod_image(link: str) -> str | None:
     return url
 
 
-def latest() -> dict:
-    """Reponse de GET /api/news."""
+def latest(refresh: bool = False) -> dict:
+    """Reponse de GET /api/news. `refresh` relit les flux sans attendre la
+    fin des 6 h (voir MIN_REFRESH_S). `fetchedAt` : la lecture la plus
+    ancienne parmi les flux affiches, ce que l'ecran annonce comme « mis a
+    jour »."""
     by_source, missing = {}, []
     for source, url in FEEDS:
-        items = fetch_feed(source, url)
+        items = fetch_feed(source, url, force=refresh)
         if items is None:
             missing.append(source)
         else:
@@ -321,4 +327,6 @@ def latest() -> dict:
     for item in items:
         if item["kind"] == "image":
             item["image"] = apod_image(item["link"]) or item["image"]
-    return {"items": items, "missing": missing}
+    times = [_cache[s][0] for s in by_source if s in _cache]
+    fetched = datetime.fromtimestamp(min(times), timezone.utc).isoformat() if times else None
+    return {"items": items, "missing": missing, "fetchedAt": fetched}

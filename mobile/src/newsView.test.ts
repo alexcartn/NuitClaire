@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { inTheNews, mentionsOf, mustSee, visibility, type Tonight } from "./newsView.ts";
+import { inTheNews, mentionsOf, mustSee, orderForTonight, sinceLabel, visibility, type Tonight } from "./newsView.ts";
 import type { NewsItem, NewsObject, TargetRow } from "./types";
 
 const NOW = new Date("2026-09-28T18:00:00Z");
@@ -41,4 +41,20 @@ test("les articles d'une fiche et le badge du plan de nuit", () => {
   const items = [article("Supernova dans NGC 7331", [target("NGC7331")]), article("Andromede", [target("M31", "NGC0224", "31")])];
   assert.equal(mentionsOf(items, { designation: "NGC0224", ngc: "NGC0224", messierId: "31" }, NOW)[0].title, "Andromede");
   assert.deepEqual([...inTheNews(items, tonight.targets!, NOW)].sort(), ["NGC0224", "NGC7331"]);
+});
+
+test("ce qui se voit ce soir passe en tete, la science en dernier", () => {
+  const items = [
+    article("Science recente", [], "2026-09-27T10:00:00+00:00", "espace"),
+    article("A observer sans objet", [], "2026-09-26T10:00:00+00:00"),
+    article("Supernova dans NGC 7331", [target("NGC7331")], "2026-09-06T10:00:00+00:00"),
+  ];
+  assert.deepEqual(orderForTonight(items, tonight).map((i) => i.title),
+    ["Supernova dans NGC 7331", "A observer sans objet", "Science recente"]);
+});
+
+test("fraicheur des actualites", () => {
+  assert.equal(sinceLabel("2026-09-28T17:59:30Z", NOW), "à l'instant");
+  assert.equal(sinceLabel("2026-09-28T17:35:00Z", NOW), "il y a 25 min");
+  assert.equal(sinceLabel("2026-09-28T16:00:00Z", NOW), "il y a 2 h");
 });

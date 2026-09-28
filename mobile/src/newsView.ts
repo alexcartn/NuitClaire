@@ -118,3 +118,23 @@ export function markNewsSeen(now: Date = new Date()): void {
 export function isNew(item: NewsItem, since: string | null): boolean {
   return Boolean(since && item.date && item.date > since);
 }
+
+/** Un objet cite est visible ce soir. */
+export function visibleTonight(item: NewsItem, t: Tonight): boolean {
+  return item.objects.some((o) => visibility(o, t)?.visible);
+}
+
+/** Ordre de lecture : d'abord ce qui se voit ce soir, puis le reste a
+ * observer, puis la science et l'espace ; par date dans chaque groupe. */
+export function orderForTonight(items: NewsItem[], t: Tonight): NewsItem[] {
+  const rank = (i: NewsItem) => (i.kind !== "observer" ? 2 : visibleTonight(i, t) ? 0 : 1);
+  return [...items].sort((a, b) => rank(a) - rank(b) || ((b.date ?? "") > (a.date ?? "") ? 1 : (b.date ?? "") < (a.date ?? "") ? -1 : 0));
+}
+
+/** « il y a 2 h », « il y a 5 min », « à l'instant ». */
+export function sinceLabel(iso: string, now: Date): string {
+  const min = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60000));
+  if (min < 2) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  return `il y a ${Math.round(min / 60)} h`;
+}

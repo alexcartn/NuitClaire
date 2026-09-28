@@ -82,3 +82,21 @@ def test_select_keeps_only_useful_series():
     sky = [it(f"News {n}", f"2026-09-2{n}") for n in range(5, 0, -1)] + [it("This Week's Sky at a Glance, Sept", "2026-09-20")]
     assert [i["title"] for i in news.select("Sky & Telescope", sky)] == [
         "This Week's Sky at a Glance, Sept", "News 5", "News 4", "News 3"]
+
+
+def test_refresh_rereads_only_after_ten_minutes(monkeypatch):
+    calls = []
+
+    class R:
+        content = b"<rss><channel></channel></rss>"
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(news.requests, "get", lambda *a, **k: calls.append(1) or R())
+    news._cache.clear()
+    news.fetch_feed("X", "u", now=1000.0)
+    news.fetch_feed("X", "u", now=1300.0, force=True)
+    assert len(calls) == 1
+    news.fetch_feed("X", "u", now=1700.0, force=True)
+    assert len(calls) == 2
+    news._cache.clear()
