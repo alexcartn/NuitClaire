@@ -115,7 +115,8 @@ export const api = {
   search: (q: string) => get<TargetRow[]>("/api/search", { q }),
   searchSuggest: (q: string, limit = 8) =>
     get<TargetSuggestion[]>("/api/search/suggest", { q, limit: String(limit) }),
-  skyBodies: () => get<SkyBodies>("/api/sky/bodies"),
+  /** `at` : un autre instant que maintenant (carte a une date choisie). */
+  skyBodies: (at?: string) => get<SkyBodies>("/api/sky/bodies", at ? { at } : undefined),
   moonTonight: () => get<MoonTonight>("/api/extras/moon"),
   planetsTonight: () => get<PlanetTonight[]>("/api/extras/planets"),
   iss: () => get<IssInfo>("/api/extras/iss"),

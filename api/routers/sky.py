@@ -46,6 +46,9 @@ def bodies_at(when: datetime, site: dict) -> dict:
 
 
 @router.get("/api/sky/bodies")
-def sky_bodies() -> dict:
+def sky_bodies(at: datetime | None = None) -> dict:
+    """`at` : un autre instant que maintenant (la carte affichee a une date
+    choisie) ; sans fuseau, compris en UTC."""
     site = site_from_settings(settings_store.load())
-    return bodies_at(datetime.now(timezone.utc), site)
+    when = datetime.now(timezone.utc) if at is None else at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+    return bodies_at(when, site)

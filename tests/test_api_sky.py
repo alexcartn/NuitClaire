@@ -21,3 +21,13 @@ def test_api_sky_bodies(api_client):
     r = api_client.get("/api/sky/bodies")
     assert r.status_code == 200
     assert "moon" in r.json() and len(r.json()["planets"]) == 7
+
+
+def test_api_sky_bodies_at_a_chosen_time(api_client):
+    r = api_client.get("/api/sky/bodies", params={"at": "2026-12-24T22:00:00Z"})
+    assert r.status_code == 200
+    assert r.json()["time"].startswith("2026-12-24T22:00")
+    # La Lune avance d'une douzaine de degres par jour : un autre instant,
+    # une autre position.
+    other = api_client.get("/api/sky/bodies", params={"at": "2026-12-26T22:00:00Z"}).json()
+    assert abs(other["moon"]["raDeg"] - r.json()["moon"]["raDeg"]) > 10

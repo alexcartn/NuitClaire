@@ -581,9 +581,17 @@ eclaire de la Lune).
   continue a la hauteur des arbres et toits ; un secteur bouche est hachure. Lueur bleutee
   du crepuscule du cote du Soleil tant qu'il n'est pas a -18 deg. Pincer pour zoomer,
   glisser pour se deplacer, double-appui pour la vue entiere ; toucher une etoile, une
-  planete ou la Lune la nomme (la fiche s'ouvre pour les astres). Plein ecran ; heure
-  reglable jusqu'a 8 h plus tard, avec reperes horaires et lecture ; option pour tourner
-  avec la boussole.
+  planete ou la Lune la nomme (la fiche s'ouvre pour les astres). Deux vues : dome, ou
+  face a l'horizon comme on voit le ciel debout (projection stereographique centree sur la
+  direction regardee ; glisser tourne la tete, la boussole peut la faire suivre). Recherche
+  sur la carte (planetes, Lune, etoiles nommees et constellations hors ligne, puis le
+  catalogue) qui centre la vue ; fleche au bord vers la cible choisie quand elle est hors
+  cadre ou sous l'horizon. Fiche au toucher calculee sur le telephone : hauteur et
+  direction, lever, passage au plus haut, coucher, et plage degagee au-dessus des arbres et
+  toits du site (`sky.visibility`). Options grille (hauteurs tous les 10 deg) et
+  constellations ; plein ecran reel (API Fullscreen) avec commandes par-dessus la carte et
+  bascule rouge ; heure reglable jusqu'a 8 h plus tard, avec reperes horaires et lecture,
+  et date au choix (Lune et planetes redemandees a cet instant, `GET /api/sky/bodies?at=`).
 - Viseur : le telephone tenu contre les jumelles, le dos vers le ciel. Direction visee
   deduite de l'orientation complete (alpha, beta, gamma). Bande de cap en haut, ciel sombre
   au-dessus de la vraie ligne d'horizon (arbres compris), sol en ombre dessous, reperes de

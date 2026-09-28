@@ -204,3 +204,107 @@ export function symbolOf(kind?: string): SkySymbol {
   if (["neb", "hii", "rfn", "snr", "cl+n", "emn"].includes(k) || k.includes("nébuleuse") || k.includes("rémanent") || k.includes("région")) return "nebula";
   return "other";
 }
+
+/** Vue face a l'horizon, comme on voit le ciel debout : projection
+ * stereographique centree sur la direction regardee `center`, x vers la
+ * droite, y vers le bas (coordonnees d'ecran). Meme echelle que le dome au
+ * centre (tan de la moitie de l'ecart) : un degre y a la meme taille. Les
+ * cercles restent des cercles, les constellations gardent leur forme jusque
+ * sur les bords. Null seulement a l'oppose exact de la direction regardee. */
+export function horizonProject(p: AltAz, center: AltAz): { x: number; y: number } | null {
+  const alt = p.alt * RAD;
+  const alt0 = center.alt * RAD;
+  const dAz = (p.az - center.az) * RAD;
+  const cosC = Math.sin(alt0) * Math.sin(alt) + Math.cos(alt0) * Math.cos(alt) * Math.cos(dAz);
+  if (1 + cosC < 1e-6) return null;
+  const k = 1 / (1 + cosC);
+  return {
+    x: k * Math.cos(alt) * Math.sin(dAz),
+    y: -k * (Math.cos(alt0) * Math.sin(alt) - Math.sin(alt0) * Math.cos(alt) * Math.cos(dAz)),
+  };
+}
+
+export interface Visibility {
+  /** Hauteur et direction a l'instant de depart. */
+  now: AltAz;
+  /** Derriere les arbres ou les toits a l'instant de depart (au-dessus de
+   * l'horizon mais sous la cime), ou dans un secteur bouche. */
+  hiddenNow: boolean;
+  rise: Date | null;
+  set: Date | null;
+  /** Passage au plus haut dans les 24 h qui suivent. */
+  culmination: { time: Date; alt: number; az: number };
+  /** Premiere plage degagee (au-dessus de l'horizon masque) a partir du
+   * depart, dans les 24 h ; null si l'objet ne sort jamais des arbres. */
+  clear: { from: Date; to: Date } | null;
+  circumpolar: boolean;
+  neverUp: boolean;
+}
+
+/** Lever, coucher, passage au plus haut et plage degagee au-dessus de
+ * l'horizon reel (arbres, toits, secteurs bouches), sur les 24 h qui
+ * suivent `from`, au pas de 5 min : a quelques minutes pres, ce qui suffit
+ * pour savoir quand sortir les jumelles. `raRateDegPerHour` fait avancer la
+ * Lune (environ 0,55 deg/h) ; les etoiles et le ciel profond restent fixes,
+ * les planetes bougent trop peu pour compter en une nuit. */
+export function visibility(
+  raDeg: number,
+  decDeg: number,
+  site: { lat: number; lon: number },
+  from: Date,
+  horizon: Record<string, boolean>,
+  horizonAlt: Record<string, number>,
+  raRateDegPerHour = 0,
+): Visibility {
+  const STEP_MIN = 5;
+  const steps = (24 * 60) / STEP_MIN;
+  let rise: Date | null = null;
+  let set: Date | null = null;
+  let best = { time: from, alt: -91, az: 0 };
+  let clearFrom: Date | null = null;
+  let clearTo: Date | null = null;
+  let prev: AltAz | null = null;
+  let prevClear = false;
+  let now: AltAz = { alt: 0, az: 0 };
+  let hiddenNow = false;
+  let everUp = false;
+  let everDown = false;
+  for (let i = 0; i <= steps; i++) {
+    const t = new Date(from.getTime() + i * STEP_MIN * 60000);
+    const p = altAz(raDeg + (raRateDegPerHour * i * STEP_MIN) / 60, decDeg, site.lat, lstDeg(t, site.lon));
+    const floor = horizonFloor(p.az, horizon, horizonAlt);
+    const isClear = floor != null && p.alt > Math.max(0, floor);
+    if (i === 0) {
+      now = p;
+      hiddenNow = p.alt > 0 && !isClear;
+    }
+    if (p.alt > 0) everUp = true;
+    else everDown = true;
+    if (prev) {
+      if (!rise && prev.alt <= 0 && p.alt > 0) rise = t;
+      if (!set && prev.alt > 0 && p.alt <= 0) set = t;
+    }
+    if (p.alt > best.alt) best = { time: t, alt: p.alt, az: p.az };
+    if (isClear && !clearFrom) clearFrom = t;
+    if (clearFrom && !clearTo && prevClear && !isClear) clearTo = t;
+    prev = p;
+    prevClear = isClear;
+  }
+  const end = new Date(from.getTime() + 24 * 3600000);
+  return {
+    now,
+    hiddenNow,
+    rise,
+    set,
+    culmination: best,
+    clear: clearFrom ? { from: clearFrom, to: clearTo ?? end } : null,
+    circumpolar: !everDown,
+    neverUp: !everUp,
+  };
+}
+
+/** Pour chercher sans se soucier des accents, des majuscules ni des espaces
+ * speciaux (« Grande Ourse » est ecrit avec des espaces fines). */
+export function fold(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").toLowerCase().trim();
+}

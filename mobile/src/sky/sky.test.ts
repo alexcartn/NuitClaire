@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { altAz, bvColor, domeProject, domeProjectFree, gmstDeg, guidance, guidanceText, horizonFloor, lstDeg, pointing, separation, sectorOf, sunRaDec, symbolOf, viewProject } from "./sky.ts";
+import { altAz, bvColor, domeProject, domeProjectFree, fold, gmstDeg, guidance, guidanceText, horizonFloor, horizonProject, lstDeg, pointing, separation, sectorOf, sunRaDec, symbolOf, viewProject, visibility } from "./sky.ts";
 
 const near = (a: number, b: number, tol = 0.5) => assert.ok(Math.abs(a - b) <= tol, `${a} ≈ ${b}`);
 
@@ -101,4 +101,46 @@ test("symboles d'atlas, depuis le code du catalogue ou le type en clair", () => 
   assert.equal(symbolOf("PN"), "planetary");
   assert.equal(symbolOf("HII"), "nebula");
   assert.equal(symbolOf(undefined), "other");
+});
+
+test("vue horizon : centre au milieu, a droite quand l'azimut augmente, en haut quand on monte", () => {
+  const c = { alt: 30, az: 180 };
+  const mid = horizonProject(c, c)!;
+  near(mid.x, 0, 1e-9);
+  near(mid.y, 0, 1e-9);
+  assert.ok(horizonProject({ alt: 30, az: 200 }, c)!.x > 0);
+  assert.ok(horizonProject({ alt: 50, az: 180 }, c)!.y < 0);
+  // Meme echelle que le dome : 90 deg du centre a 1.
+  near(horizonProject({ alt: 0, az: 270 }, { alt: 0, az: 180 })!.x, 1, 1e-9);
+  // Derriere soi reste fini (a l'oppose exact seulement : null).
+  assert.ok(horizonProject({ alt: 0, az: 0 }, c));
+  assert.equal(horizonProject({ alt: -30, az: 0 }, c), null);
+});
+
+test("visibilite : lever, passage au sud, coucher, et plage au-dessus des arbres", () => {
+  const site = { lat: 48.9, lon: 2.35 };
+  const open = { N: true, NE: true, E: true, SE: true, S: true, SW: true, W: true, NW: true };
+  const none: Record<string, number> = {};
+  const from = new Date(Date.UTC(2026, 8, 28, 12, 0, 0));
+  // Vega a Paris : circumpolaire de justesse ? Non (dec 38,8 < 41,1) : elle se couche.
+  const vega = visibility(279.23, 38.78, site, from, open, none);
+  assert.equal(vega.circumpolar, false);
+  assert.ok(vega.rise && vega.set);
+  near(vega.culmination.alt, 90 - 48.9 + 38.78, 0.5);
+  near(vega.culmination.az, 180, 3);
+  // La Polaire ne se couche jamais ; la Croix du Sud ne se leve jamais.
+  assert.equal(visibility(37.95, 89.26, site, from, open, none).circumpolar, true);
+  assert.equal(visibility(187, -60, site, from, open, none).neverUp, true);
+  // Des arbres a 30 deg partout : la plage degagee est plus courte.
+  const trees = { N: 30, NE: 30, E: 30, SE: 30, S: 30, SW: 30, W: 30, NW: 30 };
+  const hidden = visibility(279.23, 38.78, site, from, open, trees);
+  const len = (v: typeof vega) => v.clear!.to.getTime() - v.clear!.from.getTime();
+  assert.ok(len(hidden) < len(vega));
+  // Tout bouche : jamais degagee.
+  assert.equal(visibility(279.23, 38.78, site, from, {}, none).clear, null);
+});
+
+test("recherche sans accents ni espaces speciaux", () => {
+  assert.equal(fold("Grande Ourse"), "grande ourse");
+  assert.equal(fold("  Véga "), "vega");
 });
