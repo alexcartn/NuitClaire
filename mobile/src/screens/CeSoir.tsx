@@ -15,7 +15,9 @@ import { NightStrip } from "../components/NightStrip";
 import { NightPlan } from "../components/NightPlan";
 import { NightExtras } from "../components/NightExtras";
 import { CometsCard } from "../components/CometsCard";
-import { NewsSection } from "../components/NewsSection";
+import { MustSeeCard, NewsTeaser } from "../components/NewsTeaser";
+import { useNews } from "../components/NewsParts";
+import { inTheNews } from "../newsView";
 import { Section } from "../components/Section";
 import { BinocularCard } from "../components/BinocularCard";
 import { CloudChart } from "../components/CloudChart";
@@ -55,12 +57,14 @@ export function CeSoir({
   onGoTargets,
   onSearch,
   onOpenSky,
+  onOpenNews,
   onOpenTarget,
   onOpenBinocularTarget,
 }: {
   onGoTargets: () => void;
   onSearch: () => void;
   onOpenSky: () => void;
+  onOpenNews: () => void;
   onOpenTarget: (designation: string) => void;
   /** Fiche vue aux jumelles (chemin d'etoiles, viseur). */
   onOpenBinocularTarget: (designation: string) => void;
@@ -79,6 +83,7 @@ export function CeSoir({
   const nights = useFetch(fetchNights, [], "nights");
   const state = useFetch(fetchState, [], "state");
   const targets = useFetch(fetchTargets, [], "targets");
+  const news = useNews();
   const messier = useFetch(fetchMessier, [], "messier:true");
   const stale = (night.error || state.error) && night.data && state.data;
 
@@ -273,9 +278,19 @@ export function CeSoir({
         <span style={{ fontSize: "var(--text-md)" }} aria-hidden="true">→</span>
       </button>
 
-      {targets.data && <NightPlan rows={targets.data} onOpenTarget={onOpenTarget} />}
+      <MustSeeCard onOpenTarget={onOpenTarget} />
+
+      {targets.data && (
+        <NightPlan
+          rows={targets.data}
+          onOpenTarget={onOpenTarget}
+          inNews={news.data ? inTheNews(news.data.items, targets.data, new Date()) : undefined}
+        />
+      )}
 
       <CometsCard />
+
+      <NewsTeaser onOpen={onOpenNews} />
 
       {/* Pendant une sortie, la carte jumelles est deja en haut. */}
       <div className="nc-eyebrow" style={{ marginTop: "var(--space-sm)" }}>Aux jumelles et à l'œil nu</div>
@@ -285,8 +300,6 @@ export function CeSoir({
       <Section id="soir-horizon" title="Horizon dégagé" summary={`${openSectors}/8 secteurs`} defaultOpen={false}>
         <SectorChips horizon={state.data.horizon} horizonAlt={state.data.horizonAlt} />
       </Section>
-
-      <NewsSection onOpenTarget={onOpenTarget} />
     </div>
   );
 }

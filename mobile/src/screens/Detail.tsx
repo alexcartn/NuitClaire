@@ -6,6 +6,7 @@ import { targetHistory } from "../journalRead";
 import { newOp } from "../sessionQueue";
 import { AltitudeChart } from "../components/AltitudeChart";
 import { StarHopCard } from "../components/StarHopCard";
+import { InTheNews } from "../components/InTheNews";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
@@ -156,6 +157,8 @@ export function Detail({
               style={{ width: "100%", height: 200, borderRadius: 16, border: "1px solid var(--line)", objectFit: "cover", background: "var(--surf2)" }}
             />
           )}
+
+          <InTheNews designation={data.designation} ngc={data.ngc} messierId={data.messierId} />
 
           {bino && <StarHopCard designation={designation} />}
           {onOpenSky && (

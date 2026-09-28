@@ -17,6 +17,7 @@ import { Messier } from "./screens/Messier";
 import { Recherche } from "./screens/Recherche";
 import { Reglages } from "./screens/Reglages";
 import { Journal } from "./screens/Journal";
+import { Actus } from "./screens/Actus";
 
 // Carte du ciel et viseur : charges a la demande (catalogue d'etoiles
 // compris), pour ne pas alourdir l'ouverture de l'appli. Le service worker
@@ -194,7 +195,7 @@ export default function App() {
       screen: "detail",
       selected: designation,
       binoculars,
-      backTo: current.screen === "detail" || current.screen === "recherche" ? current.backTo : current.screen,
+      backTo: current.screen === "detail" || current.screen === "recherche" || current.screen === "actus" ? current.backTo : current.screen,
       depth: current.depth + 1,
     });
   };
@@ -205,9 +206,14 @@ export default function App() {
       screen: "ciel",
       selected: designation,
       skyMode: mode,
-      backTo: current.screen === "detail" || current.screen === "recherche" ? current.backTo : current.screen,
+      backTo: current.screen === "detail" || current.screen === "recherche" || current.screen === "actus" ? current.backTo : current.screen,
       depth: current.depth + 1,
     });
+  };
+
+  const openNews = () => {
+    const current = navRef.current;
+    push({ screen: "actus", selected: null, backTo: current.screen, depth: current.depth + 1 });
   };
 
   const openSearch = () => {
@@ -246,6 +252,7 @@ export default function App() {
             onGoTargets={() => changeTab("cibles")}
             onSearch={openSearch}
             onOpenSky={() => openSky(null, "carte")}
+            onOpenNews={openNews}
             onOpenTarget={(d) => openTarget(d)}
             onOpenBinocularTarget={(d) => openTarget(d, true)}
           />
@@ -301,10 +308,11 @@ export default function App() {
             onCancel={back}
           />
         )}
+        {screen === "actus" && <Actus onOpenTarget={(d) => openTarget(d)} onBack={back} />}
         {screen === "reglages" && <Reglages onChange={reloadState} />}
       </div>
       <TabBar
-        active={screen === "detail" || screen === "recherche" || screen === "ciel" ? nav.backTo : screen}
+        active={screen === "detail" || screen === "recherche" || screen === "ciel" || screen === "actus" ? nav.backTo : screen}
         onChange={changeTab}
       />
     </div>

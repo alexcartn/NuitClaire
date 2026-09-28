@@ -981,6 +981,12 @@ a {
   filter: grayscale(1) brightness(0.45) sepia(1) hue-rotate(-50deg) saturate(3);
 }
 
+/* Images d'actualite : souvent claires (fond blanc, ciel de jour) et en
+   grand pour l'image du jour, elles sont assombries davantage. */
+[data-theme="night"] .nc-news-img {
+  filter: grayscale(1) brightness(0.28) sepia(1) hue-rotate(-50deg) saturate(3);
+}
+
 [data-theme="night"] .nc-dex-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

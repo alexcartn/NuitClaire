@@ -7,9 +7,11 @@ import type { TargetRow } from "../types";
 
 /** Enchainement suggere pour la nuit (voir nightPlan.ts), avec un geste
  * pour tout poser dans le journal avant de partir. */
-export function NightPlan({ rows, onOpenTarget }: {
+export function NightPlan({ rows, onOpenTarget, inNews }: {
   rows: TargetRow[];
   onOpenTarget: (d: string) => void;
+  /** Cibles citees recemment dans les actualites (voir newsView.inTheNews). */
+  inNews?: Set<string>;
 }) {
   const plan = planNight(rows);
   const [added, setAdded] = useState(false);
@@ -44,6 +46,14 @@ export function NightPlan({ rows, onOpenTarget }: {
               <span className="nc-grow nc-ellipsis nc-caption" style={{ margin: 0 }}>
                 {row?.commonName || row?.type}
               </span>
+              {inNews?.has(b.designation) && (
+                <span className="nc-none" style={{
+                  fontSize: 10, fontWeight: 600, color: "var(--accent)", border: "1px solid var(--accent)",
+                  borderRadius: 8, padding: "1px 6px", textTransform: "uppercase", letterSpacing: ".04em",
+                }}>
+                  actu
+                </span>
+              )}
             </button>
           );
         })}
