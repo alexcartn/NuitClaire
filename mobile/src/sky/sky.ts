@@ -101,6 +101,30 @@ export function pointing(alpha: number, beta: number, gamma: number): AltAz {
   };
 }
 
+/** Rapproche `prev` de `next` d'une fraction `k` (0 : immobile, 1 : saute
+ * dessus), en passant par le plus court chemin sur la sphere : pas de tour
+ * complet entre 359 et 1 deg, pas d'emballement pres du zenith. Sert a
+ * lisser les capteurs du telephone, qui tremblent d'un ou deux degres. */
+export function smoothAim(prev: AltAz, next: AltAz, k: number): AltAz {
+  const vec = (p: AltAz) => [
+    Math.cos(p.alt * RAD) * Math.sin(p.az * RAD),
+    Math.cos(p.alt * RAD) * Math.cos(p.az * RAD),
+    Math.sin(p.alt * RAD),
+  ];
+  const a = vec(prev);
+  const b = vec(next);
+  const v = a.map((x, i) => x + (b[i] - x) * k);
+  const n = Math.hypot(v[0], v[1], v[2]);
+  // Directions opposees : pas de milieu, on saute.
+  if (n < 1e-9) return next;
+  const h = Math.hypot(v[0], v[1]);
+  return {
+    alt: Math.asin(Math.max(-1, Math.min(1, v[2] / n))) * DEG,
+    // Au zenith exact, l'azimut ne veut rien dire : on garde le precedent.
+    az: h < 1e-9 ? prev.az : ((Math.atan2(v[0], v[1]) * DEG) % 360 + 360) % 360,
+  };
+}
+
 export interface Guidance {
   /** Degres a tourner vers la droite (negatif : vers la gauche). */
   right: number;

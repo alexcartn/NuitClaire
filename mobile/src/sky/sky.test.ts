@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { altAz, bvColor, domeProject, domeProjectFree, fold, gmstDeg, guidance, guidanceText, horizonFloor, horizonProject, lstDeg, pointing, separation, sectorOf, sunRaDec, symbolOf, viewProject, visibility } from "./sky.ts";
+import { altAz, bvColor, domeProject, domeProjectFree, fold, gmstDeg, guidance, guidanceText, horizonFloor, horizonProject, lstDeg, pointing, separation, sectorOf, smoothAim, sunRaDec, symbolOf, viewProject, visibility } from "./sky.ts";
 
 const near = (a: number, b: number, tol = 0.5) => assert.ok(Math.abs(a - b) <= tol, `${a} ≈ ${b}`);
 
@@ -143,4 +143,18 @@ test("visibilite : lever, passage au sud, coucher, et plage au-dessus des arbres
 test("recherche sans accents ni espaces speciaux", () => {
   assert.equal(fold("Grande Ourse"), "grande ourse");
   assert.equal(fold("  Véga "), "vega");
+});
+
+test("lissage des capteurs : chemin le plus court, sans tour complet", () => {
+  const p = smoothAim({ alt: 20, az: 358 }, { alt: 20, az: 4 }, 0.5);
+  near(p.az, 1, 0.1);
+  near(p.alt, 20, 0.1);
+  const still = smoothAim({ alt: 10, az: 90 }, { alt: 30, az: 120 }, 0);
+  near(still.alt, 10, 1e-6);
+  near(still.az, 90, 1e-6);
+  const end = smoothAim({ alt: 10, az: 90 }, { alt: 30, az: 120 }, 1);
+  near(end.alt, 30, 1e-6);
+  near(end.az, 120, 1e-6);
+  // Au zenith, l'azimut precedent est garde.
+  near(smoothAim({ alt: 90, az: 42 }, { alt: 90, az: 200 }, 0.5).az, 42, 1e-6);
 });

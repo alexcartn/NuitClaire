@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import skyData from "./skyData.json";
 import {
   altAz, bvColor, domeProject, domeProjectFree, horizonFloor, horizonProject, lstDeg, sunRaDec, symbolOf,
@@ -175,8 +175,8 @@ const clampLook = (l: Look): Look => ({
  * pour se deplacer (ou tourner la tete, face a l'horizon) ; un appui dit ce
  * qu'on a touche. */
 export function SkyDome({
-  when, site, horizon, horizonAlt, projection = "dome", rotation, heading = null, bodies, targets, selected,
-  showGrid = false, showConstellations = true, focus = null, onSelect, onPick,
+  when, site, horizon, horizonAlt, projection = "dome", rotation, rotationLocked = false, aim = null, bodies, targets, selected,
+  showGrid = false, showConstellations = true, focus = null, onSelect, onPick, onManual, overlay,
 }: {
   when: Date;
   site: { lat: number; lon: number };
@@ -185,9 +185,16 @@ export function SkyDome({
   projection?: SkyProjection;
   /** Dome : 0, nord en haut ; cap + 180, la direction regardee en bas. */
   rotation: number;
-  /** Vue horizon : le cap de la boussole, que la vue suit ; null, on tourne
-   * au doigt. */
-  heading?: number | null;
+  /** Dome : la boussole tient la rotation ; le doigt ne la tourne plus. */
+  rotationLocked?: boolean;
+  /** Vue horizon : la direction ou pointe le telephone, que la vue suit
+   * (hauteur comprise, comme dans Star Walk) ; null, on tourne au doigt. */
+  aim?: AltAz | null;
+  /** Le doigt reprend la main sur les capteurs (glisser en suivant le
+   * telephone) : le parent coupe le suivi. */
+  onManual?: () => void;
+  /** Boutons poses sur la carte. */
+  overlay?: ReactNode;
   bodies: SkyBodies | null;
   targets: SkyTarget[];
   selected: string | null;
@@ -203,7 +210,11 @@ export function SkyDome({
   const toSky = (ra: number, dec: number): AltAz => altAz(ra, dec, site.lat, lst);
   const [view, setView] = useState<View>(DOME_VIEW);
   const [look, setLook] = useState<Look>({ az: 180, alt: LOOK_ALT, fov: LOOK_FOV });
-  const center: AltAz = { alt: look.alt, az: horizonView && heading != null ? heading : look.az };
+  const center: AltAz = horizonView && aim ? { alt: aim.alt, az: aim.az } : { alt: look.alt, az: look.az };
+  // Dome : tourne au doigt autour du zenith, comme un planisphere qu'on fait
+  // pivoter, tant que la boussole ne s'en charge pas.
+  const [spin, setSpin] = useState(0);
+  const rot = rotationLocked ? rotation : rotation + spin;
 
   // Taille reelle de la carte : la vue horizon remplit l'ecran, quelle que
   // soit sa forme ; le dome reste carre.
@@ -240,8 +251,8 @@ export function SkyDome({
     const w = (2 * R) / view.s;
     vb = { x0: view.cx - w / 2, y0: view.cy - w / 2, x1: view.cx + w / 2, y1: view.cy + w / 2 };
     zt = 1 / view.s;
-    proj = (p) => domeProject(p, rotation);
-    projFree = (p) => domeProjectFree(p, rotation);
+    proj = (p) => domeProject(p, rot);
+    projFree = (p) => domeProjectFree(p, rot);
   }
   // Les tailles a l'ecran restent lisibles au zoom : textes constants,
   // etoiles un peu plus grosses seulement.
@@ -342,7 +353,7 @@ export function SkyDome({
     ...(showGrid ? CARDINALS.map(([, az]) => pathOf(Array.from({ length: 16 }, (_, i) => proj({ alt: i * 6, az })))) : []),
   ];
   // Hauteurs ecrites le long de la direction regardee (le bas du dome).
-  const gridAz = horizonView ? center.az : rotation + 180;
+  const gridAz = horizonView ? center.az : rot + 180;
   const gridLabels = showGrid
     ? altRings.map((alt) => ({ alt, p: proj({ alt, az: gridAz + (horizonView ? 0 : 4) }) })).filter((g) => inView(g.p))
     : [];
@@ -394,7 +405,7 @@ export function SkyDome({
   const selArrow = (() => {
     if (!sel) return null;
     let a: Pt | null;
-    if (sel.pos.alt < 0 && !horizonView) a = domeProject({ alt: 0, az: sel.pos.az }, rotation);
+    if (sel.pos.alt < 0 && !horizonView) a = domeProject({ alt: 0, az: sel.pos.az }, rot);
     else a = sel.p ?? horizonProject(sel.pos, center);
     if (!a) {
       const dAz = ((sel.pos.az - center.az + 540) % 360) - 180;
@@ -414,7 +425,7 @@ export function SkyDome({
     if (horizonView) {
       setLook((l) => clampLook({ ...l, az: sel.pos.az, alt: sel.pos.alt < 0 ? 20 : Math.max(12, sel.pos.alt) }));
     } else {
-      const p = domeProject(sel.pos, rotation);
+      const p = domeProject(sel.pos, rot);
       setView(p ? clampView({ s: Math.max(view.s, 2), cx: p.x, cy: p.y }) : DOME_VIEW);
     }
   };
@@ -426,7 +437,7 @@ export function SkyDome({
     if (horizonView) {
       setLook((l) => clampLook({ ...l, az: pos.az, alt: pos.alt < 0 ? 20 : Math.max(12, pos.alt) }));
     } else {
-      const p = domeProject(pos, rotation);
+      const p = domeProject(pos, rot);
       setView(p ? clampView({ s: 2.5, cx: p.x, cy: p.y }) : DOME_VIEW);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -434,7 +445,20 @@ export function SkyDome({
 
   // --- Zoom et deplacement ------------------------------------------------
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gesture = useRef<{ moved: boolean; startDist: number; startView: View; startLook: Look; start: { x: number; y: number } } | null>(null);
+  const gesture = useRef<{
+    moved: boolean; startDist: number; startView: View; startLook: Look; startSpin: number;
+    start: { x: number; y: number }; startAngle: number | null;
+  } | null>(null);
+  // Dernieres positions du geste (az/hauteur, ou rotation du dome) : leur
+  // vitesse au lacher relance la carte, qui ralentit d'elle-meme, comme dans
+  // Star Walk. Sans elan, chaque glissement s'arrete net sous le doigt.
+  const trail = useRef<{ t: number; a: number; b: number }[]>([]);
+  const fling = useRef(0);
+  const stopFling = () => {
+    cancelAnimationFrame(fling.current);
+    fling.current = 0;
+  };
+  useEffect(() => stopFling, []);
 
   const toSvg = (clientX: number, clientY: number) => {
     const svg = svgRef.current!;
@@ -450,6 +474,13 @@ export function SkyDome({
     return { s, cx: Math.max(-lim, Math.min(lim, v.cx)), cy: Math.max(-lim, Math.min(lim, v.cy)) };
   }
   const pixelsPerUnit = () => size.w / vbW;
+  // Dome entier : un doigt fait pivoter le ciel autour du zenith.
+  const canSpin = !horizonView && !rotationLocked && view.s <= 1;
+  const angleAt = (clientX: number, clientY: number) => {
+    const q = toSvg(clientX, clientY);
+    return (Math.atan2(q.y, q.x) * 180) / Math.PI;
+  };
+  const wrap180 = (d: number) => ((d % 360) + 540) % 360 - 180;
 
   // Molette (ordinateur) : zoom, sans faire defiler la page.
   const projRef = useRef(projection);
@@ -468,6 +499,7 @@ export function SkyDome({
   }, []);
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    stopFling();
     // Garder le doigt meme s'il sort de la carte ; sans effet (et sans
     // erreur) si le navigateur ne le permet pas pour ce pointeur.
     try {
@@ -481,9 +513,12 @@ export function SkyDome({
       moved: gesture.current?.moved ?? false,
       startDist: pts.length === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0,
       startView: view,
-      startLook: { ...look, az: center.az },
+      startLook: { ...look, az: center.az, alt: center.alt },
+      startSpin: spin,
       start: pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : { x: e.clientX, y: e.clientY },
+      startAngle: pts.length === 1 && canSpin ? angleAt(e.clientX, e.clientY) : null,
     };
+    trail.current = [];
     if (pts.length === 1) gesture.current.moved = false;
   };
   const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
@@ -494,6 +529,7 @@ export function SkyDome({
     if (pts.length === 2 && g.startDist > 0) {
       const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       g.moved = true;
+      trail.current = [];
       if (horizonView) setLook(clampLook({ ...g.startLook, fov: g.startLook.fov * (g.startDist / d) }));
       else setView(clampView({ ...g.startView, s: g.startView.s * (d / g.startDist) }));
     } else if (pts.length === 1) {
@@ -501,35 +537,75 @@ export function SkyDome({
       const dy = e.clientY - g.start.y;
       if (Math.hypot(dx, dy) > 6) g.moved = true;
       if (!g.moved) return;
+      const t = performance.now();
       if (horizonView) {
+        // Glisser reprend la main sur les capteurs, depuis la ou ils
+        // pointaient.
+        if (aim) onManual?.();
         // Le ciel suit le doigt : glisser vers la droite fait regarder a
         // gauche. Pres du centre, une unite vaut 2 rad (tan de l'angle moitie).
         const span = Math.tan(((g.startLook.fov / 4) * Math.PI) / 180);
         const degPerPx = ((2 * span) / Math.min(size.w, size.h)) * (360 / Math.PI);
-        setLook(clampLook({
-          ...g.startLook,
-          az: heading != null ? g.startLook.az : g.startLook.az - dx * degPerPx,
-          alt: g.startLook.alt + dy * degPerPx,
-        }));
+        const next = clampLook({ ...g.startLook, az: g.startLook.az - dx * degPerPx, alt: g.startLook.alt + dy * degPerPx });
+        setLook(next);
+        trail.current.push({ t, a: g.startLook.az - dx * degPerPx, b: next.alt });
       } else if (g.startView.s > 1) {
         const ppu = pixelsPerUnit() * (view.s / g.startView.s);
         setView(clampView({ ...g.startView, cx: g.startView.cx - dx / ppu, cy: g.startView.cy - dy / ppu }));
+      } else if (g.startAngle != null && canSpin) {
+        const a = g.startSpin + wrap180(angleAt(e.clientX, e.clientY) - g.startAngle);
+        setSpin(a);
+        trail.current.push({ t, a, b: 0 });
       }
+      trail.current = trail.current.filter((p) => t - p.t < 100);
     }
+  };
+  /** Elan au lacher : la vitesse des 100 dernieres ms, amortie en ~1/3 s. */
+  const launch = () => {
+    const tr = trail.current;
+    trail.current = [];
+    if (tr.length < 2) return;
+    const first = tr[0];
+    const last = tr[tr.length - 1];
+    const dt = last.t - first.t;
+    if (dt < 16 || performance.now() - last.t > 60) return;
+    let va = (last.a - first.a) / dt;
+    let vb = (last.b - first.b) / dt;
+    if (Math.hypot(va, vb) < 0.01) return;
+    const spinning = !horizonView;
+    let prev = performance.now();
+    const step = (now: number) => {
+      const h = Math.min(50, now - prev);
+      prev = now;
+      if (spinning) setSpin((s) => s + va * h);
+      else setLook((l) => clampLook({ ...l, az: l.az + va * h, alt: l.alt + vb * h }));
+      const decay = Math.exp(-h / 330);
+      va *= decay;
+      vb *= decay;
+      fling.current = Math.hypot(va, vb) > 0.002 ? requestAnimationFrame(step) : 0;
+    };
+    fling.current = requestAnimationFrame(step);
   };
   const onPointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
     const wasTap = pointers.current.size === 1 && gesture.current && !gesture.current.moved;
+    const wasDrag = pointers.current.size === 1 && gesture.current?.moved;
     pointers.current.delete(e.pointerId);
     if (pointers.current.size === 1 && gesture.current) {
       const [only] = [...pointers.current.values()];
-      gesture.current = { ...gesture.current, startView: view, startLook: { ...look, az: center.az }, start: only, startDist: 0 };
+      gesture.current = { ...gesture.current, startView: view, startLook: { ...look, az: center.az, alt: center.alt }, startSpin: spin, start: only, startDist: 0, startAngle: null };
+      trail.current = [];
     }
+    if (wasDrag && !(horizonView && aim)) launch();
     if (!wasTap) return;
     pick(toSvg(e.clientX, e.clientY));
   };
   const resetView = () => {
+    stopFling();
     if (horizonView) setLook((l) => ({ ...l, alt: LOOK_ALT, fov: LOOK_FOV }));
-    else setView(DOME_VIEW);
+    else {
+      setView(DOME_VIEW);
+      setSpin(0);
+    }
   };
 
   /** Ce qui est le plus proche de l'appui, dans un rayon d'un doigt. */
@@ -563,7 +639,7 @@ export function SkyDome({
     onPick?.(null);
   };
 
-  const zoomed = horizonView ? look.fov < LOOK_FOV - 5 || Math.abs(look.alt - LOOK_ALT) > 40 : view.s > 1;
+  const zoomed = horizonView ? look.fov < LOOK_FOV - 5 || (!aim && Math.abs(look.alt - LOOK_ALT) > 40) : view.s > 1 || (!rotationLocked && Math.abs(wrap180(spin)) > 2);
   const viewBox = `${vb.x0} ${vb.y0} ${vbW} ${vbH}`;
   // Selection sous l'horizon, face a l'horizon : montree dans le sol, en
   // retrait, pour savoir ou elle se levera.
@@ -708,7 +784,7 @@ export function SkyDome({
             x = p.x;
             y = p.y + 0.075 * zt;
           } else {
-            const p = domeProject({ alt: 0, az }, rotation)!;
+            const p = domeProject({ alt: 0, az }, rot)!;
             x = p.x * 1.075;
             y = p.y * 1.075 + 0.018 * zt;
           }
@@ -739,7 +815,20 @@ export function SkyDome({
             </text>
           </g>
         )}
+        {/* Suivi du telephone : un reticule au centre, la ou il pointe. */}
+        {horizonView && aim && (() => {
+          const cx = (vb.x0 + vb.x1) / 2;
+          const cy = (vb.y0 + vb.y1) / 2;
+          const r = 0.045 * zt;
+          return (
+            <g className="nc-sky-aim" pointerEvents="none">
+              <circle cx={cx} cy={cy} r={r} vectorEffect="non-scaling-stroke" />
+              <path d={`M${cx - 2 * r} ${cy}H${cx - 1.3 * r}M${cx + 1.3 * r} ${cy}H${cx + 2 * r}M${cx} ${cy - 2 * r}V${cy - 1.3 * r}M${cx} ${cy + 1.3 * r}V${cy + 2 * r}`} vectorEffect="non-scaling-stroke" />
+            </g>
+          );
+        })()}
       </svg>
+      {overlay}
       {zoomed && (
         <button onClick={resetView} className="nc-chip nc-sky-zoom-reset">
           Vue entière

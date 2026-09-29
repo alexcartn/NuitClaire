@@ -1599,6 +1599,59 @@ a {
   background: var(--surf);
 }
 
+/* Bouton des capteurs, pose sur la carte comme dans Star Walk ou SkySafari :
+   a portee de pouce, sans descendre sous la carte le chercher. */
+.nc-sky-fab {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surf) 85%, transparent);
+  color: var(--ink2);
+  font: 600 var(--text-xs)/1 var(--font-text);
+  cursor: pointer;
+}
+
+.nc-sky-fab-on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+[data-theme="night"] .nc-sky-fab {
+  min-height: 52px;
+}
+
+.nc-sky-full .nc-sky-fab {
+  top: calc(max(var(--space-sm), env(safe-area-inset-top)) + 44px);
+  left: max(var(--space-sm), env(safe-area-inset-left));
+}
+
+@media (orientation: portrait) {
+  .nc-sky-full .nc-sky-fab {
+    top: 50%;
+  }
+}
+
+@media (orientation: landscape) {
+  .nc-sky-full .nc-sky-fab {
+    top: auto;
+    bottom: calc(max(var(--space-sm), env(safe-area-inset-bottom)) + 56px);
+  }
+}
+
+.nc-sky-aim {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  opacity: 0.8;
+}
+
 .nc-sky-grid {
   fill: none;
   stroke: rgba(170, 160, 200, 0.1);

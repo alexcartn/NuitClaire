@@ -15,7 +15,8 @@ import { SkyLegend } from "../sky/SkyLegend";
 import { SkySearch, type SkyFound } from "../sky/SkySearch";
 import { SkyViewfinder } from "../sky/SkyViewfinder";
 import { namedStar } from "../sky/skyNames";
-import { altAz, lstDeg, sectorOf } from "../sky/sky";
+import { altAz, lstDeg, pointing, sectorOf } from "../sky/sky";
+import { useSmoothAim } from "../sky/useSmoothAim";
 import type { SkyBodies } from "../sky/types";
 import type { AppState, TargetRow } from "../types";
 
@@ -93,6 +94,13 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   }, [playing]);
   const [oriented, setOriented] = useRemembered("ciel:oriented", false);
   const compass = useCompass();
+  // Capteurs, lisses : face a l'horizon, la vue suit la ou pointe le dos du
+  // telephone, hauteur comprise (a la Star Walk) ; en dome, le cap fait
+  // tourner la carte pour mettre en bas la direction regardee.
+  const horizonView = projection === "horizon";
+  const o = compass.orientation;
+  const aim = useSmoothAim(oriented && horizonView && o ? pointing(o.alpha, o.beta, o.gamma) : null);
+  const smoothHeading = useSmoothAim(oriented && !horizonView && compass.heading != null ? { alt: 0, az: compass.heading } : null);
 
   const fetchTargets = useCallback(() => api.targets(), []);
   const targets = useFetch(fetchTargets, [], "targets");
@@ -206,9 +214,31 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
     );
   }
 
-  const horizonView = projection === "horizon";
-  const heading = oriented && compass.heading != null ? compass.heading : null;
-  const rotation = heading != null ? heading + 180 : 0;
+  const rotation = smoothHeading ? smoothHeading.az + 180 : 0;
+  // Le bouton des capteurs n'apparait que s'il y a de quoi les suivre.
+  const sensorButton = (compass.heading != null || compass.needsPermission) && (
+    <button
+      onClick={() => {
+        if (oriented) {
+          setOriented(false);
+          return;
+        }
+        // iOS : l'autorisation se demande dans le geste meme.
+        if (compass.needsPermission) void compass.start();
+        setOriented(true);
+      }}
+      aria-pressed={oriented}
+      aria-label={horizonView ? "Suivre le téléphone" : "Tourner avec la boussole"}
+      className={oriented ? "nc-sky-fab nc-sky-fab-on" : "nc-sky-fab"}
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 4.5 15 12H9Z" fill="currentColor" />
+        <path d="M12 19.5 9 12h6Z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      </svg>
+      <span>{horizonView ? "Viser" : "Boussole"}</span>
+    </button>
+  );
 
   // Fiche de ce qu'on a touche : un astre nomme devient la selection ; une
   // etoile sans nom se decrit seulement.
@@ -349,7 +379,10 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
               horizonAlt={state.horizonAlt ?? {}}
               projection={projection}
               rotation={rotation}
-              heading={heading}
+              rotationLocked={smoothHeading != null}
+              aim={aim}
+              onManual={() => setOriented(false)}
+              overlay={sensorButton}
               bodies={bodies}
               targets={mapTargets}
               selected={selected}
@@ -443,30 +476,15 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
               )}
             </div>
           </div>
-          {compass.heading != null && (
-            <button
-              onClick={() => setOriented((v) => !v)}
-              role="switch"
-              aria-checked={oriented}
-              className="nc-row nc-between"
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", minHeight: 44, color: "var(--ink)", textAlign: "left" }}
-            >
-              <span style={{ fontSize: "var(--text-sm)" }}>
-                {horizonView ? "Suivre la boussole (la vue tourne avec le téléphone)" : "Tourner avec la boussole (direction regardée en bas)"}
-              </span>
-              <span className={`nc-switch ${oriented ? "nc-switch-on" : ""}`} aria-hidden="true"><span /></span>
-            </button>
-          )}
-          {compass.needsPermission && (
-            <button onClick={() => void compass.start()} className="nc-btn">Activer la boussole</button>
-          )}
           <SkyLegend />
           {/* Repliee : utile la premiere fois, encombrante ensuite. */}
           <details className="nc-caption">
             <summary style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center" }}>Lire la carte</summary>
             <p style={{ margin: 0 }}>
-              Dôme : la carte tenue au-dessus de la tête, zénith au centre, horizon au bord, est à gauche. Horizon : le
-              ciel tel qu'on le voit debout, face à une direction ; glissez pour tourner la tête et lever les yeux. En
+              Dôme : la carte tenue au-dessus de la tête, zénith au centre, horizon au bord, est à gauche ; glissez en rond
+              pour la faire pivoter, ou touchez Boussole pour mettre en bas la direction regardée. Horizon : le ciel
+              tel qu'on le voit debout ; glissez pour tourner la tête et lever les yeux, ou touchez Viser et pointez le
+              téléphone vers le ciel, la vue le suit (glisser reprend la main). En
               ombre, la cime de vos arbres et toits ; hachuré, un secteur bouché (Réglages). Pincez pour zoomer,
               touchez un astre pour savoir quand il se lève, passe au plus haut et sort des arbres ; une flèche au bord
               montre où est la cible choisie. Double-appui pour revenir à la vue entière.
