@@ -52,14 +52,17 @@ def test_magazine_columns_are_dropped():
     assert [i["title"] for i in news.parse_rss("X", xml)] == ["Nova"]
 
 
-def test_apod_page_image(monkeypatch):
-    class R:
-        text = '<a href="image/2609/big.jpg"><IMG SRC="image/2609/screen_1000.jpg" alt="x"></a>'
-        def raise_for_status(self):
-            pass
-    monkeypatch.setattr(news.requests, "get", lambda *a, **k: R())
-    news._apod_images.clear()
-    assert news.apod_image("https://apod.nasa.gov/apod/ap260924.html") == "https://apod.nasa.gov/apod/image/2609/screen_1000.jpg"
+def test_apod_feed():
+    xml = """<rss xmlns:apod="https://science.nasa.gov/apod/"><channel><item>
+    <title>Harvest Moon</title><link>https://science.nasa.gov/image-article/apod-2026-october-1-harvest-moon/</link>
+    <pubDate>Thu, 01 Oct 2026 04:05:00 +0000</pubDate>
+    <apod:hdurl>https://assets.science.nasa.gov/dynamicimage/moon.jpg?w=1600</apod:hdurl>
+    <apod:explanation><![CDATA[<strong>Explanation: </strong>Have you ever seen the full moon rise?]]></apod:explanation>
+    </item></channel></rss>"""
+    item = news.parse_rss("APOD", xml)[0]
+    assert item["image"] == "https://assets.science.nasa.gov/dynamicimage/moon.jpg?w=1600"
+    assert item["summary"] == "Have you ever seen the full moon rise?"
+    assert item["kind"] == "image" and item["date"].startswith("2026-10-01")
 
 
 def test_english_sources():

@@ -32,7 +32,9 @@ import catalog
 FEEDS = [
     ("Ciel & Espace", "https://www.cieletespace.fr/rss.xml"),
     ("Webastro", "https://www.webastro.net/forums/forum/49-lactualit%C3%A9-du-ciel.xml/"),
-    ("APOD", "https://apod.nasa.gov/apod.rss"),
+    # L'APOD a quitte apod.nasa.gov (son ancien flux renvoie vers une page
+    # HTML) : son flux est desormais sur science.nasa.gov.
+    ("APOD", "https://science.nasa.gov/feed/apod-basic/"),
     # En anglais, les deux references de l'observation amateur : le ciel de
     # la semaine et les vraies nouvelles (Sky & Telescope ; son flux general
     # est ferme aux robots, pas celui-ci), et le ciel de chaque soir
@@ -99,10 +101,9 @@ PLANETS_EN = {"Mercury": "Mercure", "Venus": "Vénus", "Saturn": "Saturne"}
 _DESIGNATION = re.compile(r"(?<![\w/])(M|NGC|IC)\s?(\d{1,4})(?!\w)")
 _COMET = re.compile(r"\b(?:[CP]/\d{4}\s?[A-Z]{1,2}\d{0,3}|\d{1,3}P)(?=[\s/),.;:]|$)")
 MAX_OBJECTS = 3
-# Le flux APOD ne donne qu'une vignette de calendrier (quelques dizaines de
-# pixels) : floue en grand. La page du jour porte l'image a taille d'ecran.
-_APOD_PAGE_IMG = re.compile(r"""<img\s+src=["'](image/[^"']+)["']""", re.I)
-_apod_images: dict[str, str | None] = {}
+# Le flux APOD de science.nasa.gov n'a pas de <description> : le texte et
+# l'image (deja a taille d'ecran) sont dans ses propres balises.
+_APOD_NS = "{https://science.nasa.gov/apod/}"
 
 
 def _fold(text: str) -> str:
@@ -168,13 +169,16 @@ def _clean(fragment: str) -> str:
 
 # Formules que WordPress ajoute a chaque description.
 _WP_BOILERPLATE = re.compile(r"\s*(Continue reading\b.*|The post .* appeared first on .*)$", re.S)
-# Et la phrase d'appel qui ouvre chaque « Sky Today » d'Astronomy.
+# Et la phrase d'appel qui ouvre chaque « Sky Today » d'Astronomy, et le
+# « Explanation: » de chaque APOD.
 _PROMO = re.compile(r"^Looking for a sky event this week\?\s*Check out our full\s+Sky This Week\s+column\.\s*", re.I)
+_APOD_LEAD = re.compile(r"^Explanation:\s*", re.I)
 
 
 def _summary(text: str) -> str:
     text = _WP_BOILERPLATE.sub("", text).strip()
     text = _PROMO.sub("", text).strip()
+    text = _APOD_LEAD.sub("", text)
     if len(text) <= SUMMARY_CHARS:
         return text
     cut = text[:SUMMARY_CHARS].rsplit(" ", 1)[0]
@@ -198,6 +202,9 @@ def _date(item: ET.Element, link: str) -> datetime | None:
 
 
 def _image(item: ET.Element, description: str) -> str | None:
+    hdurl = _text(item.find(f"{_APOD_NS}hdurl"))
+    if hdurl:
+        return hdurl
     enclosure = item.find("enclosure")
     if enclosure is not None and (enclosure.get("type") or "").startswith("image/"):
         return enclosure.get("url")
@@ -216,7 +223,7 @@ def parse_rss(source: str, xml_text: str | bytes) -> list[dict]:
     out = []
     for item in root.iter("item"):
         link = _text(item.find("link"))
-        raw_desc = _text(item.find("description"))
+        raw_desc = _text(item.find("description")) or _text(item.find(f"{_APOD_NS}explanation"))
         title = _clean(_text(item.find("title")))
         if not title:
             # APOD laisse parfois le titre vide : l'alt de l'image le donne.
@@ -295,22 +302,6 @@ def merge(by_source: dict[str, list[dict]], now: datetime, limit: int = 40) -> l
     return kept[:limit]
 
 
-def apod_image(link: str) -> str | None:
-    """Image de la page APOD `link`, gardee en memoire ; None un jour de
-    video ou si la page est injoignable (la vignette du flux reste alors)."""
-    if link in _apod_images:
-        return _apod_images[link]
-    try:
-        r = requests.get(link, timeout=10, headers=_HEADERS)
-        r.raise_for_status()
-        m = _APOD_PAGE_IMG.search(r.text)
-        url = requests.compat.urljoin(link, m[1]) if m else None
-    except requests.RequestException:
-        return None
-    _apod_images[link] = url
-    return url
-
-
 def latest(refresh: bool = False) -> dict:
     """Reponse de GET /api/news. `refresh` relit les flux sans attendre la
     fin des 6 h (voir MIN_REFRESH_S). `fetchedAt` : la lecture la plus
@@ -324,9 +315,6 @@ def latest(refresh: bool = False) -> dict:
         else:
             by_source[source] = items
     items = merge(by_source, datetime.now(timezone.utc))
-    for item in items:
-        if item["kind"] == "image":
-            item["image"] = apod_image(item["link"]) or item["image"]
     times = [_cache[s][0] for s in by_source if s in _cache]
     fetched = datetime.fromtimestamp(min(times), timezone.utc).isoformat() if times else None
     return {"items": items, "missing": missing, "fetchedAt": fetched}
