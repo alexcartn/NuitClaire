@@ -290,6 +290,29 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   );
 
 
+  // Rappel des cibles faciles en ce moment (celles de « En attendant le
+  // Seestar ») : un appui la montre sur la carte ou la vise, donc utile aussi
+  // dans le viseur.
+  const pickChips =
+    (binoculars.data?.picks.length ?? 0) > 0 && (
+    <div className="nc-stack-xs">
+      <span className="nc-caption">Faciles {eye ? "à l'œil nu" : "aux jumelles"} {binoculars.data!.at}</span>
+      <div className="nc-row nc-hscroll">
+        {binoculars.data!.picks.map((p) => (
+          <button
+            key={p.designation}
+            onClick={() => { setPicked(null); setSelected(p.designation === selected ? null : p.designation); }}
+            className={`nc-chip nc-none ${p.designation === selected ? "nc-chip-active" : ""}`}
+            aria-pressed={p.designation === selected}
+          >
+            <span className="nc-num">{p.designation}</span>
+            {p.name ? ` · ${p.name}` : ""}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="nc-screen">
       {/* Une seule ligne de commandes : la carte passe avant tout le reste. */}
@@ -378,27 +401,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
                 carte au lieu de lui prendre de la hauteur. */}
             <div className={full ? "nc-stack-xs nc-sky-full-bottom" : "nc-stack"}>
               {!full && optionsRow}
-        {/* Rappel des cibles faciles aux jumelles en ce moment (celles de
-            « En attendant le Seestar ») : un appui la montre sur la carte ou
-            la vise. */}
-        {!full && (binoculars.data?.picks.length ?? 0) > 0 && (
-          <div className="nc-stack-xs">
-            <span className="nc-caption">Faciles {eye ? "à l'œil nu" : "aux jumelles"} {binoculars.data!.at}</span>
-            <div className="nc-row nc-hscroll">
-              {binoculars.data!.picks.map((p) => (
-                <button
-                  key={p.designation}
-                  onClick={() => { setPicked(null); setSelected(p.designation === selected ? null : p.designation); }}
-                  className={`nc-chip nc-none ${p.designation === selected ? "nc-chip-active" : ""}`}
-                  aria-pressed={p.designation === selected}
-                >
-                  <span className="nc-num">{p.designation}</span>
-                  {p.name ? ` · ${p.name}` : ""}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+              {!full && pickChips}
               <div className="nc-stack-xs">
                 <div className="nc-row nc-between">
                   <span className="nc-caption nc-num">{whenLabel}</span>
@@ -501,7 +504,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
         </>
       ) : compass.orientation ? (
         <>
-          <div className="nc-segmented" role="radiogroup" aria-label="Regarder">
+          <div className="nc-segmented nc-sky-mode" role="radiogroup" aria-label="Regarder">
             {(["jumelles", "oeil"] as const).map((m) => (
               <button
                 key={m}
@@ -514,6 +517,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
               </button>
             ))}
           </div>
+          {pickChips}
           <SkyViewfinder
             naked={eye}
             orientation={compass.orientation}
@@ -526,13 +530,23 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
             horizonAlt={skyHorizonAlt}
             bodies={bodiesNow.data}
           />
-          <p className="nc-caption" style={{ margin: 0 }}>
+          <div className="nc-sky-toggles" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
+            <button onClick={() => setShowHorizon((v) => !v)} role="switch" aria-checked={showHorizon} className="nc-sky-toggle" style={{ flexDirection: "row", alignItems: "center" }}>
+              <span>Horizon dégagé (arbres et toits de Réglages)</span>
+              <span className={`nc-switch ${showHorizon ? "nc-switch-on" : ""}`} aria-hidden="true"><span /></span>
+            </button>
+          </div>
+          {/* Repliee : utile la premiere fois, encombrante ensuite. */}
+          <details className="nc-caption">
+            <summary style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center" }}>Lire le viseur</summary>
+          <p style={{ margin: 0 }}>
             {eye
               ? "Levez le téléphone vers le ciel, écran vers vous : la vue montre ce qui est derrière lui, et nomme étoiles et planètes. Baissez-le pour regarder, votre œil fait le reste. "
               : "Tenez le téléphone contre les jumelles, écran vers vous. "}
             La boussole se trompe de quelques degrés : dessinez un 8 avec le téléphone pour la calibrer, loin de la
             voiture.{eye ? "" : " Le chemin d'étoiles de la fiche fait les derniers degrés."}
           </p>
+          </details>
         </>
       ) : compass.needsPermission ? (
         <button onClick={() => void compass.start()} disabled={compass.state === "asking"} className="nc-btn nc-btn-primary">
