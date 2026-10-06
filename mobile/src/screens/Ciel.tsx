@@ -254,7 +254,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   // Vue et options : sous la carte ; en plein ecran, en haut avec la
   // recherche, pour laisser le bas a l'heure et a la fiche.
   const optionsRow = (
-    <div className="nc-row nc-hscroll nc-sky-options" role="group" aria-label="Affichage">
+    <div className="nc-sky-options" role="group" aria-label="Affichage">
       <div className="nc-segmented nc-sky-projection" role="radiogroup" aria-label="Projection">
         {(["dome", "horizon"] as const).map((p) => (
           <button
@@ -268,82 +268,53 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
           </button>
         ))}
       </div>
-      {([
-        ["Grille", showGrid, setShowGrid],
-        ["Constellations", showConst, setShowConst],
-        ["Horizon dégagé", showHorizon, setShowHorizon],
-      ] as const).map(([label, on, set]) => (
-        <button
-          key={label}
-          onClick={() => set((v: boolean) => !v)}
-          role="switch"
-          aria-checked={on}
-          className="nc-chip nc-none nc-chip-switch"
-        >
-          {label}
-          <span className={`nc-switch ${on ? "nc-switch-on" : ""}`} aria-hidden="true"><span /></span>
-        </button>
-      ))}
-      {!full && (
-        <button onClick={() => setFull(true)} className="nc-chip nc-none">Plein écran</button>
-      )}
+      <div className="nc-sky-toggles">
+        {([
+          ["Grille", showGrid, setShowGrid],
+          ["Constellations", showConst, setShowConst],
+          ["Horizon dégagé", showHorizon, setShowHorizon],
+        ] as const).map(([label, on, set]) => (
+          <button
+            key={label}
+            onClick={() => set((v: boolean) => !v)}
+            role="switch"
+            aria-checked={on}
+            className="nc-sky-toggle"
+          >
+            <span>{label}</span>
+            <span className={`nc-switch ${on ? "nc-switch-on" : ""}`} aria-hidden="true"><span /></span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 
 
   return (
     <div className="nc-screen">
-      <div className="nc-row nc-between">
-        {onBack ? (
-          <button onClick={onBack} className="nc-link nc-link-accent">
+      {/* Une seule ligne de commandes : la carte passe avant tout le reste. */}
+      <div className="nc-row" style={{ gap: "var(--space-sm)" }}>
+        {onBack && (
+          <button onClick={onBack} className="nc-link nc-link-accent nc-none" aria-label="Retour">
             <TabIcon name="back" />
             Retour
           </button>
-        ) : (
-          <div />
         )}
+        <div className="nc-segmented nc-grow nc-sky-mode" role="radiogroup" aria-label="Vue">
+          {(["carte", "viseur"] as const).map((m) => (
+            <button
+              key={m}
+              role="radio"
+              aria-checked={mode === m}
+              onClick={() => setMode(m)}
+              className={mode === m ? "nc-segment nc-segment-active" : "nc-segment"}
+            >
+              {m === "carte" ? "Carte du ciel" : "Viseur"}
+            </button>
+          ))}
+        </div>
         <NightToggle />
       </div>
-      <div>
-        <div className="nc-eyebrow">Ciel</div>
-        <div className="nc-title">{mode === "carte" ? "Carte du ciel" : "Viseur"}</div>
-      </div>
-
-      <div className="nc-segmented" role="radiogroup" aria-label="Vue">
-        {(["carte", "viseur"] as const).map((m) => (
-          <button
-            key={m}
-            role="radio"
-            aria-checked={mode === m}
-            onClick={() => setMode(m)}
-            className={mode === m ? "nc-segment nc-segment-active" : "nc-segment"}
-          >
-            {m === "carte" ? "Carte" : "Viseur"}
-          </button>
-        ))}
-      </div>
-
-      {/* Rappel des cibles faciles aux jumelles en ce moment (celles de
-          « En attendant le Seestar ») : un appui la montre sur la carte ou
-          la vise. */}
-      {(binoculars.data?.picks.length ?? 0) > 0 && (
-        <div className="nc-stack-xs">
-          <span className="nc-caption">Faciles {eye ? "à l'œil nu" : "aux jumelles"} {binoculars.data!.at}</span>
-          <div className="nc-row nc-hscroll">
-            {binoculars.data!.picks.map((p) => (
-              <button
-                key={p.designation}
-                onClick={() => { setPicked(null); setSelected(p.designation === selected ? null : p.designation); }}
-                className={`nc-chip nc-none ${p.designation === selected ? "nc-chip-active" : ""}`}
-                aria-pressed={p.designation === selected}
-              >
-                <span className="nc-num">{p.designation}</span>
-                {p.name ? ` · ${p.name}` : ""}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {mode === "carte" ? (
         <>
@@ -362,7 +333,16 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
                   </span>
                 </div>
               )}
-              <SkySearch targets={targets.data ?? []} onChoose={onFound} />
+              <div className="nc-row" style={{ alignItems: "flex-start", gap: "var(--space-xs)" }}>
+                <div className="nc-grow" style={{ minWidth: 0 }}>
+                  <SkySearch targets={targets.data ?? []} onChoose={onFound} />
+                </div>
+                {!full && (
+                  <button onClick={() => setFull(true)} className="nc-round-btn nc-none" aria-label="Plein écran" title="Plein écran">
+                    <TabIcon name="expand" />
+                  </button>
+                )}
+              </div>
               {full && optionsRow}
             </div>
             <SkyDome
@@ -398,6 +378,27 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
                 carte au lieu de lui prendre de la hauteur. */}
             <div className={full ? "nc-stack-xs nc-sky-full-bottom" : "nc-stack"}>
               {!full && optionsRow}
+        {/* Rappel des cibles faciles aux jumelles en ce moment (celles de
+            « En attendant le Seestar ») : un appui la montre sur la carte ou
+            la vise. */}
+        {!full && (binoculars.data?.picks.length ?? 0) > 0 && (
+          <div className="nc-stack-xs">
+            <span className="nc-caption">Faciles {eye ? "à l'œil nu" : "aux jumelles"} {binoculars.data!.at}</span>
+            <div className="nc-row nc-hscroll">
+              {binoculars.data!.picks.map((p) => (
+                <button
+                  key={p.designation}
+                  onClick={() => { setPicked(null); setSelected(p.designation === selected ? null : p.designation); }}
+                  className={`nc-chip nc-none ${p.designation === selected ? "nc-chip-active" : ""}`}
+                  aria-pressed={p.designation === selected}
+                >
+                  <span className="nc-num">{p.designation}</span>
+                  {p.name ? ` · ${p.name}` : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
               <div className="nc-stack-xs">
                 <div className="nc-row nc-between">
                   <span className="nc-caption nc-num">{whenLabel}</span>
