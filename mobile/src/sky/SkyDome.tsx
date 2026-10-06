@@ -176,7 +176,7 @@ const clampLook = (l: Look): Look => ({
  * qu'on a touche. */
 export function SkyDome({
   when, site, horizon, horizonAlt, projection = "dome", rotation, heading = null, bodies, targets, selected,
-  showGrid = false, showConstellations = true, focus = null, onSelect, onPick,
+  showGrid = false, showConstellations = true, highlightConstellation = null, focus = null, onSelect, onPick, onConstellation,
 }: {
   when: Date;
   site: { lat: number; lon: number };
@@ -193,6 +193,12 @@ export function SkyDome({
   selected: string | null;
   showGrid?: boolean;
   showConstellations?: boolean;
+  /** Constellation (identifiant) dont tout le trace est mis en valeur, meme
+   * quand les constellations sont masquees. */
+  highlightConstellation?: string | null;
+  /** Un appui sur un trait de constellation la choisit ; un appui dans le
+   * vide (null) la lache. */
+  onConstellation?: (id: string | null) => void;
   /** Centrer la carte sur ce point ; `n` change a chaque demande. */
   focus?: { raDeg: number; decDeg: number; n: number } | null;
   onSelect: (designation: string) => void;
@@ -260,7 +266,7 @@ export function SkyDome({
     [lst, site.lat],
   );
   const linesSky = useMemo(
-    () => (skyData.lines as number[][]).map(([r1, d1, r2, d2]) => [toSky(r1, d1), toSky(r2, d2)] as const),
+    () => (skyData.lines as (number | string)[][]).map(([r1, d1, r2, d2, id]) => [toSky(r1 as number, d1 as number), toSky(r2 as number, d2 as number), id as string] as const),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lst, site.lat],
   );
@@ -289,9 +295,15 @@ export function SkyDome({
   );
 
   const stars = starsSky.map((s) => ({ ...s, p: proj(s.pos) })).filter((s): s is typeof s & { p: Pt } => inView(s.p, -0.05));
-  const lines = showConstellations
-    ? linesSky.map(([a, b]) => [proj(a), proj(b)] as const).filter((l): l is readonly [Pt, Pt] => !!l[0] && !!l[1] && (inView(l[0]) || inView(l[1])))
-    : [];
+  const projectedLines = linesSky
+    .map(([a, b, id]) => ({ a: proj(a), b: proj(b), id }))
+    .filter((l): l is { a: Pt; b: Pt; id: string } => !!l.a && !!l.b && (inView(l.a) || inView(l.b)));
+  const lines = showConstellations ? projectedLines.filter((l) => l.id !== highlightConstellation) : [];
+  const hlLines = highlightConstellation ? projectedLines.filter((l) => l.id === highlightConstellation) : [];
+  const hlName = highlightConstellation
+    ? (skyData.constellations as { id: string; fr: string; ra: number; dec: number }[]).find((c) => c.id === highlightConstellation)
+    : null;
+  const hlPos = hlName ? proj(toSky(hlName.ra, hlName.dec)) : null;
   const milkyway = milkywaySky.map((rings) => rings.map((ring) => pathOf(ring.map(projFree), true)).join(""));
   const constellations = showConstellations ? constSky.map((c) => ({ ...c, p: proj(c.pos) })).filter((c) => inView(c.p)) : [];
 
@@ -560,6 +572,17 @@ export function SkyDome({
       onPick?.({ kind: "etoile", name: st.label || "Étoile", detail: `magnitude ${st.mag.toFixed(1).replace(".", ",")}`, alt: st.pos.alt, az: st.pos.az, raDeg: st.ra, decDeg: st.dec });
       return;
     }
+    // Un trait de constellation proche : on la choisit en entier.
+    const near = (l: { a: Pt; b: Pt }) => {
+      const dx = l.b.x - l.a.x, dy = l.b.y - l.a.y;
+      const len2 = dx * dx + dy * dy;
+      const u = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((q.x - l.a.x) * dx + (q.y - l.a.y) * dy) / len2));
+      return Math.hypot(l.a.x + u * dx - q.x, l.a.y + u * dy - q.y);
+    };
+    const seg = showConstellations
+      ? lines.concat(hlLines).map((l) => ({ l, d: near(l) })).sort((x, y) => x.d - y.d)[0]
+      : undefined;
+    onConstellation?.(seg && seg.d <= reach * 0.5 ? seg.l.id : null);
     onPick?.(null);
   };
 
@@ -631,9 +654,17 @@ export function SkyDome({
             </text>
           ))}
 
-          {lines.map(([a, b], i) => (
-            <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="nc-sky-const" vectorEffect="non-scaling-stroke" />
+          {lines.map((l, i) => (
+            <line key={i} x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y} className="nc-sky-const" vectorEffect="non-scaling-stroke" />
           ))}
+          {hlLines.map((l, i) => (
+            <line key={`hl${i}`} x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y} className="nc-sky-const nc-sky-const-hl" vectorEffect="non-scaling-stroke" />
+          ))}
+          {hlName && hlPos && inView(hlPos) && (
+            <text x={hlPos.x} y={hlPos.y} fontSize={0.036 * zt} textAnchor="middle" className="nc-sky-const-name nc-sky-const-name-hl" pointerEvents="none">
+              {hlName.fr}
+            </text>
+          )}
           {constellations.map((c) => (
             <text key={c.id} x={c.p!.x} y={c.p!.y} fontSize={0.03 * zt} textAnchor="middle" className="nc-sky-const-name" pointerEvents="none">
               {c.fr}

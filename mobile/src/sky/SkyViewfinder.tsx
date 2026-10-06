@@ -102,7 +102,7 @@ export function SkyViewfinder({ orientation, site, target, targetLabel, targetKi
   );
   const lines = useMemo(
     () =>
-      (skyData.lines as number[][])
+      (skyData.lines as unknown as number[][])
         .map(([r1, d1, r2, d2]) => [
           viewProject(altAz(r1, d1, site.lat, lst), aim),
           viewProject(altAz(r2, d2, site.lat, lst), aim),

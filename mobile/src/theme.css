@@ -2135,3 +2135,28 @@ a {
   background: var(--surf);
   border-top: 1px solid var(--line);
 }
+
+/* Constellation choisie : tout son trace, plus marque que le fond. */
+.nc-sky-const-hl {
+  stroke: rgba(200, 190, 240, 0.95);
+  stroke-width: 2;
+}
+
+.nc-sky-const-name-hl {
+  fill: rgba(225, 218, 250, 0.95);
+}
+
+[data-theme="night"] .nc-sky-const-hl {
+  stroke: var(--ink);
+  stroke-opacity: 1;
+}
+
+[data-theme="night"] .nc-sky-const-name-hl {
+  fill: var(--ink);
+}
+
+/* Puce a interrupteur (options de la carte du ciel) : le libelle et un
+   ON/OFF visible, au lieu d'une puce qui change seulement de couleur. */
+.nc-chip-switch {
+  gap: var(--space-xs);
+}

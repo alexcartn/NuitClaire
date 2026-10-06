@@ -8,8 +8,8 @@ import { CONSTELLATIONS, NAMED_STARS } from "./skyNames";
 
 export interface SkyFound {
   name: string;
-  /** Constellation : la carte s'y centre sans rien selectionner. */
-  constellation?: { raDeg: number; decDeg: number };
+  /** Constellation : la carte s'y centre et la met en valeur en entier. */
+  constellation?: { id?: string; raDeg: number; decDeg: number };
 }
 
 interface Hit {
@@ -39,7 +39,7 @@ export function SkySearch({ targets, onChoose }: { targets: TargetRow[]; onChoos
       ...BODY_NAMES.filter(has).map((b) => ({ key: `b:${b}`, name: b, hint: b === "Lune" ? "" : "planète", found: { name: b } })),
       ...NAMED_STARS.filter((s) => has(s.name)).map((s) => ({ key: `s:${s.name}`, name: s.name, hint: "étoile", found: { name: s.name } })),
       ...CONSTELLATIONS.filter((c) => has(c.name)).map((c) => ({
-        key: `c:${c.name}`, name: c.name, hint: "constellation", found: { name: c.name, constellation: { raDeg: c.raDeg, decDeg: c.decDeg } },
+        key: `c:${c.name}`, name: c.name, hint: "constellation", found: { name: c.name, constellation: { id: c.id, raDeg: c.raDeg, decDeg: c.decDeg } },
       })),
       ...targets
         .filter((t) => has(t.designation) || has(t.commonName) || has(t.messierId))

@@ -54,6 +54,10 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   const [projection, setProjection] = useRemembered<SkyProjection>("ciel:projection", "dome");
   const [showGrid, setShowGrid] = useRemembered("ciel:grid", false);
   const [showConst, setShowConst] = useRemembered("ciel:constellations", true);
+  // Le masque d'horizon (arbres, toits) vient de Reglages ; on peut le
+  // couper ici pour voir tout le ciel, sans toucher a ce qui y est regle.
+  const [showHorizon, setShowHorizon] = useRemembered("ciel:horizon", true);
+  const [hlConst, setHlConst] = useState<string | null>(null);
   const [focusReq, setFocusReq] = useState<{ name: string; n: number; raDeg?: number; decDeg?: number } | null>(null);
   const { isNight, toggleNight } = useTheme();
   // Plein ecran du navigateur en plus (barre d'adresse et barre d'etat
@@ -192,6 +196,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   const onFound = (f: SkyFound) => {
     setPicked(null);
     if (f.constellation) {
+      setHlConst(f.constellation.id ?? null);
       setFocusReq((r) => ({ name: f.name, n: (r?.n ?? 0) + 1, ...f.constellation }));
       return;
     }
@@ -208,6 +213,9 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   }
 
   const horizonView = projection === "horizon";
+  const OPEN_SECTORS = { N: true, NE: true, E: true, SE: true, S: true, SW: true, W: true, NW: true };
+  const skyHorizon = showHorizon ? state.horizon : OPEN_SECTORS;
+  const skyHorizonAlt = showHorizon ? (state.horizonAlt ?? {}) : {};
   const heading = oriented && compass.heading != null ? compass.heading : null;
   const rotation = heading != null ? heading + 180 : 0;
 
@@ -260,12 +268,22 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
           </button>
         ))}
       </div>
-      <button onClick={() => setShowGrid((v) => !v)} aria-pressed={showGrid} className={`nc-chip nc-none ${showGrid ? "nc-chip-active" : ""}`}>
-        Grille
-      </button>
-      <button onClick={() => setShowConst((v) => !v)} aria-pressed={showConst} className={`nc-chip nc-none ${showConst ? "nc-chip-active" : ""}`}>
-        Constellations
-      </button>
+      {([
+        ["Grille", showGrid, setShowGrid],
+        ["Constellations", showConst, setShowConst],
+        ["Horizon dégagé", showHorizon, setShowHorizon],
+      ] as const).map(([label, on, set]) => (
+        <button
+          key={label}
+          onClick={() => set((v: boolean) => !v)}
+          role="switch"
+          aria-checked={on}
+          className="nc-chip nc-none nc-chip-switch"
+        >
+          {label}
+          <span className={`nc-switch ${on ? "nc-switch-on" : ""}`} aria-hidden="true"><span /></span>
+        </button>
+      ))}
       {!full && (
         <button onClick={() => setFull(true)} className="nc-chip nc-none">Plein écran</button>
       )}
@@ -350,8 +368,8 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
             <SkyDome
               when={when}
               site={site}
-              horizon={state.horizon}
-              horizonAlt={state.horizonAlt ?? {}}
+              horizon={skyHorizon}
+              horizonAlt={skyHorizonAlt}
               projection={projection}
               rotation={rotation}
               heading={heading}
@@ -360,6 +378,8 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
               selected={selected}
               showGrid={showGrid}
               showConstellations={showConst}
+              highlightConstellation={hlConst}
+              onConstellation={setHlConst}
               focus={focus}
               onSelect={(d) => setSelected(d)}
               onPick={(p) => {
@@ -439,8 +459,8 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
                   when={when}
                   isNow={isNow}
                   site={site}
-                  horizon={state.horizon}
-                  horizonAlt={state.horizonAlt ?? {}}
+                  horizon={skyHorizon}
+                  horizonAlt={skyHorizonAlt}
                   compact={full}
                   onAim={info.aim ? () => { setFull(false); setMode("viseur"); } : undefined}
                   onFiche={info.fiche ? () => onOpenTarget(info.name) : undefined}
@@ -501,8 +521,8 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
             targetLabel={selectedTarget?.designation ?? null}
             targetKind={selectedTarget?.kind}
             fovDeg={fov}
-            horizon={state.horizon}
-            horizonAlt={state.horizonAlt ?? {}}
+            horizon={skyHorizon}
+            horizonAlt={skyHorizonAlt}
             bodies={bodiesNow.data}
           />
           <p className="nc-caption" style={{ margin: 0 }}>

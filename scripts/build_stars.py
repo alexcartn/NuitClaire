@@ -35,11 +35,17 @@ def main(src: Path) -> None:
                         info.get("name", ""), desig, s["properties"].get("bv", "")])
     lines = json.loads((src / "constellations.lines.json").read_text())["features"]
     segments = []
+    segment_ids = []
     for c in lines:
         for line in c["geometry"]["coordinates"]:
             for (a, b) in zip(line, line[1:]):
                 segments.append([round(ra_deg(a[0]), 3), round(a[1], 3), round(ra_deg(b[0]), 3), round(b[1], 3)])
+                segment_ids.append(c["id"])
     (OUT / "constellation_lines.json").write_text(json.dumps(segments, separators=(",", ":")))
+    # Constellation de chaque segment, dans le meme ordre : la carte du ciel
+    # s'en sert pour mettre en valeur une constellation entiere. A part, pour
+    # que starhop.py continue de lire des segments a quatre nombres.
+    (OUT / "constellation_line_ids.json").write_text(json.dumps(segment_ids, separators=(",", ":")))
 
     # Noms des constellations (francais) et point ou poser l'etiquette.
     names = [
@@ -98,7 +104,10 @@ def build_mobile_sky() -> None:
                 bv = round(float(r["bv"]), 2) if r.get("bv") else 0.6
                 stars.append([round(float(r["ra_deg"]), 2), round(float(r["dec_deg"]), 2), round(m, 1),
                               MOBILE_NAMES.get(r["name"], ""), bv])
-    lines = [[round(v, 2) for v in seg] for seg in json.loads((OUT / "constellation_lines.json").read_text())]
+    segments = json.loads((OUT / "constellation_lines.json").read_text())
+    ids = json.loads((OUT / "constellation_line_ids.json").read_text())
+    # Cinquieme valeur : l'identifiant de la constellation (voir main()).
+    lines = [[*[round(v, 2) for v in seg], cid] for seg, cid in zip(segments, ids)]
     constellations = json.loads((OUT / "constellation_names.json").read_text())
     milkyway = json.loads((OUT / "milkyway.json").read_text())
     target = OUT.parent / "mobile" / "src" / "sky" / "skyData.json"
