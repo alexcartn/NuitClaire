@@ -9,6 +9,7 @@ import { buildDex, captureDates, MESSIER_TOTAL, MONTHS_FR, pace, type DexEntry }
 import { StaleNotice } from "../components/StaleNotice";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { CiblesSwitch } from "../components/CiblesSwitch";
 import { Section } from "../components/Section";
 import { useRemembered } from "../useRemembered";
 
@@ -64,9 +65,12 @@ function DexChips({ entries, onOpen }: { entries: DexEntry[]; onOpen: (d: string
 export function Messier({
   captured,
   onOpenTarget,
+  onSwitch,
 }: {
   captured: Set<string>;
   onOpenTarget: (designation: string) => void;
+  /** Bascule vers « Cibles ce soir » (meme onglet de la barre). */
+  onSwitch: (screen: "cibles" | "messier") => void;
 }) {
   const fetchRows = useCallback(() => api.messier(false), []);
   const rows = useFetch(fetchRows, [], "messier:false");
@@ -121,6 +125,7 @@ export function Messier({
         }
       />
 
+      <CiblesSwitch active="messier" onSelect={onSwitch} />
 
       <div className="nc-card nc-stack">
         <div style={{ height: 10, borderRadius: 5, background: "var(--bar)", overflow: "hidden" }}>

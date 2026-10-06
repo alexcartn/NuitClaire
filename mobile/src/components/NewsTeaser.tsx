@@ -10,29 +10,39 @@ export function MustSeeCard({ onOpenTarget }: { onOpenTarget: (designation: stri
   const tonight = useTonight();
   const picks = data ? mustSee(data.items, tonight, new Date()) : [];
   if (picks.length === 0) return null;
+  // Un meme article peut citer plusieurs objets visibles ce soir : le titre
+  // n'est affiche qu'une fois, avec un repere par objet dessous.
+  const byItem = new Map<string, typeof picks>();
+  for (const pick of picks) {
+    const key = pick.item.link;
+    byItem.set(key, [...(byItem.get(key) ?? []), pick]);
+  }
   return (
-    <div className="nc-card nc-stack-xs" style={{ borderColor: "var(--accent)" }}>
-      <div className="nc-eyebrow" style={{ color: "var(--accent)" }}>À ne pas manquer</div>
-      {picks.map(({ item, object, visibility }) => {
-        const open = object.kind !== "comet" ? () => onOpenTarget(object.designation) : undefined;
+    <div className="nc-card nc-stack-xs">
+      <div className="nc-eyebrow">À ne pas manquer</div>
+      {[...byItem.values()].map((group) => {
+        const { item } = group[0];
         return (
-          <div key={object.designation} className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
+          <div key={item.link} className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
             <a href={item.link} target="_blank" rel="noopener noreferrer"
               style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--ink)", textDecoration: "none", lineHeight: 1.3 }}>
               {item.title}
             </a>
-            <div className="nc-row nc-between" style={{ gap: "var(--space-xs)" }}>
-              <span className="nc-caption">{item.source}{item.date ? ` · ${fmtNewsDate(item.date)}` : ""}</span>
-              {open ? (
-                <button onClick={open} className="nc-link nc-link-accent nc-none" style={{ minHeight: 36 }}>
-                  <span className="nc-num">{object.label}</span> · {visibility.text} ›
+            <span className="nc-caption">{item.source}{item.date ? ` · ${fmtNewsDate(item.date)}` : ""}</span>
+            {group.map(({ object, visibility }) => {
+              const open = object.kind !== "comet" ? () => onOpenTarget(object.designation) : undefined;
+              return open ? (
+                <button key={object.designation} onClick={open} className="nc-link nc-row nc-between" style={{ minHeight: 44, color: "var(--ink)", width: "100%", alignSelf: "stretch", fontSize: "var(--text-sm)" }}>
+                  <span>{object.label}</span>
+                  <span className="nc-num" style={{ color: "var(--ink2)" }}>{visibility.text} ›</span>
                 </button>
               ) : (
-                <span className="nc-caption nc-none" style={{ color: "var(--good)" }}>
-                  <span className="nc-num">{object.label}</span> · {visibility.text}
-                </span>
-              )}
-            </div>
+                <div key={object.designation} className="nc-row nc-between" style={{ minHeight: 44, fontSize: "var(--text-sm)" }}>
+                  <span>{object.label}</span>
+                  <span className="nc-num" style={{ color: "var(--ink2)" }}>{visibility.text}</span>
+                </div>
+              );
+            })}
           </div>
         );
       })}

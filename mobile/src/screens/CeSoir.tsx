@@ -8,8 +8,6 @@ import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { TabIcon } from "../components/TabIcon";
 import { ScoreCard } from "../components/ScoreCard";
-import { StatCard } from "../components/StatCard";
-import { MoonPhase } from "../components/MoonPhase";
 import { SectorChips } from "../components/SectorChips";
 import { NightStrip } from "../components/NightStrip";
 import { NightPlan } from "../components/NightPlan";
@@ -56,14 +54,12 @@ function seestarTarget(current: CurrentSession | undefined): string | null {
 export function CeSoir({
   onGoTargets,
   onSearch,
-  onOpenSky,
   onOpenNews,
   onOpenTarget,
   onOpenBinocularTarget,
 }: {
   onGoTargets: () => void;
   onSearch: () => void;
-  onOpenSky: () => void;
   onOpenNews: () => void;
   onOpenTarget: (designation: string) => void;
   /** Fiche vue aux jumelles (chemin d'etoiles, viseur). */
@@ -154,9 +150,6 @@ export function CeSoir({
             >
               <TabIcon name="refresh" />
             </button>
-            <button onClick={onOpenSky} className="nc-round-btn" aria-label="Carte du ciel" title="Carte du ciel">
-              <TabIcon name="sky" />
-            </button>
             <button onClick={onSearch} className="nc-round-btn" aria-label="Rechercher un objet" title="Rechercher un objet">
               <TabIcon name="search" />
             </button>
@@ -169,54 +162,6 @@ export function CeSoir({
       <ScoreCard night={n} />
 
       {nights.data && <NightStrip nights={nights.data} />}
-
-      <div className="nc-grid-2">
-        <StatCard
-          label="Température"
-          value={
-            n.tempNowC != null ? (
-              <>
-                {Math.round(n.tempNowC)}
-                <span className="nc-unit">°C</span>
-              </>
-            ) : (
-              "n/d"
-            )
-          }
-          sub={
-            n.tempMinC != null && n.tempMaxC != null
-              ? `${Math.round(n.tempMinC)}° → ${Math.round(n.tempMaxC)}° cette nuit`
-              : undefined
-          }
-        />
-        <StatCard
-          label="Lune"
-          value={
-            <span className="nc-row" style={{ gap: "var(--space-xs)", alignItems: "center" }}>
-              <MoonPhase illum={n.moonIllum} waxing={n.moonWaxing} size={26} />
-              <span>
-                {Math.round(n.moonIllum)}
-                <span className="nc-unit">%</span>
-              </span>
-            </span>
-          }
-          sub={n.moonWaxing ? "Croissante" : "Décroissante"}
-        />
-        <StatCard label="Buée" valueIsWord value={n.dewRisk} sub={`Anti-buée : ${n.dewAdvice}`} />
-        <StatCard
-          label="Rafales"
-          value={
-            n.windGustsKmh != null ? (
-              <>
-                {Math.round(n.windGustsKmh)}
-                <span className="nc-unit"> km/h</span>
-              </>
-            ) : (
-              "n/d"
-            )
-          }
-        />
-      </div>
 
       {/* Le detail des chiffres juste au-dessus, replie : on l'ouvre quand
           la note hesite. */}
@@ -262,39 +207,35 @@ export function CeSoir({
         </div>
       </Section>
 
-      <button onClick={onGoTargets} className="nc-btn nc-btn-primary nc-cta">
-        <span className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
-          <span style={{ fontSize: "var(--text-md)" }}>
-            {targetCount != null
-              ? `${plural(targetCount, "cible pointable", "cibles pointables")} ce soir`
-              : "Cibles de ce soir"}
-          </span>
-          <span style={{ fontSize: "var(--text-xs)", opacity: 0.75 }}>
-            {targetCount != null && messier.data
-              ? `dont ${plural(uncapturedMessier, "Messier pas encore capturé", "Messier pas encore capturés")}`
-              : "calcul des créneaux…"}
-          </span>
-        </span>
-        <span style={{ fontSize: "var(--text-md)" }} aria-hidden="true">→</span>
-      </button>
-
-      <MustSeeCard onOpenTarget={onOpenTarget} />
-
       {targets.data && (
         <NightPlan
           rows={targets.data}
           onOpenTarget={onOpenTarget}
           inNews={news.data ? inTheNews(news.data.items, targets.data, new Date()) : undefined}
+          onGoTargets={onGoTargets}
+          targetsLabel={
+            targetCount != null ? `${plural(targetCount, "cible pointable", "cibles pointables")} ce soir` : "Cibles de ce soir"
+          }
+          targetsSub={
+            targetCount != null && messier.data
+              ? `dont ${plural(uncapturedMessier, "Messier pas encore capturé", "Messier pas encore capturés")}`
+              : "calcul des créneaux…"
+          }
         />
       )}
+
+      <MustSeeCard onOpenTarget={onOpenTarget} />
 
       <CometsCard />
 
       <NewsTeaser onOpen={onOpenNews} />
 
       {/* Pendant une sortie, la carte jumelles est deja en haut. */}
-      <div className="nc-eyebrow" style={{ marginTop: "var(--space-sm)" }}>Aux jumelles et à l'œil nu</div>
-      {!posing && binocularCard}
+      {!posing && (
+        <Section id="soir-jumelles" title="Jumelles et œil nu" summary={state.data.binoculars?.label} defaultOpen={false}>
+          {binocularCard}
+        </Section>
+      )}
       <NightExtras />
 
       <Section id="soir-horizon" title="Horizon dégagé" summary={`${openSectors}/8 secteurs`} defaultOpen={false}>

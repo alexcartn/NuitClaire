@@ -26,7 +26,7 @@ import { Actus } from "./screens/Actus";
 // met ce morceau en cache comme le reste : il marche hors ligne.
 const Ciel = lazy(() => import("./screens/Ciel"));
 
-const SCREENS: Screen[] = ["soir", "cibles", "messier", "journal", "reglages"];
+const SCREENS: Screen[] = ["soir", "ciel", "cibles", "messier", "journal", "reglages"];
 
 /** Ou l'on est, et comment on y est arrive. Pose tel quel dans
  * `history.state` : le bouton retour d'Android (ou le geste retour d'iOS)
@@ -240,6 +240,15 @@ export default function App() {
 
   const { screen, selected } = nav;
 
+  // Onglet a surligner : les fiches, la recherche et les actus gardent celui
+  // d'ou l'on vient, et Messier est un segment de « Cibles ».
+  const shown = screen === "detail" || screen === "recherche" || screen === "ciel" || screen === "actus" ? nav.backTo : screen;
+  const activeTab: Screen = shown === "messier" ? "cibles" : shown;
+  /** « Cibles » et « Objectif Messier » partagent un onglet : on bascule sur
+   * place, sans empiler d'historique. */
+  const switchList = (to: "cibles" | "messier") =>
+    replace({ screen: to, selected: null, backTo: to, depth: navRef.current.depth });
+
   return (
     <div className="nc-app">
       {updateReady && (
@@ -258,7 +267,6 @@ export default function App() {
           <CeSoir
             onGoTargets={() => changeTab("cibles")}
             onSearch={openSearch}
-            onOpenSky={() => openSky(null, "carte")}
             onOpenNews={openNews}
             onOpenTarget={(d) => openTarget(d)}
             onOpenBinocularTarget={(d) => openTarget(d, true)}
@@ -269,6 +277,7 @@ export default function App() {
             captured={captured}
             windowLabel={windowLabel(state?.windowMode, state?.viewWindow)}
             onOpenTarget={(d) => openTarget(d)}
+            onSwitch={switchList}
           />
         )}
         {screen === "detail" && selected && (
@@ -290,6 +299,7 @@ export default function App() {
           <Messier
             captured={captured}
             onOpenTarget={(d) => openTarget(d)}
+            onSwitch={switchList}
           />
         )}
         {screen === "journal" && <Journal onOpenTarget={(d) => openTarget(d)} onCaptureChange={reloadState} />}
@@ -300,7 +310,7 @@ export default function App() {
               initialTarget={selected}
               initialMode={nav.skyMode ?? "carte"}
               onOpenTarget={(d) => openTarget(d)}
-              onBack={back}
+              onBack={nav.backTo === "ciel" && nav.depth <= 1 ? undefined : back}
             />
           </Suspense>
         )}
@@ -319,10 +329,7 @@ export default function App() {
         {screen === "actus" && <Actus onOpenTarget={(d) => openTarget(d)} onBack={back} />}
         {screen === "reglages" && <Reglages onChange={reloadState} />}
       </div>
-      <TabBar
-        active={screen === "detail" || screen === "recherche" || screen === "ciel" || screen === "actus" ? nav.backTo : screen}
-        onChange={changeTab}
-      />
+      <TabBar active={activeTab} onChange={changeTab} />
     </div>
   );
 }

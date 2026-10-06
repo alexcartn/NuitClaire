@@ -38,6 +38,12 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
   useEffect(() => {
     if (latest) setOpenItem(latest);
   }, [latest]);
+  // La cible sur laquelle le Seestar pose : la derniere ajoutee et pas encore
+  // cochee faite (meme regle que « Ce soir »).
+  const posing = [...current.items].filter((i) => !i.done).sort((a, b) => (a.addedAt < b.addedAt ? 1 : -1))[0]?.designation ?? null;
+  // Le ressenti et la cloture ne s'affichent qu'a la demande : pendant la
+  // sortie, la page doit montrer les cibles et le fil de la nuit.
+  const [closing, setClosing] = useState(false);
   const [capturing, setCapturing] = useState<string | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
@@ -94,15 +100,17 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
   };
 
   return (
-    <div className="nc-card nc-stack" style={{ borderColor: "var(--accent)" }}>
-      <div className="nc-row nc-between nc-baseline">
-        <div style={{ fontSize: "var(--text-md)" }}>Session en cours</div>
-        {current.openedAt && (
-          <div className="nc-num" style={{ fontSize: "var(--text-xs)", color: "var(--accent)" }}>
-            depuis {fmtHM(current.openedAt)}
-            {current.scoreAtOpen != null ? ` · score ${current.scoreAtOpen}` : ""}
-          </div>
-        )}
+    <div className="nc-card nc-stack">
+      <div className="nc-row nc-between">
+        <div className="nc-eyebrow">Cibles de la nuit</div>
+        <button
+          onClick={() => setClosing((v) => !v)}
+          className="nc-btn nc-btn-sm nc-none"
+          aria-expanded={closing}
+          style={{ fontSize: "var(--text-sm)" }}
+        >
+          {closing ? "Annuler" : "Clôturer"}
+        </button>
       </div>
 
       {/* D'ou cette sortie est faite, fige a son ouverture : changer de
@@ -132,6 +140,9 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
                 >
                   {item.designation}
                 </button>
+                {item.designation === posing && !item.done && (
+                  <span className="nc-eyebrow nc-none" style={{ color: "var(--accent)" }}>en cours</span>
+                )}
                 {/* Toute la ligne ouvre ou replie la cible ; son resume dit ce
                     qui a deja ete saisi sans avoir a la deplier. */}
                 <button
@@ -236,47 +247,51 @@ export function CurrentSessionCard({ current, places, pendingNotes, captured, se
         <Timeline entries={current.timeline} pendingNotes={pendingNotes} onDelete={deleteTimelineEntry} />
       </div>
 
+      {closing && (
+        <>
       <div className="nc-divider" />
-
-      <div className="nc-stack-xs">
-        <div className="nc-eyebrow">Ressenti de la nuit</div>
-        <Rating label="Satisfaction" scope="de la nuit" value={current.feeling.rating} onChange={(rating) => setFeeling({ rating })} />
-        {/* Volontairement distincte du score calcule : c'est l'ecart
-            entre les deux qui interesse, pas leur accord. */}
-        <Rating
-          label="Ciel perçu"
-          scope="cette nuit"
-          value={current.feeling.skyQuality}
-          onChange={(skyQuality) => setFeeling({ skyQuality })}
-        />
-        {/* Intitule visible en plus du placeholder : celui-ci disparait
-            des que le champ est rempli, et on ne saurait plus lequel des
-            deux on relit. */}
-        <label className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
-          <span className="nc-caption">Ce que je retiens</span>
-          <input
-            value={feelingDraft.highlight ?? current.feeling.highlight}
-            onChange={(e) => setFeelingDraft((d) => ({ ...d, highlight: e.target.value }))}
-            onBlur={(e) => saveFeelingText("highlight", e.target.value)}
-            placeholder="Ce que je retiens"
-            className="nc-input"
+  
+        <div className="nc-stack-xs">
+          <div className="nc-eyebrow">Ressenti de la nuit</div>
+          <Rating label="Satisfaction" scope="de la nuit" value={current.feeling.rating} onChange={(rating) => setFeeling({ rating })} />
+          {/* Volontairement distincte du score calcule : c'est l'ecart
+              entre les deux qui interesse, pas leur accord. */}
+          <Rating
+            label="Ciel perçu"
+            scope="cette nuit"
+            value={current.feeling.skyQuality}
+            onChange={(skyQuality) => setFeeling({ skyQuality })}
           />
-        </label>
-        <label className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
-          <span className="nc-caption">À refaire autrement</span>
-          <input
-            value={feelingDraft.nextTime ?? current.feeling.nextTime}
-            onChange={(e) => setFeelingDraft((d) => ({ ...d, nextTime: e.target.value }))}
-            onBlur={(e) => saveFeelingText("nextTime", e.target.value)}
-            placeholder="À refaire autrement"
-            className="nc-input"
-          />
-        </label>
-      </div>
+          {/* Intitule visible en plus du placeholder : celui-ci disparait
+              des que le champ est rempli, et on ne saurait plus lequel des
+              deux on relit. */}
+          <label className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
+            <span className="nc-caption">Ce que je retiens</span>
+            <input
+              value={feelingDraft.highlight ?? current.feeling.highlight}
+              onChange={(e) => setFeelingDraft((d) => ({ ...d, highlight: e.target.value }))}
+              onBlur={(e) => saveFeelingText("highlight", e.target.value)}
+              placeholder="Ce que je retiens"
+              className="nc-input"
+            />
+          </label>
+          <label className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
+            <span className="nc-caption">À refaire autrement</span>
+            <input
+              value={feelingDraft.nextTime ?? current.feeling.nextTime}
+              onChange={(e) => setFeelingDraft((d) => ({ ...d, nextTime: e.target.value }))}
+              onBlur={(e) => saveFeelingText("nextTime", e.target.value)}
+              placeholder="À refaire autrement"
+              className="nc-input"
+            />
+          </label>
+        </div>
 
-      <button onClick={onClose} className="nc-btn nc-btn-primary">
-        Clôturer la session
-      </button>
+          <button onClick={onClose} className="nc-btn nc-btn-primary">
+            Clôturer la session
+          </button>
+        </>
+      )}
     </div>
   );
 }

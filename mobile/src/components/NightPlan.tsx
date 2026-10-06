@@ -7,9 +7,13 @@ import type { TargetRow } from "../types";
 
 /** Enchainement suggere pour la nuit (voir nightPlan.ts), avec un geste
  * pour tout poser dans le journal avant de partir. */
-export function NightPlan({ rows, onOpenTarget, inNews }: {
+export function NightPlan({ rows, onOpenTarget, inNews, targetsLabel, targetsSub, onGoTargets }: {
   rows: TargetRow[];
   onOpenTarget: (d: string) => void;
+  /** Lien vers la liste complete, sous le plan : « 281 cibles pointables ». */
+  targetsLabel?: string;
+  targetsSub?: string;
+  onGoTargets?: () => void;
   /** Cibles citees recemment dans les actualites (voir newsView.inTheNews). */
   inNews?: Set<string>;
 }) {
@@ -30,7 +34,7 @@ export function NightPlan({ rows, onOpenTarget, inNews }: {
     <div className="nc-card nc-stack">
       <div className="nc-row nc-between nc-baseline">
         <div className="nc-eyebrow">Plan de la nuit</div>
-        <span className="nc-caption">suggestion, d'après les créneaux</span>
+        <span className="nc-caption">{plan.length} créneaux</span>
       </div>
       <div className="nc-stack-xs">
         {plan.map((b) => {
@@ -58,9 +62,18 @@ export function NightPlan({ rows, onOpenTarget, inNews }: {
           );
         })}
       </div>
-      <button onClick={addAll} disabled={added} className="nc-btn">
+      <button onClick={addAll} disabled={added} className="nc-btn nc-btn-primary">
         {added ? "Ajoutées au journal ✓" : "Tout ajouter au journal"}
       </button>
+      {onGoTargets && targetsLabel && (
+        <button onClick={onGoTargets} className="nc-plan-link">
+          <span className="nc-stack-xs" style={{ gap: "var(--space-2xs)" }}>
+            <span style={{ fontSize: "var(--text-sm)" }}>{targetsLabel}</span>
+            {targetsSub && <span className="nc-caption" style={{ margin: 0 }}>{targetsSub}</span>}
+          </span>
+          <span aria-hidden="true" style={{ fontSize: "var(--text-md)", color: "var(--accent)" }}>→</span>
+        </button>
+      )}
     </div>
   );
 }

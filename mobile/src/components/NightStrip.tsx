@@ -19,8 +19,7 @@ export function NightStrip({ nights }: { nights: NightBrief[] }) {
   if (nights.length < 2) return null;
   return (
     <div className="nc-stack-xs">
-      <div className="nc-eyebrow">Prochaines nuits</div>
-      <div className="nc-night-strip">
+      <div className="nc-night-strip" aria-label="Prochaines nuits">
         {nights.map((n, i) => (
           <div key={n.date} className={`nc-night-day ${i === 0 ? "nc-night-day-today" : ""}`}>
             <span className="nc-caption" style={{ margin: 0 }}>{dayLabel(n.date, i)}</span>

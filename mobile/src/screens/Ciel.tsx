@@ -41,7 +41,8 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   initialTarget: string | null;
   initialMode: "carte" | "viseur";
   onOpenTarget: (designation: string) => void;
-  onBack: () => void;
+  /** Absent quand la carte est l'onglet lui-meme : rien vers quoi revenir. */
+  onBack?: () => void;
 }) {
   const [mode, setMode] = useState<"carte" | "viseur">(initialMode);
   const [selected, setSelected] = useState<string | null>(initialTarget);
@@ -275,10 +276,14 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   return (
     <div className="nc-screen">
       <div className="nc-row nc-between">
-        <button onClick={onBack} className="nc-link nc-link-accent">
-          <TabIcon name="back" />
-          Retour
-        </button>
+        {onBack ? (
+          <button onClick={onBack} className="nc-link nc-link-accent">
+            <TabIcon name="back" />
+            Retour
+          </button>
+        ) : (
+          <div />
+        )}
         <NightToggle />
       </div>
       <div>

@@ -16,9 +16,9 @@ export function TwilightBar({ night }: { night: Night }) {
   const total = new Date(night.civilDawn).getTime() - new Date(night.civilDusk).getTime();
   const segments = [
     { from: night.civilDusk, to: night.nauticalDusk, color: "var(--bar)" },
-    { from: night.nauticalDusk, to: night.astroDusk, color: "oklch(.5 .09 290)" },
-    { from: night.astroDusk, to: night.astroDawn, color: "var(--accent)" },
-    { from: night.astroDawn, to: night.nauticalDawn, color: "oklch(.5 .09 290)" },
+    { from: night.nauticalDusk, to: night.astroDusk, color: "var(--ink3)" },
+    { from: night.astroDusk, to: night.astroDawn, color: "var(--ink2)" },
+    { from: night.astroDawn, to: night.nauticalDawn, color: "var(--ink3)" },
     { from: night.nauticalDawn, to: night.civilDawn, color: "var(--bar)" },
   ];
 
@@ -40,7 +40,7 @@ export function TwilightBar({ night }: { night: Night }) {
         <span>
           crepuscule <span className="nc-num">{fmt(night.civilDusk)}</span>
         </span>
-        <span style={{ color: "var(--accent)" }}>
+        <span style={{ color: "var(--ink)" }}>
           nuit astro <span className="nc-num">{fmt(night.astroDusk)} → {fmt(night.astroDawn)}</span>
         </span>
       </div>

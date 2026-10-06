@@ -2,13 +2,13 @@ import { TabIcon, type TabIconName } from "./TabIcon";
 import type { Screen } from "../types";
 
 // Icones SVG dessinees (voir TabIcon.tsx, qui explique l'abandon des
-// glyphes Unicode) : lune pour la nuit en cours, reticule pour les cibles,
-// grille pour le catalogue Messier (distincte du reticule), carnet pour le
+// glyphes Unicode) : lune pour la nuit en cours, etoile pour la carte du ciel,
+// reticule pour les cibles (Messier en est un segment), carnet pour le
 // journal, curseurs pour les reglages.
 const TABS: { key: Screen; label: string; icon: TabIconName }[] = [
   { key: "soir", label: "Ce soir", icon: "moon" },
+  { key: "ciel", label: "Ciel", icon: "sky" },
   { key: "cibles", label: "Cibles", icon: "target" },
-  { key: "messier", label: "Messier", icon: "grid" },
   { key: "journal", label: "Journal", icon: "notebook" },
   { key: "reglages", label: "Réglages", icon: "sliders" },
 ];

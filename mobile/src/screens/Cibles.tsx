@@ -7,7 +7,8 @@ import { StaleNotice } from "../components/StaleNotice";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { Section } from "../components/Section";
-import { TargetRowCard } from "../components/TargetRow";
+import { TargetRowCompact } from "../components/TargetRowCompact";
+import { CiblesSwitch } from "../components/CiblesSwitch";
 import { MagnitudeFilter, TypeChips, distinctTypes, magnitudeBounds } from "../components/CatalogFilters";
 import {
   activeFilterCount,
@@ -23,10 +24,9 @@ import type { TargetRow } from "../types";
 /** Cartes affichees par groupe avant « Voir les N autres ». */
 const GROUP_PAGE = 8;
 
-function GroupSection({ group, index, captured, onOpenTarget }: {
+function GroupSection({ group, index, onOpenTarget }: {
   group: CiblesGroup;
   index: number;
-  captured: Set<string>;
   onOpenTarget: (designation: string) => void;
 }) {
   const [all, setAll] = useRemembered(`cibles:all:${group.key}`, false);
@@ -36,12 +36,7 @@ function GroupSection({ group, index, captured, onOpenTarget }: {
     // autres replies : on deplie le type qui interesse.
     <Section id={`cibles:${group.key}`} title={group.title} count={group.rows.length} defaultOpen={index === 0}>
       {shown.map((row) => (
-        <TargetRowCard
-          key={row.designation}
-          row={row}
-          isNew={!!row.messierId && !captured.has(row.messierId)}
-          onOpen={() => onOpenTarget(row.designation)}
-        />
+        <TargetRowCompact key={row.designation} row={row} onOpen={() => onOpenTarget(row.designation)} />
       ))}
       {group.rows.length > GROUP_PAGE && (
         <button onClick={() => setAll((v) => !v)} className="nc-link" style={{ alignSelf: "center" }} aria-expanded={all}>
@@ -59,12 +54,15 @@ export function Cibles({
   captured,
   windowLabel,
   onOpenTarget,
+  onSwitch,
 }: {
   captured: Set<string>;
   /** "nuit complète" ou "20:00–22:30" : le titre annoncait « nuit complete »
    * en dur, meme en fenetre habituelle. */
   windowLabel: string;
   onOpenTarget: (designation: string) => void;
+  /** Bascule vers l'objectif Messier (meme onglet de la barre). */
+  onSwitch: (screen: "cibles" | "messier") => void;
 }) {
   // Memorises (voir useRemembered) : ouvrir une fiche puis revenir ne remet
   // plus les filtres a zero.
@@ -112,8 +110,9 @@ export function Cibles({
       <ScreenHeader
         eyebrow="Cibles faisables"
         title={rows ? `${plural(visible.length, "cible", "cibles")} · ${selectedHour != null ? `vers ${hourLabel(selectedHour)}` : windowLabel}` : "Chargement…"}
-        sub="Messier manquants d'abord, puis cadrage simple, puis heures disponibles."
       />
+
+      <CiblesSwitch active="cibles" onSelect={onSwitch} />
 
 
       {loading && !rows && <p className="nc-caption">Chargement…</p>}
@@ -145,11 +144,28 @@ export function Cibles({
       )}
 
       {hours.length > 1 && (
-        <Section id="cibles-hours" title="À quelle heure ?">
-          {/* Le pendant du calendrier Messier, a l'echelle de la nuit : combien
-              de cibles (filtres compris) sont pointables a chaque heure. Un
-              appui filtre la liste sur cette heure, un second l'enleve. */}
-          <div className="nc-month-grid" role="tablist" aria-label="Heures de la nuit">
+        // Le pendant du calendrier Messier, a l'echelle de la nuit : combien
+        // de cibles (filtres compris) sont pointables a chaque heure. Un
+        // appui filtre la liste sur cette heure, un second l'enleve.
+        <div className="nc-stack-xs">
+          <div className="nc-row nc-between nc-baseline">
+            <div className="nc-eyebrow">À quelle heure ?</div>
+            <span className="nc-caption" style={{ margin: 0 }}>
+              {selectedHour != null
+                ? `${hourLabel(selectedHour)} à ${hourLabel(selectedHour + 60)}`
+                : "toute la nuit"}
+            </span>
+          </div>
+          <div className="nc-row nc-hscroll" role="tablist" aria-label="Heures de la nuit" style={{ gap: "var(--space-xs)" }}>
+            <button
+              role="tab"
+              aria-selected={selectedHour == null}
+              onClick={() => setHour(null)}
+              className={`nc-hour ${selectedHour == null ? "nc-hour-active" : ""}`}
+            >
+              <span className="nc-hour-label">Toutes</span>
+              <span className="nc-hour-count nc-num">{filtered.length}</span>
+            </button>
             {hours.map((h) => {
               const n = filtered.filter((r) => visibleDuring(r, h)).length;
               return (
@@ -158,24 +174,19 @@ export function Cibles({
                   role="tab"
                   aria-selected={h === selectedHour}
                   onClick={() => setHour(h === selectedHour ? null : h)}
-                  className={["nc-month", h === selectedHour ? "nc-month-active" : "", n === 0 ? "nc-month-empty" : ""].join(" ")}
+                  className={["nc-hour", h === selectedHour ? "nc-hour-active" : "", n === 0 ? "nc-hour-empty" : ""].join(" ")}
                 >
-                  <span>{hourLabel(h)}</span>
-                  <span className="nc-month-count">{n}</span>
+                  <span className="nc-hour-label nc-num">{hourLabel(h)}</span>
+                  <span className="nc-hour-count nc-num">{n}</span>
                 </button>
               );
             })}
           </div>
-          <p className="nc-caption" style={{ margin: 0 }}>
-            {selectedHour != null
-              ? `Cibles pointables entre ${hourLabel(selectedHour)} et ${hourLabel(selectedHour + 60)}. Touchez à nouveau pour toute la nuit.`
-              : "Touchez une heure pour ne garder que les cibles pointables à ce moment-là."}
-          </p>
-        </Section>
+        </div>
       )}
 
       {groups.map((g, i) => (
-        <GroupSection key={g.key} group={g} index={i} captured={captured} onOpenTarget={onOpenTarget} />
+        <GroupSection key={g.key} group={g} index={i} onOpenTarget={onOpenTarget} />
       ))}
 
       {rows && rows.length === 0 && (

@@ -14,10 +14,15 @@ import type { SessionItem, TargetRow } from "../types";
 const QUICK_NOTES = ["Buée", "Nuage", "Mise au point", "Avion", "Satellite", "Vent"] as const;
 
 /** Ajouter une cible, une note, ou un evenement en un appui. */
-export function AddToSession({ items, send }: {
+export function AddToSession({ items, send, docked = false }: {
   items: SessionItem[];
   send: (body: SessionOpBody) => void;
+  /** Arrime au bas de l'ecran pendant une sortie : on tape et on lit au
+   * meme endroit, a portee de pouce, sans remonter en haut de la page. La
+   * recherche de cible, plus rare, se replie derriere « + Cible ». */
+  docked?: boolean;
 }) {
+  const [showTarget, setShowTarget] = useState(false);
   const [targetQuery, setTargetQuery] = useState("");
   const [targetResults, setTargetResults] = useState<TargetRow[] | null>(null);
   // La Lune et les planetes, hors catalogue : reconnues ici, sans requete.
@@ -87,21 +92,23 @@ export function AddToSession({ items, send }: {
     setFreeNoteDraft("");
   };
 
-  return (
-    <div className="nc-card nc-stack">
-      <div className="nc-eyebrow">Ajouter à la session</div>
-      <form onSubmit={(e) => { e.preventDefault(); searchTargets(); }} className="nc-row">
-        <input
-          value={targetQuery}
-          onChange={(e) => setTargetQuery(e.target.value)}
-          placeholder="Cible : M31, NGC7380, Saturne…"
-          aria-label="Désignation de la cible à ajouter"
-          className="nc-input nc-num"
-        />
-        <button type="submit" className="nc-btn nc-none" disabled={searchingTarget}>
-          {searchingTarget ? "…" : "Chercher"}
-        </button>
-      </form>
+  const targetForm = (
+    <form onSubmit={(e) => { e.preventDefault(); searchTargets(); }} className="nc-row">
+      <input
+        value={targetQuery}
+        onChange={(e) => setTargetQuery(e.target.value)}
+        placeholder="Cible : M31, NGC7380, Saturne…"
+        aria-label="Désignation de la cible à ajouter"
+        className="nc-input nc-num"
+      />
+      <button type="submit" className="nc-btn nc-none" disabled={searchingTarget}>
+        {searchingTarget ? "…" : "Chercher"}
+      </button>
+    </form>
+  );
+
+  const targetPanel = (
+    <>
       {searchError && <div className="nc-notice">Recherche impossible pour l'instant (pas de réseau ?).</div>}
       {targetResults && (
         <div className="nc-stack-xs">
@@ -128,42 +135,83 @@ export function AddToSession({ items, send }: {
           ))}
         </div>
       )}
+    </>
+  );
+
+  const prefixHint = prefix && (
+    <p className="nc-caption" style={{ margin: 0 }}>
+      Sera rattachée à <span className="nc-num" style={{ color: "var(--ink)" }}>{prefix.designation}</span>
+      {prefixIsNew ? ", ajoutée à la session." : "."}
+    </p>
+  );
+
+  const quickButtons = QUICK_NOTES.map((label) => (
+    <button
+      key={label}
+      onClick={() => addQuickNote(label)}
+      className={`nc-chip nc-none ${lastQuick === label ? "nc-chip-active" : ""}`}
+      aria-label={`Noter : ${label}`}
+    >
+      {lastQuick === label ? `${label} ✓` : label}
+    </button>
+  ));
+
+  const noteInput = (
+    <input
+      value={freeNoteDraft}
+      onChange={(e) => setFreeNoteDraft(e.target.value)}
+      onKeyDown={(e) => e.key === "Enter" && submitFreeNote()}
+      placeholder="Note : « M31 très contrasté », conditions…"
+      aria-label="Note"
+      className="nc-input"
+    />
+  );
+
+  if (docked) {
+    return (
+      <div className="nc-composer">
+        {targetPanel}
+        <div className="nc-row nc-hscroll" style={{ gap: "var(--space-xs)" }}>{quickButtons}</div>
+        {showTarget && targetForm}
+        <div className="nc-row">
+          <button
+            onClick={() => setShowTarget((v) => !v)}
+            className="nc-btn nc-none"
+            aria-expanded={showTarget}
+            aria-label="Ajouter une cible"
+          >
+            + Cible
+          </button>
+          {noteInput}
+          <button onClick={submitFreeNote} disabled={!freeNoteDraft.trim()} className="nc-btn nc-btn-primary nc-none">
+            Ajouter
+          </button>
+        </div>
+        {prefixHint}
+      </div>
+    );
+  }
+
+  return (
+    <div className="nc-card nc-stack">
+      <div className="nc-eyebrow">Ajouter à la session</div>
+      {targetForm}
+      {targetPanel}
 
       <div className="nc-divider" />
 
       <div className="nc-stack-xs">
         <div className="nc-row">
-          <input
-            value={freeNoteDraft}
-            onChange={(e) => setFreeNoteDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submitFreeNote()}
-            placeholder="Note : « M31 très contrasté », conditions…"
-            aria-label="Note"
-            className="nc-input"
-          />
+          {noteInput}
           <button onClick={submitFreeNote} disabled={!freeNoteDraft.trim()} className="nc-btn nc-none">
             Ajouter
           </button>
         </div>
-        {prefix && (
-          <p className="nc-caption" style={{ margin: 0 }}>
-            Sera rattachée à <span className="nc-num" style={{ color: "var(--accent)" }}>{prefix.designation}</span>
-            {prefixIsNew ? ", ajoutée à la session." : "."}
-          </p>
-        )}
+        {prefixHint}
       </div>
 
       <div className="nc-row nc-wrap" style={{ gap: "var(--space-xs)" }}>
-        {QUICK_NOTES.map((label) => (
-          <button
-            key={label}
-            onClick={() => addQuickNote(label)}
-            className={`nc-chip ${lastQuick === label ? "nc-chip-active" : ""}`}
-            aria-label={`Noter : ${label}`}
-          >
-            {lastQuick === label ? `${label} ✓` : label}
-          </button>
-        ))}
+        {quickButtons}
       </div>
     </div>
   );

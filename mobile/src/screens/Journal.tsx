@@ -8,7 +8,7 @@ import { knownSites } from "../journalRead";
 import { latestMonth, outingYears } from "../journalView";
 import { useRemembered } from "../useRemembered";
 import { useWakeLock } from "../useWakeLock";
-import { plural } from "../format";
+import { fmtHM, plural } from "../format";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { SyncBanner } from "../journal/SyncBanner";
 import { JournalStats } from "../journal/JournalStats";
@@ -100,16 +100,28 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
     }
   };
 
+  const composer = <AddToSession items={current.items} send={send} docked={sessionActive} />;
+
   return (
     <div className="nc-screen">
       <ScreenHeader
-        eyebrow="Journal de session"
-        title={plural(past.length, "sortie enregistrée", "sorties enregistrées")}
+        eyebrow={sessionActive ? "Journal" : "Journal de session"}
+        title={sessionActive ? "Sortie en cours" : plural(past.length, "sortie enregistrée", "sorties enregistrées")}
+        sub={
+          sessionActive && current.openedAt ? (
+            <span className="nc-num">
+              depuis {fmtHM(current.openedAt)}
+              {current.scoreAtOpen != null ? ` · score ${current.scoreAtOpen}` : ""}
+            </span>
+          ) : undefined
+        }
       />
 
       <SyncBanner pendingCount={pendingCount} syncError={syncError} loadError={loadError} />
 
-      <AddToSession items={current.items} send={send} />
+      {/* Hors sortie, la saisie reste en tete ; pendant la sortie elle passe
+          au bas de l'ecran (voir plus bas) et la page commence par les cibles. */}
+      {!sessionActive && composer}
 
       {sessionActive ? (
         <CurrentSessionCard
@@ -152,6 +164,8 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
           onOpenTarget={onOpenTarget}
         />
       )}
+
+      {sessionActive && composer}
     </div>
   );
 }
