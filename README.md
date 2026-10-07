@@ -621,6 +621,13 @@ eclaire de la Lune).
   (Autel, Croix du Sud et sept de Lacaille) n'en ont pas, faute de planche libre. Une planche en
   couvre souvent plusieurs ; elle est chargee en ligne, assombrie en vision nocturne, et son
   absence hors ligne se dit. Le retour ramene a la carte, la constellation toujours en valeur.
+  Sous la gravure, trois cartes repliables racontent l'histoire de chaque constellation en
+  detail (`sky/legendsDetails*.ts`, 385 paragraphes) : d'ou vient la figure (autres cultures,
+  variantes, nom), les etoiles et leurs noms (origine arabe, grecque ou latine), et son parcours
+  dans les atlas et l'astronomie (Ptolemee, Al-Sufi, Bayer, decouvertes). Replier une section vaut
+  pour toutes les constellations. Les textes sont ecrits a la main, sans reseau, et se relisent
+  hors ligne ; les tests verifient leur forme (couverture des 88, sources, absence de doublon avec
+  le recit court), pas l'exactitude des faits, qui releve d'une relecture.
 - Viseur : le telephone tenu contre les jumelles, le dos vers le ciel. Direction visee
   deduite de l'orientation complete (alpha, beta, gamma). Bande de cap en haut, ciel sombre
   au-dessus de la vraie ligne d'horizon (arbres compris), sol en ombre dessous, reperes de

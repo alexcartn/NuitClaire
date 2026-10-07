@@ -12,6 +12,7 @@
 import { LEGENDS_ANCIENT } from "./legendsAncient.ts";
 import { LEGENDS_MODERN } from "./legendsModern.ts";
 import { PLATES } from "./legendPlates.ts";
+import { DETAILS } from "./legendsDetails.ts";
 
 /** Une planche gravee sur Wikimedia Commons. */
 export interface Plate {
@@ -74,7 +75,10 @@ export interface Legend {
   plate?: string;
 }
 
-export const LEGENDS: Record<string, Legend> = { ...LEGENDS_ANCIENT, ...LEGENDS_MODERN };
+/** Les legendes completes : le recit court, puis ses developpements. */
+export const LEGENDS: Record<string, Legend> = Object.fromEntries(
+  Object.entries({ ...LEGENDS_ANCIENT, ...LEGENDS_MODERN }).map(([id, l]) => [id, DETAILS[id] ? { ...l, details: DETAILS[id] } : l]),
+);
 
 export { PLATES };
 

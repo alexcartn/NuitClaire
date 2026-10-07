@@ -114,3 +114,31 @@ test("la typographie francaise colle guillemets et signes doubles au mot voisin"
   assert.equal(typo("le « ceinturon » : fin ; non ? si !"), "le «\u00a0ceinturon\u00a0»\u00a0: fin\u00a0; non\u00a0? si\u00a0!");
   assert.equal(typo("rien à changer"), "rien à changer");
 });
+
+test("chaque constellation a ses developpements, et aucun n'est orphelin", async () => {
+  const { DETAILS } = await import("./legendsDetails.ts");
+  assert.deepEqual(IDS.filter((id) => !LEGENDS[id].details?.length), [], "constellations sans développements");
+  assert.deepEqual(Object.keys(DETAILS).filter((id) => !IDS.includes(id)), [], "développements d'une constellation inconnue");
+});
+
+test("un meme developpement n'est pas copie d'une constellation a l'autre", () => {
+  // Hors les contextes communs a une famille (Lacaille, Keyser et Houtman), deux
+  // constellations ne partagent pas un paragraphe.
+  const COMMUNS = (text: string) => /^(Pieter Dirkszoon Keyser|Nicolas-Louis de Lacaille)/.test(text);
+  const vu = new Map<string, string>();
+  for (const [id, l] of Object.entries(LEGENDS)) {
+    for (const d of l.details ?? []) {
+      for (const p of d.text) {
+        if (COMMUNS(p)) continue;
+        assert.ok(!vu.has(p) || vu.get(p) === id, `${id} copie un paragraphe de ${vu.get(p)} : ${p.slice(0, 60)}`);
+        vu.set(p, id);
+      }
+    }
+  }
+});
+
+test("la masse des textes reste raisonnable pour un paquet charge a la demande", () => {
+  const total = Object.values(LEGENDS).reduce((n, l) => n + [...l.text, ...(l.details ?? []).flatMap((d) => d.text)].join("").length, 0);
+  assert.ok(total > 100_000, `texte trop mince : ${total}`);
+  assert.ok(total < 400_000, `texte trop gros : ${total}`);
+});
