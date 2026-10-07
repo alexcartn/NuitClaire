@@ -1544,6 +1544,42 @@ a {
   border-bottom: none;
 }
 
+/* Liste des constellations (sky/SkyConstellations.tsx) : elle defile dans
+   sa section au lieu d'allonger la page de 89 lignes. La choisie se lit au
+   poids de la police autant qu'a la couleur (le mode nuit n'a qu'une teinte). */
+.nc-sky-const-list {
+  max-height: 18rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.nc-sky-const-group {
+  display: block;
+  padding: var(--space-xs) 0;
+}
+
+.nc-sky-const-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  font: 400 var(--text-sm)/1.3 var(--font-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.nc-sky-const-item-active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Options d'affichage sur une ligne qui defile si l'ecran est etroit. */
 .nc-sky-options {
   align-items: center;

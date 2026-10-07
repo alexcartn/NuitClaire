@@ -8,7 +8,7 @@ const hm = (d: Date) => fmtHM(d.toISOString());
  * il se leve, passe au plus haut et se couche, et surtout quand il depasse
  * les arbres et les toits de ce site. Calcule sur le telephone. */
 export function SkyInfoCard({
-  name, detail, raDeg, decDeg, raRate = 0, when, isNow, site, horizon, horizonAlt, compact = false, onAim, onFiche,
+  name, detail, raDeg, decDeg, raRate = 0, when, isNow, site, horizon, horizonAlt, compact = false, notes, onAim, onFiche, onClose,
 }: {
   name: string;
   detail: string;
@@ -23,8 +23,13 @@ export function SkyInfoCard({
   horizonAlt: Record<string, number>;
   /** Plein ecran : l'essentiel sur deux lignes, pour laisser voir la carte. */
   compact?: boolean;
+  /** Precisions sous les horaires (hors plein ecran), une ligne chacune. */
+  notes?: string[];
   onAim?: () => void;
   onFiche?: () => void;
+  /** Une constellation n'est pas une cible : on la referme au lieu de la
+   * viser. */
+  onClose?: () => void;
 }) {
   // A la minute pres : inutile de refaire 288 pas a chaque rendu.
   const minute = Math.floor(when.getTime() / 60000);
@@ -69,10 +74,11 @@ export function SkyInfoCard({
           <strong style={{ fontWeight: 600 }}>{name}</strong>
           {detail && <span className="nc-caption"> · {detail}</span>}
         </span>
-        {(onAim || onFiche) && (
+        {(onAim || onFiche || onClose) && (
           <span className="nc-row nc-none" style={{ gap: "var(--space-xs)" }}>
             {onAim && <button onClick={onAim} className="nc-chip nc-chip-active">Viser</button>}
             {onFiche && <button onClick={onFiche} className="nc-chip">Fiche</button>}
+            {onClose && <button onClick={onClose} className="nc-chip">Fermer</button>}
           </span>
         )}
       </div>
@@ -82,6 +88,7 @@ export function SkyInfoCard({
       </span>
       {!compact && <span className="nc-caption">{path}</span>}
       {!compact && clear && <span className="nc-caption">{clear}</span>}
+      {!compact && notes?.map((n) => <span key={n} className="nc-caption">{n}</span>)}
     </div>
   );
 }

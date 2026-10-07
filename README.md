@@ -603,6 +603,12 @@ eclaire de la Lune).
   constellations ; plein ecran reel (API Fullscreen) avec commandes par-dessus la carte et
   bascule rouge ; heure reglable jusqu'a 8 h plus tard, avec reperes horaires et lecture,
   et date au choix (Lune et planetes redemandees a cet instant, `GET /api/sky/bodies?at=`).
+  Constellations cliquables : un nom ecrit sur la carte ou un trait (rayon d'un doigt, apres
+  les astres) la met en valeur en entier et ouvre sa fiche (hauteur, lever, passage au plus
+  haut et coucher du centre de la figure, etoiles nommees), qu'on referme par « Fermer » ;
+  la section repliable « Constellations », sous la carte, les liste toutes, celles qui sont
+  dans le ciel a l'heure affichee d'abord (`sky/constellationList.ts`), et ramene la carte a
+  l'ecran au choix. Hors ligne, comme le reste de la carte.
 - Viseur : le telephone tenu contre les jumelles, le dos vers le ciel. Direction visee
   deduite de l'orientation complete (alpha, beta, gamma). Bande de cap en haut, ciel sombre
   au-dessus de la vraie ligne d'horizon (arbres compris), sol en ombre dessous, reperes de

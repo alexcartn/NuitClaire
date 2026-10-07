@@ -567,12 +567,27 @@ export function SkyDome({
       onPick?.({ kind: "planete", name: pl.pl.name, detail: `magnitude ${pl.pl.mag.toFixed(1).replace(".", ",")}`, alt: pl.pos.alt, az: pl.pos.az, raDeg: pl.pl.raDeg, decDeg: pl.pl.decDeg });
       return;
     }
+    // Un nom de constellation ecrit sur la carte se touche la ou il est ecrit,
+    // meme par-dessus une petite etoile (sans quoi on tombe presque toujours
+    // sur « Étoile, magnitude 4,5 »). Une etoile nommee garde la priorite.
+    const fs = 0.03 * zt, margin = reach * 0.4;
+    const onName = constellations.find((c) =>
+      c.p != null
+      && Math.abs(q.x - c.p.x) <= (c.fr.length * fs * 0.58) / 2 + margin
+      && q.y >= c.p.y - fs * 0.75 - margin && q.y <= c.p.y + fs * 0.25 + margin);
     const st = stars.filter((s) => s.mag <= 4.5).sort((a, b) => dist(a.p) - dist(b.p))[0];
-    if (st && dist(st.p) <= reach * 0.8) {
+    if (st && dist(st.p) <= reach * 0.8 && (st.label || !onName)) {
       onPick?.({ kind: "etoile", name: st.label || "Étoile", detail: `magnitude ${st.mag.toFixed(1).replace(".", ",")}`, alt: st.pos.alt, az: st.pos.az, raDeg: st.ra, decDeg: st.dec });
       return;
     }
-    // Un trait de constellation proche : on la choisit en entier.
+    if (onName) {
+      onConstellation?.(onName.id);
+      onPick?.(null);
+      return;
+    }
+    // Un trait de constellation proche : on la choisit en entiere. Un trait
+    // fin se manque au doigt : rayon plus grand que pour les astres, mais
+    // apres eux (on arrive ici seulement quand rien d'autre n'est touche).
     const near = (l: { a: Pt; b: Pt }) => {
       const dx = l.b.x - l.a.x, dy = l.b.y - l.a.y;
       const len2 = dx * dx + dy * dy;
@@ -582,7 +597,7 @@ export function SkyDome({
     const seg = showConstellations
       ? lines.concat(hlLines).map((l) => ({ l, d: near(l) })).sort((x, y) => x.d - y.d)[0]
       : undefined;
-    onConstellation?.(seg && seg.d <= reach * 0.5 ? seg.l.id : null);
+    onConstellation?.(seg && seg.d <= reach * 1.4 ? seg.l.id : null);
     onPick?.(null);
   };
 

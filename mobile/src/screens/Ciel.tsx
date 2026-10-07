@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { isBody } from "../solarSystem";
 import { useFetch } from "../useFetch";
@@ -9,12 +9,13 @@ import { useWatchMode } from "../useWatchMode";
 import { fmtHM } from "../format";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
+import { SkyConstellations } from "../sky/SkyConstellations";
 import { SkyDome, type SkyPick, type SkyProjection, type SkyTarget } from "../sky/SkyDome";
 import { SkyInfoCard } from "../sky/SkyInfoCard";
 import { SkyLegend } from "../sky/SkyLegend";
 import { SkySearch, type SkyFound } from "../sky/SkySearch";
 import { SkyViewfinder } from "../sky/SkyViewfinder";
-import { namedStar } from "../sky/skyNames";
+import { CONSTELLATIONS, CONSTELLATION_STARS, namedStar } from "../sky/skyNames";
 import { altAz, lstDeg, sectorOf } from "../sky/sky";
 import type { SkyBodies } from "../sky/types";
 import type { AppState, TargetRow } from "../types";
@@ -58,6 +59,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   // couper ici pour voir tout le ciel, sans toucher a ce qui y est regle.
   const [showHorizon, setShowHorizon] = useRemembered("ciel:horizon", true);
   const [hlConst, setHlConst] = useState<string | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
   const [focusReq, setFocusReq] = useState<{ name: string; n: number; raDeg?: number; decDeg?: number } | null>(null);
   const { isNight, toggleNight } = useTheme();
   // Plein ecran du navigateur en plus (barre d'adresse et barre d'etat
@@ -200,8 +202,15 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
       setFocusReq((r) => ({ name: f.name, n: (r?.n ?? 0) + 1, ...f.constellation }));
       return;
     }
+    setHlConst(null);
     setSelected(f.name);
     setFocusReq((r) => ({ name: f.name, n: (r?.n ?? 0) + 1 }));
+  };
+  // La liste des constellations est sous la carte : on ramene la carte a
+  // l'ecran pour voir ou l'on est alle.
+  const onChooseConstellation = (f: SkyFound) => {
+    onFound(f);
+    mapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   if (!site || !state) {
@@ -243,6 +252,16 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
       raRate: d === "Lune" ? MOON_RA_RATE : 0, aim: true, fiche: !star,
     };
   })();
+
+  // Constellation choisie (liste, recherche ou appui sur la carte) : sa fiche
+  // prend la place de celle d'un astre. Les horaires sont ceux du centre de
+  // la figure, qui s'etend sur plusieurs dizaines de degres.
+  const constInfo = hlConst ? CONSTELLATIONS.find((c) => c.id === hlConst) ?? null : null;
+  const constStars = (constInfo && CONSTELLATION_STARS.get(constInfo.id)) || [];
+  const constNotes = [
+    ...(constStars.length ? [`${constStars.length > 1 ? "Étoiles nommées" : "Étoile nommée"} : ${constStars.join(", ")}`] : []),
+    "Hauteur et horaires pour le centre de la figure.",
+  ];
 
   const whenLabel = isNow
     ? "Maintenant"
@@ -301,7 +320,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
         {binoculars.data!.picks.map((p) => (
           <button
             key={p.designation}
-            onClick={() => { setPicked(null); setSelected(p.designation === selected ? null : p.designation); }}
+            onClick={() => { setPicked(null); setHlConst(null); setSelected(p.designation === selected ? null : p.designation); }}
             className={`nc-chip nc-none ${p.designation === selected ? "nc-chip-active" : ""}`}
             aria-pressed={p.designation === selected}
           >
@@ -342,7 +361,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
       {mode === "carte" ? (
         <>
           {/* Plein ecran : la carte seule, les commandes par-dessus. */}
-          <div className={full ? "nc-sky-full" : "nc-stack"}>
+          <div ref={mapRef} className={full ? "nc-sky-full" : "nc-stack"}>
             <div className={full ? "nc-stack-xs nc-sky-full-top" : "nc-stack-xs"}>
               {full && (
                 <div className="nc-row nc-between">
@@ -384,8 +403,10 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
               highlightConstellation={hlConst}
               onConstellation={setHlConst}
               focus={focus}
-              onSelect={(d) => setSelected(d)}
+              onSelect={(d) => { setHlConst(null); setSelected(d); }}
               onPick={(p) => {
+                // Un astre touche prend la place de la constellation choisie.
+                if (p) setHlConst(null);
                 // Lune, planete, etoile nommee : elles deviennent la
                 // selection (on peut les viser) ; une etoile anonyme se
                 // decrit seulement.
@@ -453,7 +474,22 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
                   <span className="nc-caption">Lune et planètes indisponibles hors ligne à une autre date.</span>
                 )}
               </div>
-              {info && (
+              {constInfo ? (
+                <SkyInfoCard
+                  name={constInfo.name}
+                  detail={`constellation (${constInfo.id})`}
+                  raDeg={constInfo.raDeg}
+                  decDeg={constInfo.decDeg}
+                  when={when}
+                  isNow={isNow}
+                  site={site}
+                  horizon={skyHorizon}
+                  horizonAlt={skyHorizonAlt}
+                  compact={full}
+                  notes={constNotes}
+                  onClose={() => setHlConst(null)}
+                />
+              ) : info && (
                 <SkyInfoCard
                   name={info.name}
                   detail={info.detail}
@@ -470,6 +506,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
                   onFiche={info.fiche ? () => onOpenTarget(info.name) : undefined}
                 />
               )}
+              {!full && <SkyConstellations when={when} site={site} activeId={hlConst} onChoose={onChooseConstellation} />}
             </div>
           </div>
           {compass.heading != null && (
