@@ -14,6 +14,11 @@ export interface Figure {
 
 const RAD = Math.PI / 180;
 
+/** Un point de trace sans etoile du catalogue a moins de ca (degres) en est
+ * une trop faible : on la dessine a cette magnitude. */
+const FAINT_MATCH_DEG = 0.15;
+const FAINT_MAG = 5.3;
+
 /** Projection stereographique centree sur (ra0, dec0), en degres, est a
  * gauche et nord en haut (y vers le bas, comme en SVG). Conforme : les
  * angles sont respectes, donc le dessin ressemble au ciel meme pour les
@@ -79,5 +84,14 @@ export function buildFigure(id: string, stars: StarRow[], lines: LineRow[], aspe
     })
     .filter((s): s is NonNullable<typeof s> => s !== null && s.x >= box.x && s.x <= box.x + w && s.y >= box.y && s.y <= box.y + h);
 
-  return { box, segments, stars: inside };
+  // Une extremite de trait sans etoile au catalogue (les etoiles trop faibles
+  // pour lui, comme celles de la Table) recoit quand meme son point : sans
+  // lui le trace flotterait.
+  const vertices = segments.flatMap((s) => [{ x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 }]);
+  const missing = vertices
+    .filter((v) => !inside.some((st) => Math.hypot(st.x - v.x, st.y - v.y) < FAINT_MATCH_DEG))
+    .filter((v, i, all) => all.findIndex((w) => Math.hypot(w.x - v.x, w.y - v.y) < FAINT_MATCH_DEG) === i)
+    .map((v) => ({ x: v.x, y: v.y, mag: FAINT_MAG, bv: 0.6, label: "" }));
+
+  return { box, segments, stars: [...inside, ...missing] };
 }

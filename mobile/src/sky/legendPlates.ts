@@ -1,0 +1,40 @@
+import type { Plate } from "./legends.ts";
+
+/** Les planches gravees (domaine public, Wikimedia Commons), par cle. Dimensions et
+ * licence verifiees sur Commons ; une planche couvre souvent plusieurs
+ * constellations (voir le champ `plate` de chaque legende). */
+export const PLATES: Record<string, Plate> = {
+  dra: { file: "Sidney Hall - Urania's Mirror - Draco and Ursa Minor.jpg", width: 2524, height: 3593, title: "Dragon et Petite Ourse", source: "urania" },
+  cam: { file: "Sidney Hall - Urania's Mirror - Camelopardalis, Tarandus and Custos Messium.jpg", width: 3595, height: 2516, title: "Girafe, Renne et Gardien des moissons", source: "urania" },
+  cas: { file: "Sidney Hall - Urania's Mirror - Cassiopeia (image right side up).jpg", width: 2486, height: 3572, title: "Cassiopée", source: "urania" },
+  cep: { file: "Sidney Hall - Urania's Mirror - Cepheus.jpg", width: 2493, height: 3568, title: "Céphée", source: "urania" },
+  and: { file: "Sidney Hall - Urania's Mirror - Gloria Frederici, Andromeda, and Triangula.jpg", width: 2515, height: 3587, title: "Gloire de Frédéric, Andromède et Triangles", source: "urania" },
+  per: { file: "Sidney Hall - Urania's Mirror - Perseus.jpg", width: 3571, height: 2500, title: "Persée et la tête de Méduse", source: "urania" },
+  aur: { file: "Sidney Hall - Urania's Mirror - Auriga.jpg", width: 2509, height: 3584, title: "Cocher", source: "urania" },
+  lyn: { file: "Sidney Hall - Urania's Mirror - Lynx and Telescopium Herschilii.jpg", width: 3599, height: 2516, title: "Lynx et Télescope d'Herschel", source: "urania" },
+  uma: { file: "Sidney Hall - Urania's Mirror - Ursa Major.jpg", width: 3591, height: 2523, title: "Grande Ourse", source: "urania" },
+  boo: { file: "Sidney Hall - Urania's Mirror - Bootes, Canes Venatici, Coma Berenices, and Quadrans Muralis.jpg", width: 3580, height: 2514, title: "Bouvier, Chiens de chasse, Chevelure de Bérénice et Quart de cercle mural", source: "urania" },
+  her: { file: "Sidney Hall - Urania's Mirror - Hercules and Corona Borealis.jpg", width: 3574, height: 2518, title: "Hercule et Couronne boréale", source: "urania" },
+  oph: { file: "Sidney Hall - Urania's Mirror - Taurus Poniatowski, Serpentarius, Scutum Sobiesky, and Serpens.jpg", width: 3592, height: 2527, title: "Taureau de Poniatowski, Serpentaire, Écu de Sobieski et Serpent", source: "urania" },
+  del: { file: "Sidney Hall - Urania's Mirror - Delphinus, Sagitta, Aquila, and Antinous.jpg", width: 2514, height: 3576, title: "Dauphin, Flèche, Aigle et Antinoüs", source: "urania" },
+  lyr: { file: "Sidney Hall - Urania's Mirror - Lacerta, Cygnus, Lyra, Vulpecula and Anser.jpg", width: 3566, height: 2504, title: "Lézard, Cygne, Lyre, Petit Renard et Oie", source: "urania" },
+  peg: { file: "Sidney Hall - Urania's Mirror - Pegasus and Equuleus (best currently available version - 2014).jpg", width: 990, height: 690, title: "Pégase et Petit Cheval", source: "urania" },
+  ari: { file: "Sidney Hall - Urania's Mirror - Aries and Musca Borealis.jpg", width: 3588, height: 2509, title: "Bélier et Mouche boréale", source: "urania" },
+  tau: { file: "Sidney Hall - Urania's Mirror - Taurus.jpg", width: 3602, height: 2533, title: "Taureau", source: "urania" },
+  gem: { file: "Sidney Hall - Urania's Mirror - Gemini.jpg", width: 3568, height: 2494, title: "Gémeaux", source: "urania" },
+  cnc: { file: "Sidney Hall - Urania's Mirror - Cancer.jpg", width: 3280, height: 4690, title: "Cancer", source: "urania" },
+  leo: { file: "Sidney Hall - Urania's Mirror - Leo Major and Leo Minor.jpg", width: 3305, height: 4709, title: "Lion et Petit Lion", source: "urania" },
+  vir: { file: "Sidney Hall - Urania's Mirror - Virgo.jpg", width: 3566, height: 2505, title: "Vierge", source: "urania" },
+  lib: { file: "Sidney Hall - Urania's Mirror - Libra.jpg", width: 3586, height: 2506, title: "Balance", source: "urania" },
+  sco: { file: "Sidney Hall - Urania's Mirror - Scorpio.jpg", width: 2494, height: 3573, title: "Scorpion", source: "urania" },
+  sgr: { file: "Sidney Hall - Urania's Mirror - Sagittarius and Corona Australis, Microscopium, and Telescopium.png", width: 3572, height: 2498, title: "Sagittaire, Couronne australe, Microscope et Télescope", source: "urania", thumbWidth: 500 },
+  cap: { file: "Sidney Hall - Urania's Mirror - Capricornus.jpg", width: 3600, height: 2516, title: "Capricorne", source: "urania" },
+  aqr: { file: "Sidney Hall - Urania's Mirror - Aquarius, Piscis Australis & Ballon Aerostatique.jpg", width: 3568, height: 2498, title: "Verseau, Poisson austral et Ballon aérostatique", source: "urania" },
+  psc: { file: "Sidney Hall - Urania's Mirror - Pisces.jpg", width: 3567, height: 2497, title: "Poissons", source: "urania" },
+  eri: { file: "Sidney Hall - Urania's Mirror - Psalterium Georgii, Fluvius Eridanus, Cetus, Officina Sculptoris, Fornax Chemica, and Machina Electrica.jpg", width: 3637, height: 2520, title: "Harpe de Georges, Éridan, Baleine, Atelier du sculpteur, Fourneau chimique et Machine électrique", source: "urania" },
+  ori: { file: "Sidney Hall - Urania's Mirror - Orion (best currently available version - 2014).jpg", width: 1252, height: 1800, title: "Orion", source: "urania" },
+  cma: { file: "Sidney Hall - Urania's Mirror - Canis Major, Lepus, Columba Noachi & Cela Sculptoris.jpg", width: 3573, height: 2512, title: "Grand Chien, Lièvre, Colombe de Noé et Burin du sculpteur", source: "urania" },
+  mon: { file: "Sidney Hall - Urania's Mirror - Monoceros, Canis Minor, and Atelier Typographique.jpg", width: 3590, height: 2512, title: "Licorne, Petit Chien et Atelier typographique", source: "urania" },
+  hya: { file: "Sidney Hall - Urania's Mirror - Noctua, Corvus, Crater, Sextans Uraniæ, Hydra, Felis, Lupus, Centaurus, Antlia Pneumatica, Argo Navis, and Pyxis Nautica.jpg", width: 3585, height: 2508, title: "Chouette, Corbeau, Coupe, Sextant, Hydre, Chat, Loup, Centaure, Machine pneumatique, Navire Argo et Boussole", source: "urania" },
+  aus: { file: "Bayer-1661-Uranometria-Leaf 49-Southern Constellations.jpeg", width: 2284, height: 1776, title: "constellations australes (planche 49)", source: "bayer" },
+};

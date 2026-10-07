@@ -42,9 +42,10 @@ export function ConstellationFigure({ id, title }: { id: string; title: string }
           className="nc-sky-star"
         />
       ))}
-      {fig.stars.filter((s) => s.label).map((s) => {
+      {fig.stars.filter((s) => s.label && s.y - labelSize * 0.9 > box.y && s.y + labelSize * 0.5 < box.y + box.h).map((s) => {
         // Le nom se met a droite de l'etoile ; a gauche quand il sortirait
-        // du cadre (Aldebaran, au bord).
+        // du cadre (Aldebaran, au bord). Une etoile trop pres du haut ou du bas
+        // garde son point mais pas son nom, qui serait coupe.
         const gap = starRadius(s.mag, box.w) + labelSize * 0.35;
         const flip = s.x + gap + s.label.length * labelSize * 0.58 > box.x + box.w;
         return (

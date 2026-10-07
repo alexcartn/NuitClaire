@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
 import { ConstellationFigure } from "../sky/ConstellationFigure";
-import { engravingUrl, LEGENDS } from "../sky/legends";
+import { engravingOf, engravingUrl, LEGENDS } from "../sky/legends";
 import { CONSTELLATIONS } from "../sky/skyNames";
 
 /** Legende d'une constellation : son trace, le recit (ou l'origine du nom
@@ -34,7 +34,7 @@ export default function Legende({ id, onBack }: { id: string; onBack: () => void
     );
   }
 
-  const { engraving } = legend;
+  const engraving = engravingOf(legend);
   return (
     <div className="nc-screen">
       {header}
@@ -60,7 +60,7 @@ export default function Legende({ id, onBack }: { id: string; onBack: () => void
             <span className="nc-caption">La gravure se charge en ligne : elle n'est pas disponible pour l'instant.</span>
           ) : (
             <img
-              src={engravingUrl(engraving.file)}
+              src={engravingUrl(engraving.file, engraving.thumbWidth)}
               alt={`Gravure ancienne de la constellation ${entry.name}`}
               width={engraving.width}
               height={engraving.height}

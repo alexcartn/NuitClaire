@@ -609,14 +609,18 @@ eclaire de la Lune).
   la section repliable « Constellations », sous la carte, les liste toutes, celles qui sont
   dans le ciel a l'heure affichee d'abord (`sky/constellationList.ts`), et ramene la carte a
   l'ecran au choix. Hors ligne, comme le reste de la carte.
-  Legende (en cours de validation : Orion, Cassiopee et Lynx seulement) : un bouton « Legende »
-  sur la fiche ouvre un ecran (`screens/Legende.tsx`) avec le trace de la constellation (calcule
-  par `sky/constellationFigure.ts` depuis les traits et les etoiles de la carte, nord en haut, est
-  a gauche), le recit ecrit a la main (`sky/legends.ts`, sans reseau ; une constellation moderne
-  dit son origine au lieu d'inventer un mythe) et une gravure du Miroir d'Uranie (Sidney Hall,
-  1824, domaine public) chargee depuis Wikimedia Commons, assombrie en vision nocturne ; hors
-  ligne, la gravure manque et l'ecran le dit. Le retour ramene a la carte, la constellation
-  toujours en valeur.
+  Legende : un bouton « Legende » sur la fiche ouvre un ecran (`screens/Legende.tsx`) avec le
+  trace de la constellation (calcule par `sky/constellationFigure.ts` depuis les traits et les
+  etoiles de la carte, nord en haut, est a gauche), son recit et une gravure ancienne. Les 88
+  constellations ont leur texte, ecrit a la main et sans reseau (`sky/legendsAncient.ts` pour
+  les recits grecs et latins, `sky/legendsModern.ts` pour les constellations creees par Hevelius,
+  Plancius, Keyser et Houtman ou Lacaille : leur fiche dit qui, quand et pourquoi au lieu
+  d'inventer un mythe). Les gravures (`sky/legendPlates.ts`) sont des planches du domaine public
+  de Wikimedia Commons : le Miroir d'Uranie (Sidney Hall, 1824) pour 67 constellations, la
+  planche australe de Bayer (1661) pour les douze de Keyser et Houtman ; neuf constellations
+  (Autel, Croix du Sud et sept de Lacaille) n'en ont pas, faute de planche libre. Une planche en
+  couvre souvent plusieurs ; elle est chargee en ligne, assombrie en vision nocturne, et son
+  absence hors ligne se dit. Le retour ramene a la carte, la constellation toujours en valeur.
 - Viseur : le telephone tenu contre les jumelles, le dos vers le ciel. Direction visee
   deduite de l'orientation complete (alpha, beta, gamma). Bande de cap en haut, ciel sombre
   au-dessus de la vraie ligne d'horizon (arbres compris), sol en ombre dessous, reperes de

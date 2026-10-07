@@ -44,7 +44,10 @@ test("on garde les etoiles du cadre, pas celles qui sont loin, et leur nom", () 
     [250, -40, 2, "Lointaine", 0.1], // de l'autre cote du ciel
   ];
   const fig = buildFigure("Tst", stars, lines)!;
-  assert.deepEqual(fig.stars.map((s) => s.label), ["Haute", ""]);
+  const labels = fig.stars.map((s) => s.label);
+  assert.ok(labels.includes("Haute"), "l'étoile nommée du tracé est gardée");
+  assert.ok(!labels.includes("Lointaine"), "l'étoile de l'autre côté du ciel est écartée");
+  assert.ok(fig.stars.some((st) => st.mag === 4), "l'étoile voisine est gardée");
 });
 
 test("une constellation a cheval sur 0 h reste d'un seul tenant", () => {
@@ -59,4 +62,14 @@ test("un tout petit trace n'est pas agrandi jusqu'a remplir le cadre", () => {
   const tiny: LineRow[] = [[50, 0, 50.5, 0.5, "Pet"]];
   const fig = buildFigure("Pet", [], tiny)!;
   assert.ok(fig.box.w >= 8 && fig.box.h >= 8 * 0.99);
+});
+
+test("une extremite de trait sans etoile au catalogue recoit quand meme un point", () => {
+  const faint: LineRow[] = [[100, 20, 102, 22, "Fai"]];
+  const fig = buildFigure("Fai", [], faint)!;
+  assert.equal(fig.stars.length, 2, "une étoile par extrémité");
+  // Et pas de doublon quand l'etoile existe deja.
+  const stars: StarRow[] = [[100, 20, 3, "", 0.5]];
+  const fig2 = buildFigure("Fai", stars, faint)!;
+  assert.equal(fig2.stars.length, 2, "l'étoile du catalogue + un point pour l'autre extrémité");
 });
