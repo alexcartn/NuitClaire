@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { engravingOf, engravingUrl, LEGENDS, PLATES, plateCredit } from "./legends.ts";
+import { engravingOf, engravingUrl, LEGENDS, PLATES, plateCredit, typo } from "./legends.ts";
 
 const skyData = JSON.parse(readFileSync(new URL("./skyData.json", import.meta.url), "utf8")) as { constellations: { id: string }[] };
 const IDS = [...new Set(skyData.constellations.map((c) => c.id))];
@@ -94,4 +94,23 @@ test("la planche en PNG, trop lourde a pleine taille, est demandee plus petite",
   assert.ok(sgr.file.endsWith(".png"));
   assert.equal(sgr.thumbWidth, 500);
   assert.ok(engravingUrl(sgr.file, sgr.thumbWidth).endsWith("?width=500"));
+});
+
+test("les developpements d'une legende sont bien formes, dans l'ordre, sans doublon", () => {
+  const ordre = ["origines", "etoiles", "histoire"];
+  for (const [id, l] of Object.entries(LEGENDS)) {
+    if (!l.details) continue;
+    const kinds = l.details.map((d) => d.kind);
+    assert.deepEqual(kinds, ordre.filter((k) => kinds.includes(k as never)), `${id} : ordre ou doublon`);
+    for (const d of l.details) {
+      assert.ok(d.text.length > 0 && d.text.every((p) => p.trim().length > 40), `${id}/${d.kind} : paragraphe trop court`);
+      assert.ok(!/—|TODO|XXX|\?\?/.test(d.text.join(" ")), `${id}/${d.kind}`);
+      assert.ok(d.text.every((p) => p === p.trim() && !/\s{2,}/.test(p)), `${id}/${d.kind} : espaces en trop`);
+    }
+  }
+});
+
+test("la typographie francaise colle guillemets et signes doubles au mot voisin", () => {
+  assert.equal(typo("le « ceinturon » : fin ; non ? si !"), "le «\u00a0ceinturon\u00a0»\u00a0: fin\u00a0; non\u00a0? si\u00a0!");
+  assert.equal(typo("rien à changer"), "rien à changer");
 });

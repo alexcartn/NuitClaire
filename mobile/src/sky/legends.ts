@@ -40,6 +40,23 @@ export interface Engraving {
   thumbWidth?: number;
 }
 
+/** Les developpements d'une legende, dans un ordre fixe : d'ou vient la figure
+ * (les autres cultures, les variantes du recit, le nom), ce que disent ses
+ * etoiles (noms, origine de ces noms), et son parcours dans les atlas et
+ * l'astronomie. Une legende n'en a que si on a quelque chose de sur a dire. */
+export type DetailKind = "origines" | "etoiles" | "histoire";
+
+export const DETAIL_TITLES: Record<DetailKind, string> = {
+  origines: "D'où vient la figure",
+  etoiles: "Les étoiles et leurs noms",
+  histoire: "Dans l'histoire du ciel",
+};
+
+export interface LegendDetail {
+  kind: DetailKind;
+  text: string[];
+}
+
 export interface Legend {
   /** Antique : un recit transmis par les Grecs et les Latins. Moderne :
    * creee par un astronome, aucun mythe. */
@@ -50,6 +67,8 @@ export interface Legend {
   text: string[];
   /** D'ou vient le recit. */
   source: string;
+  /** Pour aller plus loin : l'histoire de la constellation en detail. */
+  details?: LegendDetail[];
   /** Cle de la planche (voir PLATES) ; absente quand aucune gravure du
    * domaine public n'a ete trouvee pour cette constellation. */
   plate?: string;
@@ -82,4 +101,14 @@ export function engravingOf(legend: Legend): Engraving | null {
   const plate = legend.plate ? PLATES[legend.plate] : undefined;
   if (!plate) return null;
   return { file: plate.file, width: plate.width, height: plate.height, credit: plateCredit(plate), thumbWidth: plate.thumbWidth };
+}
+
+/** Typographie francaise : une espace insecable apres « et avant », avant les
+ * deux-points et les autres signes doubles, pour qu'un guillemet ou un signe
+ * ne reste pas seul en bout de ligne. Applique a l'affichage, pas aux textes. */
+export function typo(text: string): string {
+  return text
+    .replace(/« /g, "«\u00a0")
+    .replace(/ »/g, "\u00a0»")
+    .replace(/ ([:;?!])/g, "\u00a0$1");
 }

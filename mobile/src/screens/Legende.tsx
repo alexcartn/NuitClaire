@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { NightToggle } from "../components/NightToggle";
+import { Section } from "../components/Section";
 import { TabIcon } from "../components/TabIcon";
 import { ConstellationFigure } from "../sky/ConstellationFigure";
-import { engravingOf, engravingUrl, LEGENDS } from "../sky/legends";
+import { DETAIL_TITLES, engravingOf, engravingUrl, LEGENDS, typo } from "../sky/legends";
 import { CONSTELLATIONS } from "../sky/skyNames";
 
 /** Legende d'une constellation : son trace, le recit (ou l'origine du nom
@@ -41,7 +42,7 @@ export default function Legende({ id, onBack }: { id: string; onBack: () => void
       <div>
         <div className="nc-eyebrow">Constellation {legend.origin === "antique" ? "antique" : "moderne"}</div>
         <div className="nc-title" style={{ marginTop: "var(--space-2xs)" }}>{entry.name}</div>
-        <div className="nc-sub">{legend.tagline}</div>
+        <div className="nc-sub">{typo(legend.tagline)}</div>
       </div>
 
       <ConstellationFigure id={id} title={entry.name} />
@@ -49,9 +50,9 @@ export default function Legende({ id, onBack }: { id: string; onBack: () => void
       <div className="nc-card nc-stack">
         <div className="nc-eyebrow">{legend.origin === "antique" ? "Légende" : "Origine"}</div>
         <div className="nc-legend-text nc-stack-xs">
-          {legend.text.map((p) => <p key={p}>{p}</p>)}
+          {legend.text.map((p) => <p key={p}>{typo(p)}</p>)}
         </div>
-        <span className="nc-caption">{legend.source}</span>
+        <span className="nc-caption">{typo(legend.source)}</span>
       </div>
 
       {engraving && (
@@ -70,9 +71,19 @@ export default function Legende({ id, onBack }: { id: string; onBack: () => void
               style={{ aspectRatio: `${engraving.width} / ${engraving.height}` }}
             />
           )}
-          <figcaption className="nc-caption">{engraving.credit} · Wikimedia Commons, domaine public</figcaption>
+          <figcaption className="nc-caption">{typo(engraving.credit)} · Wikimedia Commons, domaine public</figcaption>
         </figure>
       )}
+
+      {/* Pour aller plus loin. Les ids des sections sont communs a toutes les
+          constellations : replier « Les etoiles » une fois vaut pour la suite. */}
+      {legend.details?.map((d) => (
+        <Section key={d.kind} id={`legende-${d.kind}`} title={DETAIL_TITLES[d.kind]}>
+          <div className="nc-legend-text nc-stack-xs">
+            {d.text.map((p) => <p key={p}>{typo(p)}</p>)}
+          </div>
+        </Section>
+      ))}
     </div>
   );
 }

@@ -186,6 +186,23 @@ export const LEGENDS_MODERN: Record<string, Legend> = {
       "Elle paraît en 1690, dans l'atlas posthume de Hevelius, le Firmamentum Sobiescianum.",
     ],
     source: "Constellation créée par Johannes Hevelius, publiée en 1690.",
+    details: [
+      {
+        kind: "origines",
+        text: [
+          "Johannes Hevelius (Jan Heweliusz), brasseur et magistrat de Dantzig, était aussi l'un des meilleurs observateurs du XVIIe siècle. Il a créé sept constellations encore en usage : les Chiens de chasse, le Lézard, le Petit Lion, le Lynx, l'Écu de Sobieski, le Sextant et le Petit Renard.",
+          "Le Lynx remplit un grand espace du ciel du Nord sans étoile brillante, entre le Cocher, les Gémeaux, le Cancer, le Petit Lion, la Grande Ourse et la Girafe. Depuis l'Antiquité, le lynx passe pour l'animal à la vue la plus perçante : le héros Lyncée, l'un des Argonautes, était réputé pour la sienne.",
+        ],
+      },
+      {
+        kind: "histoire",
+        text: [
+          "Hevelius observait à l'œil nu : il refusait les lunettes de visée que ses contemporains jugeaient indispensables pour mesurer les positions. Cela a donné lieu à une querelle avec Robert Hooke. En 1679, le jeune Edmond Halley a fait le voyage jusqu'à Dantzig, a contrôlé ses mesures et les a trouvées d'une exactitude remarquable.",
+          "Hevelius est mort en 1687 ; son atlas, le Firmamentum Sobiescianum, a paru en 1690. Sa seconde épouse, Elisabeth, qui l'aidait à observer, a fait publier ses ouvrages après sa mort.",
+          "La planche du Lynx du Miroir d'Uranie (1824), qui illustre cette page, le montre avec le Télescope d'Herschel, une constellation abandonnée créée en 1781 par l'astronome Maximilian Hell pour honorer William Herschel, qui venait de découvrir Uranus.",
+        ],
+      },
+    ],
     plate: "lyn",
   },
   Men: {
