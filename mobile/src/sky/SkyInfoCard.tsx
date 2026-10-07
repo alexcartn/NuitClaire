@@ -8,7 +8,7 @@ const hm = (d: Date) => fmtHM(d.toISOString());
  * il se leve, passe au plus haut et se couche, et surtout quand il depasse
  * les arbres et les toits de ce site. Calcule sur le telephone. */
 export function SkyInfoCard({
-  name, detail, raDeg, decDeg, raRate = 0, when, isNow, site, horizon, horizonAlt, compact = false, notes, onAim, onFiche, onClose,
+  name, detail, raDeg, decDeg, raRate = 0, when, isNow, site, horizon, horizonAlt, compact = false, notes, onAim, onFiche, onLegend, onClose,
 }: {
   name: string;
   detail: string;
@@ -27,6 +27,8 @@ export function SkyInfoCard({
   notes?: string[];
   onAim?: () => void;
   onFiche?: () => void;
+  /** Legende de la constellation (ecran Legende). */
+  onLegend?: () => void;
   /** Une constellation n'est pas une cible : on la referme au lieu de la
    * viser. */
   onClose?: () => void;
@@ -74,10 +76,11 @@ export function SkyInfoCard({
           <strong style={{ fontWeight: 600 }}>{name}</strong>
           {detail && <span className="nc-caption"> · {detail}</span>}
         </span>
-        {(onAim || onFiche || onClose) && (
+        {(onAim || onFiche || onLegend || onClose) && (
           <span className="nc-row nc-none" style={{ gap: "var(--space-xs)" }}>
             {onAim && <button onClick={onAim} className="nc-chip nc-chip-active">Viser</button>}
             {onFiche && <button onClick={onFiche} className="nc-chip">Fiche</button>}
+            {onLegend && <button onClick={onLegend} className="nc-chip nc-chip-active">Légende</button>}
             {onClose && <button onClick={onClose} className="nc-chip">Fermer</button>}
           </span>
         )}

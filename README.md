@@ -609,6 +609,14 @@ eclaire de la Lune).
   la section repliable « Constellations », sous la carte, les liste toutes, celles qui sont
   dans le ciel a l'heure affichee d'abord (`sky/constellationList.ts`), et ramene la carte a
   l'ecran au choix. Hors ligne, comme le reste de la carte.
+  Legende (en cours de validation : Orion, Cassiopee et Lynx seulement) : un bouton « Legende »
+  sur la fiche ouvre un ecran (`screens/Legende.tsx`) avec le trace de la constellation (calcule
+  par `sky/constellationFigure.ts` depuis les traits et les etoiles de la carte, nord en haut, est
+  a gauche), le recit ecrit a la main (`sky/legends.ts`, sans reseau ; une constellation moderne
+  dit son origine au lieu d'inventer un mythe) et une gravure du Miroir d'Uranie (Sidney Hall,
+  1824, domaine public) chargee depuis Wikimedia Commons, assombrie en vision nocturne ; hors
+  ligne, la gravure manque et l'ecran le dit. Le retour ramene a la carte, la constellation
+  toujours en valeur.
 - Viseur : le telephone tenu contre les jumelles, le dos vers le ciel. Direction visee
   deduite de l'orientation complete (alpha, beta, gamma). Bande de cap en haut, ciel sombre
   au-dessus de la vraie ligne d'horizon (arbres compris), sol en ombre dessous, reperes de

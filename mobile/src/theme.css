@@ -2264,3 +2264,51 @@ a {
   border-radius: 22px;
   white-space: nowrap;
 }
+
+/* Page legende d'une constellation (screens/Legende.tsx). Le trace garde le
+   fond de la carte : un ciel de nuit, quel que soit le theme. */
+.nc-const-fig {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
+
+.nc-const-fig-line {
+  stroke: rgba(196, 186, 232, 0.75);
+  stroke-width: 1.5;
+}
+
+[data-theme="night"] .nc-const-fig-line {
+  stroke: var(--ink2);
+  stroke-opacity: 0.85;
+}
+
+.nc-legend-text p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--ink2);
+}
+
+.nc-legend-figure {
+  margin: 0;
+}
+
+.nc-legend-engraving {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surf2);
+}
+
+/* Vision nocturne : la gravure, claire sur fond de papier et grande,
+   aveuglerait : plus sombre que les vignettes (voir .nc-dex-cell img). */
+[data-theme="night"] .nc-legend-engraving {
+  filter: grayscale(1) brightness(0.22) sepia(1) hue-rotate(-50deg) saturate(3);
+}

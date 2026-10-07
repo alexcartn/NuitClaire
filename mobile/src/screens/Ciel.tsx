@@ -10,6 +10,7 @@ import { fmtHM } from "../format";
 import { NightToggle } from "../components/NightToggle";
 import { TabIcon } from "../components/TabIcon";
 import { SkyConstellations } from "../sky/SkyConstellations";
+import { LEGENDS } from "../sky/legends";
 import { SkyDome, type SkyPick, type SkyProjection, type SkyTarget } from "../sky/SkyDome";
 import { SkyInfoCard } from "../sky/SkyInfoCard";
 import { SkyLegend } from "../sky/SkyLegend";
@@ -37,11 +38,14 @@ const toLocalInput = (d: Date) =>
  * cibles aux jumelles. Calcule sur le telephone (voir sky/sky.ts) : marche
  * hors ligne, une fois la liste de la nuit et la position de la Lune gardees
  * sur l'appareil. */
-export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, onBack }: {
+export default function Ciel({ state, initialTarget, initialMode, initialConstellation, onOpenTarget, onOpenLegend, onBack }: {
   state: AppState | null;
   initialTarget: string | null;
   initialMode: "carte" | "viseur";
+  /** Constellation a remettre en valeur (retour de sa legende). */
+  initialConstellation: string | null;
   onOpenTarget: (designation: string) => void;
+  onOpenLegend: (id: string) => void;
   /** Absent quand la carte est l'onglet lui-meme : rien vers quoi revenir. */
   onBack?: () => void;
 }) {
@@ -58,9 +62,14 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
   // Le masque d'horizon (arbres, toits) vient de Reglages ; on peut le
   // couper ici pour voir tout le ciel, sans toucher a ce qui y est regle.
   const [showHorizon, setShowHorizon] = useRemembered("ciel:horizon", true);
-  const [hlConst, setHlConst] = useState<string | null>(null);
+  const [hlConst, setHlConst] = useState<string | null>(initialConstellation);
   const mapRef = useRef<HTMLDivElement>(null);
-  const [focusReq, setFocusReq] = useState<{ name: string; n: number; raDeg?: number; decDeg?: number } | null>(null);
+  // Au retour d'une legende, la carte se recentre sur la constellation comme
+  // quand on l'avait choisie.
+  const [focusReq, setFocusReq] = useState<{ name: string; n: number; raDeg?: number; decDeg?: number } | null>(() => {
+    const c = CONSTELLATIONS.find((k) => k.id === initialConstellation);
+    return c ? { name: c.name, n: 1, raDeg: c.raDeg, decDeg: c.decDeg } : null;
+  });
   const { isNight, toggleNight } = useTheme();
   // Plein ecran du navigateur en plus (barre d'adresse et barre d'etat
   // masquees) quand il le permet ; sinon (iPhone dans Safari) la carte
@@ -487,6 +496,7 @@ export default function Ciel({ state, initialTarget, initialMode, onOpenTarget, 
                   horizonAlt={skyHorizonAlt}
                   compact={full}
                   notes={constNotes}
+                  onLegend={LEGENDS[constInfo.id] ? () => onOpenLegend(constInfo.id) : undefined}
                   onClose={() => setHlConst(null)}
                 />
               ) : info && (

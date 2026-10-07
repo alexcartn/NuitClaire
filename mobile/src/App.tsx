@@ -25,6 +25,7 @@ import { Actus } from "./screens/Actus";
 // compris), pour ne pas alourdir l'ouverture de l'appli. Le service worker
 // met ce morceau en cache comme le reste : il marche hors ligne.
 const Ciel = lazy(() => import("./screens/Ciel"));
+const Legende = lazy(() => import("./screens/Legende"));
 
 const SCREENS: Screen[] = ["soir", "ciel", "cibles", "messier", "journal", "reglages"];
 
@@ -47,6 +48,9 @@ interface Nav {
   binoculars?: boolean;
   /** Meme fiche, a l'oeil nu (le switch de « En attendant le Seestar »). */
   eye?: boolean;
+  /** Ecran Ciel : constellation choisie, retrouvee en revenant de sa
+   * legende. */
+  constellation?: string;
 }
 
 /** Ecran d'ouverture : "soir" par defaut, ou celui demande par l'URL. Sert
@@ -218,6 +222,15 @@ export default function App() {
     });
   };
 
+  /** Legende d'une constellation, depuis la carte du ciel. La constellation
+   * choisie est notee dans l'entree de la carte, pour la retrouver en
+   * revenant. */
+  const openLegend = (id: string) => {
+    const current = navRef.current;
+    replace({ ...current, constellation: id });
+    push({ screen: "legende", selected: id, backTo: current.screen, depth: current.depth + 1 });
+  };
+
   const openNews = () => {
     const current = navRef.current;
     push({ screen: "actus", selected: null, backTo: current.screen, depth: current.depth + 1 });
@@ -242,7 +255,7 @@ export default function App() {
 
   // Onglet a surligner : les fiches, la recherche et les actus gardent celui
   // d'ou l'on vient, et Messier est un segment de « Cibles ».
-  const shown = screen === "detail" || screen === "recherche" || screen === "ciel" || screen === "actus" ? nav.backTo : screen;
+  const shown = screen === "detail" || screen === "recherche" || screen === "ciel" || screen === "actus" || screen === "legende" ? nav.backTo : screen;
   const activeTab: Screen = shown === "messier" ? "cibles" : shown;
   /** « Cibles » et « Objectif Messier » partagent un onglet : on bascule sur
    * place, sans empiler d'historique. */
@@ -309,9 +322,16 @@ export default function App() {
               state={state}
               initialTarget={selected}
               initialMode={nav.skyMode ?? "carte"}
+              initialConstellation={nav.constellation ?? null}
               onOpenTarget={(d) => openTarget(d)}
+              onOpenLegend={openLegend}
               onBack={nav.backTo === "ciel" && nav.depth <= 1 ? undefined : back}
             />
+          </Suspense>
+        )}
+        {screen === "legende" && selected && (
+          <Suspense fallback={<div className="nc-screen"><p className="nc-caption">Chargement…</p></div>}>
+            <Legende id={selected} onBack={back} />
           </Suspense>
         )}
         {screen === "recherche" && (
