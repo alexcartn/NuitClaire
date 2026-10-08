@@ -21,6 +21,7 @@ from imagery import dss_image_url
 from optics import EYE_HOP_DEG, binocular_optics, eye_optics, with_optics
 from rows import day_frame, filter_label, row_from_search
 from scoring import discovery_sort_key, min_alt_for, recommended_exposure_minutes, target_altitude_series
+from season import target_year_windows
 from wiki import wiki_title_candidates
 
 router = APIRouter()
@@ -184,6 +185,9 @@ def target_detail(designation: str, instrument: str = Query(default="seestar", p
             for t, a in series.iterrows()
         ],
         "minAltDeg": min_alt_for(target, site),
+        # Meme instrument que la fiche (`target` porte ses `optics`) : la
+        # hauteur minimale des jumelles n'est pas celle du Seestar.
+        "yearWindow": target_year_windows(target, site, horizon),
         "peakSector": peak["sector"], "peakAz": peak["az"], "peakTime": peak_t.isoformat(),
         "exposureLowMin": low, "exposureHighMin": high,
         "wiki": wiki,

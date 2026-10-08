@@ -223,6 +223,27 @@ class TargetSuggestionOut(BaseModel):
     type: str
 
 
+class YearWindowOut(BaseModel):
+    """Une plage de dates ou la cible est atteignable (voir season.py). `start`
+    precede aujourd'hui quand la plage est deja commencee (`current`)."""
+    start: str
+    end: str
+    current: bool
+    peakDate: str
+    peakHours: int
+
+
+class TargetYearOut(BaseModel):
+    """Quand la cible est atteignable depuis le site sur les 12 prochains
+    mois, sans meteo ni Lune (voir season.target_year_windows)."""
+    status: str  # unreachable | hidden | seasonal | allYear
+    culminationDeg: float
+    minAltDeg: float
+    windows: list[YearWindowOut]
+    peakDate: str | None
+    peakHours: int
+
+
 class AltitudePoint(BaseModel):
     time: str
     alt: float
@@ -251,6 +272,8 @@ class TargetDetailOut(TargetRowOut):
     # La Lune et les planetes (voir bodies.as_target_detail) : phase,
     # lever/coucher, lunes, anneaux... Absent pour le ciel profond.
     body: dict | None = None
+    # Absent pour la Lune et les planetes : leur position change chaque nuit.
+    yearWindow: TargetYearOut | None = None
 
 
 class NoteContext(BaseModel):

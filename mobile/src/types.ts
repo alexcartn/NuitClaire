@@ -214,6 +214,27 @@ export interface ExposureEntry {
   at: string;
 }
 
+/** Une plage de dates ou la cible est atteignable ; `start` precede
+ * aujourd'hui quand elle est deja commencee (`current`). */
+export interface YearWindow {
+  start: string;
+  end: string;
+  current: boolean;
+  peakDate: string;
+  peakHours: number;
+}
+
+/** Quand la cible est atteignable depuis le site sur les 12 prochains mois,
+ * sans meteo ni Lune (voir season.target_year_windows). */
+export interface TargetYear {
+  status: "unreachable" | "hidden" | "seasonal" | "allYear";
+  culminationDeg: number;
+  minAltDeg: number;
+  windows: YearWindow[];
+  peakDate: string | null;
+  peakHours: number;
+}
+
 export interface TargetDetail extends TargetRow {
   minAltDeg: number;
   altitudeSeries: AltitudePoint[];
@@ -231,6 +252,8 @@ export interface TargetDetail extends TargetRow {
   exposureTotalMin: number;
   /** La Lune et les planetes seulement. */
   body?: BodyInfo | null;
+  /** Absent pour la Lune et les planetes : leur position change chaque nuit. */
+  yearWindow?: TargetYear | null;
 }
 
 export const COMPASS_SECTORS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;

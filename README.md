@@ -502,6 +502,30 @@ rend 13 atteignables avec un horizon sud degage ; les 8 restants (M6, M7, M54, M
 M69, M70, M83) demandent une sortie plus au sud. Cocher un Messier fait dans le journal
 propose de le marquer capture.
 
+### Fiche cible : « Dans l'annee »
+
+Sous la courbe de ce soir, la fiche d'une cible dit quand elle est atteignable sur les douze
+prochains mois (`season.target_year_windows`, champ `yearWindow` de
+`GET /api/targets/{designation}`, rendu par `components/YearWindowCard.tsx`, textes dans
+`yearWindowView.ts`). Quatre cas :
+
+- jamais visible depuis ta position : elle reste sous l'horizon, ou culmine plus bas que la
+  hauteur minimale de l'instrument (NGC 3372, la Carene, depuis Marson) ;
+- cachee par ton horizon : elle monte assez haut, mais jamais dans un secteur degage (voir
+  Reglages, section Horizon) ;
+- visible une partie de l'annee : une ou plusieurs plages « du 9 sept. au 18 mars », avec le
+  maximum d'heures par nuit et la meilleure date, et une barre de douze mois partant du mois
+  courant (le trait marque aujourd'hui) ;
+- visible toute l'annee.
+
+Meme geometrie que les saisons Messier (nuit noire, hauteur minimale de l'instrument choisi,
+secteur d'horizon degage), sans meteo ni Lune qu'on ne connait pas a l'avance. Une nuit compte
+a partir de 2 h pointables : avec un echantillon par heure, une seule heure est ambigue et le
+resultat clignotait d'un soir a l'autre en bord de saison, ce qui fabriquait de fausses
+fenetres. Les trous de quelques jours ou les nuits gardent encore une heure sont refermes
+(`season.workable_days`). Les planetes et la Lune n'ont pas cette carte : leur position change
+chaque nuit.
+
 ### Journal
 
 Organise comme Messier et Cibles (`journalView.ts`, pur et teste) :

@@ -6,6 +6,7 @@ import { targetHistory } from "../journalRead";
 import { newOp } from "../sessionQueue";
 import { AltitudeChart } from "../components/AltitudeChart";
 import { StarHopCard } from "../components/StarHopCard";
+import { YearWindowCard } from "../components/YearWindowCard";
 import { InTheNews } from "../components/InTheNews";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { NightToggle } from "../components/NightToggle";
@@ -282,6 +283,10 @@ export function Detail({
               <span className="nc-num">{fmtHM(data.peakTime)}</span>.
             </p>
           </div>
+
+          {/* Juste sous la courbe de ce soir : « infaisable ce soir » appelle
+              tout de suite « et quand, alors ? ». */}
+          {data.yearWindow && <YearWindowCard year={data.yearWindow} />}
 
           <div className="nc-card" style={{ padding: 0, overflow: "hidden" }}>
             {characteristics(data, bino, eye).map(([k, v], i, arr) => (
