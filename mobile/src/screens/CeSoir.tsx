@@ -157,6 +157,12 @@ export function CeSoir({
         }
       />
 
+      {/* Deux colonnes sur grand ecran : la nuit (note, creneaux, plan) a
+          gauche, ce qu'on peut regarder en attendant a droite. Sur
+          telephone les deux enveloppes s'effacent (voir desktop.css) et
+          l'ordre est celui d'une seule colonne. */}
+      <div className="nc-cols">
+      <div className="nc-col">
       {posing && binocularCard}
 
       <ScoreCard night={n} />
@@ -223,7 +229,9 @@ export function CeSoir({
           }
         />
       )}
+      </div>
 
+      <div className="nc-col">
       <MustSeeCard onOpenTarget={onOpenTarget} />
 
       <CometsCard />
@@ -241,6 +249,8 @@ export function CeSoir({
       <Section id="soir-horizon" title="Horizon dégagé" summary={`${openSectors}/8 secteurs`} defaultOpen={false}>
         <SectorChips horizon={state.data.horizon} horizonAlt={state.data.horizonAlt} />
       </Section>
+      </div>
+      </div>
     </div>
   );
 }

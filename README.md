@@ -376,6 +376,33 @@ angles en retrait. Elle etait auparavant dans la couleur la plus eteinte de la
 palette, sous un nom deux fois plus gros -- exactement l'inverse du premier
 principe de `.impeccable.md`.
 
+### Vue ordinateur
+
+Sur un grand ecran, l'appli n'est plus une colonne de telephone au milieu d'une page
+vide. `mobile/src/desktop.css` (importee apres `theme.css`) ne s'applique qu'a partir de
+1024 px de large ; en dessous, la vue telephone est celle de `theme.css`, au pixel pres
+(verifie par comparaison de captures avant/apres sur les ecrans principaux).
+
+- A partir de 1024 px : la barre d'onglets devient un menu lateral (memes boutons, empiles,
+  avec le nom de l'appli), le contenu passe a 760 px, la barre de defilement reapparait et
+  les elements cliquables ont un survol.
+- A partir de 1200 px : le contenu passe a 1120 px et se range sur deux colonnes (Ce soir,
+  fiche d'une cible, Journal, Reglages), les rangees de « Cibles » vont deux par deux, et la
+  carte du ciel passe a gauche, fixe, avec ses commandes a droite. Recherche, Actus, Legendes
+  et Messier restent sur une colonne de 760 px (`nc-screen-narrow`) : une ligne de mille
+  pixels se lit mal.
+
+La detection est une requete de largeur, pas un test de navigateur ni du JavaScript : un
+navigateur de bureau reduit a la taille d'un telephone retrouve la vue telephone, une
+tablette en paysage obtient la vue ordinateur, et rien ne clignote au chargement.
+
+Les colonnes sont des enveloppes `.nc-cols` / `.nc-col` dans le JSX, en `display: contents`
+sous le seuil : elles disparaissent de la mise en page, donc ni l'ordre ni les ecarts d'une
+seule colonne ne changent. Une enveloppe se coupe donc toujours en deux moities consecutives
+de l'ordre telephone (le gauche, puis le droit), jamais autrement. Les marges de l'ecran sont
+les variables `--screen-px` / `--screen-pb`, car les rangees de puces et la saisie du journal
+debordent de ces marges : elles s'elargissent en un seul endroit.
+
 ### Icones
 
 Les icones de la barre d'onglets sont dessinees en SVG (`mobile/src/components/TabIcon.tsx`)

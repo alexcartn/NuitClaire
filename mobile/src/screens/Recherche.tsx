@@ -147,7 +147,7 @@ export function Recherche({
   const empty = query.trim().length < MIN_QUERY_LENGTH;
 
   return (
-    <div className="nc-screen">
+    <div className="nc-screen nc-screen-narrow">
       <div className="nc-row">
         <div className="nc-grow" style={{ position: "relative" }}>
           <input

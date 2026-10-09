@@ -233,6 +233,10 @@ export function Detail({
             )}
           </div>
 
+          {/* Grand ecran : l'objet et sa courbe a gauche, ses caracteristiques
+              et l'historique a droite (voir desktop.css). */}
+          <div className="nc-cols">
+          <div className="nc-col">
           {data.imageUrl && (
             <img
               src={data.imageUrl}
@@ -287,7 +291,9 @@ export function Detail({
           {/* Juste sous la courbe de ce soir : « infaisable ce soir » appelle
               tout de suite « et quand, alors ? ». */}
           {data.yearWindow && <YearWindowCard year={data.yearWindow} />}
+          </div>
 
+          <div className="nc-col">
           <div className="nc-card" style={{ padding: 0, overflow: "hidden" }}>
             {characteristics(data, bino, eye).map(([k, v], i, arr) => (
               <div
@@ -453,6 +459,8 @@ export function Detail({
                 {addedToJournal ? "Ajoutée ✓" : "Ajouter au journal"}
               </button>
             )}
+          </div>
+          </div>
           </div>
         </>
       )}

@@ -37,7 +37,7 @@ export default function Legende({ id, onBack }: { id: string; onBack: () => void
 
   const engraving = engravingOf(legend);
   return (
-    <div className="nc-screen">
+    <div className="nc-screen nc-screen-narrow">
       {header}
       <div>
         <div className="nc-eyebrow">Constellation {legend.origin === "antique" ? "antique" : "moderne"}</div>

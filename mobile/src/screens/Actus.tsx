@@ -50,7 +50,7 @@ export function Actus({ onOpenTarget, onBack }: {
   const count = (f: Filter) => pick(f).length;
 
   return (
-    <div className="nc-screen">
+    <div className="nc-screen nc-screen-narrow">
       <div className="nc-row nc-between">
         <button onClick={onBack} className="nc-link nc-link-accent">
           <TabIcon name="back" />

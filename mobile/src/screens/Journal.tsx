@@ -119,6 +119,10 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
 
       <SyncBanner pendingCount={pendingCount} syncError={syncError} loadError={loadError} />
 
+      {/* Grand ecran : la sortie (ou de quoi en commencer une) a gauche, le
+          carnet des sorties passees et les statistiques a droite. */}
+      <div className="nc-cols">
+      <div className="nc-col">
       {/* Hors sortie, la saisie reste en tete ; pendant la sortie elle passe
           au bas de l'ecran (voir plus bas) et la page commence par les cibles. */}
       {!sessionActive && composer}
@@ -140,7 +144,9 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
       ) : (
         <StartSuggestions send={send} onOpenTarget={onOpenTarget} />
       )}
+      </div>
 
+      <div className="nc-col">
       <PastOutings
         data={data}
         year={shownYear}
@@ -164,6 +170,8 @@ export function Journal({ onOpenTarget, onCaptureChange }: {
           onOpenTarget={onOpenTarget}
         />
       )}
+      </div>
+      </div>
 
       {sessionActive && composer}
     </div>

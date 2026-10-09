@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { registerServiceWorker } from "./pwa";
 import "./theme.css";
+import "./desktop.css";
 
 // Service worker : uniquement sur le build de production. En dev, un cache
 // de coquille masquerait les modifications a chaque rechargement.

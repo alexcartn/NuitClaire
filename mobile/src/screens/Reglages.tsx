@@ -186,6 +186,10 @@ export function Reglages({ onChange }: { onChange: () => void }) {
       <ScreenHeader eyebrow="Réglages" title="Poste et appli" />
       {saveError && <div className="nc-notice" role="alert">{saveError}</div>}
 
+      {/* Grand ecran : le lieu et l'horizon (ce qui s'edite) a gauche, les
+          reglages replies a droite. Deux enveloppes neutres sur telephone. */}
+      <div className="nc-cols">
+      <div className="nc-col">
       <Section id="reglages-lieu" title="Lieu" summary={data?.site.name}>
         {data && (
           <div className="nc-caption" style={{ margin: 0, color: "var(--ink2)" }}>
@@ -297,7 +301,9 @@ export function Reglages({ onChange }: { onChange: () => void }) {
           />
         )}
       </Section>
+      </div>
 
+      <div className="nc-col">
       {data && (
         <Section
           id="reglages-instrument"
@@ -559,6 +565,8 @@ export function Reglages({ onChange }: { onChange: () => void }) {
           </button>
         )}
       </Section>
+      </div>
+      </div>
     </div>
   );
 }

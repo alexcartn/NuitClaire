@@ -1,0 +1,252 @@
+/* Vue ordinateur : menu a gauche, contenu elargi, deux colonnes.
+ *
+ * L'appli est faite pour un telephone, en colonne de 480 px avec la barre
+ * d'onglets en bas ; sur un grand ecran elle restait telle quelle, au milieu
+ * d'une page vide. Tout ce qui change est ici, derriere des requetes de
+ * largeur : en dessous de 1024 px, rien de ce fichier ne s'applique et la
+ * vue telephone est exactement celle de theme.css.
+ *
+ * La detection est donc une largeur de fenetre, pas un test de navigateur :
+ * un navigateur de bureau reduit a la taille d'un telephone retrouve la vue
+ * telephone, et une tablette en paysage obtient la vue ordinateur. Meme
+ * logique que le plein ecran de la carte (orientation, theme.css), sans le
+ * moindre JavaScript : rien a synchroniser, rien qui clignote au chargement.
+ *
+ * Deux paliers :
+ *   >= 1024 px : menu lateral, colonne de contenu elargie (760 px) ;
+ *   >= 1200 px : le contenu passe sur deux colonnes (1120 px).
+ * Une colonne de 2 x 340 px serait plus etroite que le telephone pour lequel
+ * les cartes sont dessinees ; le second palier attend d'avoir la place. */
+
+/* Enveloppes de mise en page, neutres sur telephone : `display: contents`
+ * les retire de la mise en page, leurs enfants redeviennent ceux de l'ecran.
+ * Elles ne changent ni l'ordre ni les ecarts d'une seule colonne. */
+.nc-cols,
+.nc-col,
+.nc-trow-grid {
+  display: contents;
+}
+
+/* Une rangee de cible n'est plus la derniere de son parent depuis qu'elle
+ * est dans `.nc-trow-grid` : le filet de la derniere rangee ne doit tomber
+ * que si aucun bouton « Voir les N autres » ne la suit. Meme resultat qu'avant
+ * l'enveloppe. */
+.nc-trow-grid > .nc-trow:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.nc-trow-grid:last-child > .nc-trow:last-child {
+  border-bottom: none;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --screen-px: 40px;
+    --screen-pb: 56px;
+  }
+
+  /* Menu a gauche, contenu a droite. La barre de mise a jour, quand elle
+     existe, passe au-dessus des deux. */
+  .nc-app {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    max-width: none;
+    margin: 0;
+  }
+
+  .nc-update {
+    grid-column: 1 / -1;
+  }
+
+  .nc-scroll {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  /* La barre d'onglets devient le menu : memes boutons, memes icones, empiles. */
+  .nc-tabbar {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    padding: var(--space-xl) var(--space-sm) var(--space-lg);
+    border-top: none;
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+  }
+
+  /* Le nom de l'appli, que le telephone n'affiche pas : la barre du bas n'a
+     pas la place, et l'icone de l'ecran d'accueil le porte deja. */
+  .nc-tabbar::before {
+    content: "NuitClaire";
+    padding: 0 var(--space-sm) var(--space-lg);
+    font: 600 var(--text-md)/1 var(--font-display);
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .nc-tab {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-sm);
+    padding: 0 var(--space-sm);
+    border-radius: 12px;
+  }
+
+  .nc-tab-label {
+    font-size: var(--text-sm);
+  }
+
+  .nc-tab-active {
+    background: var(--surf2);
+  }
+
+  /* Au telephone, la barre de defilement est cachee : on defile au doigt. A
+     la souris, elle dit ou l'on en est dans une page longue. */
+  .nc-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--bar) transparent;
+  }
+
+  .nc-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .nc-scroll::-webkit-scrollbar-thumb {
+    background: var(--bar);
+    border-radius: 5px;
+    border: 2px solid var(--bg);
+  }
+
+  .nc-screen {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding-top: var(--space-xl);
+    gap: var(--space-lg);
+  }
+
+  /* Un choix entre deux ou trois libelles n'a pas besoin de mille pixels :
+     etire sur la page, il ressemblait a un bandeau. */
+  .nc-segmented,
+  .nc-seg {
+    max-width: 440px;
+  }
+
+  /* Sur la carte, le choix Carte / Viseur reste a gauche et la bascule de
+     theme a l'extremite de la ligne. */
+  .nc-sky-mode {
+    margin-right: auto;
+  }
+}
+
+/* Deux colonnes : la place y est (2 x ~440 px, soit la largeur pour laquelle
+   les cartes sont dessinees). Chaque colonne est une pile a part : ouvrir une
+   section dans l'une ne decale pas l'autre. */
+@media (min-width: 1200px) {
+  .nc-screen {
+    max-width: 1120px;
+  }
+
+  /* Listes et textes continus (recherche, actus, legendes, catalogue
+     Messier) : une ligne de mille pixels se lit mal, et les heures a droite
+     se retrouvaient a un demi-ecran de leur cible. */
+  .nc-screen.nc-screen-narrow {
+    max-width: 760px;
+  }
+
+  .nc-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-lg);
+    align-items: start;
+  }
+
+  .nc-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-width: 0;
+  }
+
+  /* Cibles : les rangees d'un groupe deux par deux. */
+  .nc-trow-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-xl);
+  }
+
+  /* Carte du ciel : la carte a gauche, aussi grande que la place le permet
+     et fixe pendant qu'on parcourt les commandes, la recherche et l'heure a
+     droite. */
+  .nc-sky-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: var(--space-lg);
+    row-gap: var(--space-sm);
+    align-items: start;
+  }
+
+  .nc-sky-split > :nth-child(1) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .nc-sky-split > .nc-sky-wrap {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    position: sticky;
+    top: var(--space-md);
+  }
+
+  .nc-sky-split > :nth-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+/* Entre 1024 et 1199 px la carte reste seule sur sa ligne : sans plafond elle
+   serait plus haute que la fenetre. */
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .nc-sky-split > .nc-sky-wrap {
+    width: min(100%, calc(100dvh - 220px));
+    margin: 0 auto;
+  }
+}
+
+/* Souris : un curseur qui dit ce qui se clique, un fond qui repond au
+   survol. Aucun effet au doigt, ou le survol n'existe pas. */
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled),
+  [role="radio"],
+  [role="switch"],
+  [role="tab"],
+  summary,
+  .nc-section-head {
+    cursor: pointer;
+  }
+
+  .nc-tab:not(.nc-tab-active):hover {
+    background: var(--surf2);
+    color: var(--ink);
+  }
+
+  /* Le fond suit les coins de la carte (16 px moins son filet) ; ouverte,
+     seuls les coins du haut, le corps de la section prenant le relais. */
+  .nc-section-head:hover {
+    background: var(--surf2);
+    border-radius: 15px;
+  }
+
+  .nc-section-head[aria-expanded="true"]:hover {
+    border-radius: 15px 15px 0 0;
+  }
+
+  .nc-trow-main:hover {
+    background: var(--surf2);
+    border-radius: 10px;
+  }
+}

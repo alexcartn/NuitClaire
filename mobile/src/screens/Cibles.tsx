@@ -35,9 +35,12 @@ function GroupSection({ group, index, onOpenTarget }: {
     // Le premier groupe ouvert (les Messier a capturer quand il y en a), les
     // autres replies : on deplie le type qui interesse.
     <Section id={`cibles:${group.key}`} title={group.title} count={group.rows.length} defaultOpen={index === 0}>
-      {shown.map((row) => (
-        <TargetRowCompact key={row.designation} row={row} onOpen={() => onOpenTarget(row.designation)} />
-      ))}
+      {/* Deux rangees de front sur grand ecran (voir desktop.css). */}
+      <div className="nc-trow-grid">
+        {shown.map((row) => (
+          <TargetRowCompact key={row.designation} row={row} onOpen={() => onOpenTarget(row.designation)} />
+        ))}
+      </div>
       {group.rows.length > GROUP_PAGE && (
         <button onClick={() => setAll((v) => !v)} className="nc-link" style={{ alignSelf: "center" }} aria-expanded={all}>
           {all ? "Réduire" : `Voir les ${group.rows.length - GROUP_PAGE} autres`}

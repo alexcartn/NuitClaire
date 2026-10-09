@@ -370,7 +370,7 @@ export default function Ciel({ state, initialTarget, initialMode, initialConstel
       {mode === "carte" ? (
         <>
           {/* Plein ecran : la carte seule, les commandes par-dessus. */}
-          <div ref={mapRef} className={full ? "nc-sky-full" : "nc-stack"}>
+          <div ref={mapRef} className={full ? "nc-sky-full" : "nc-stack nc-sky-split"}>
             <div className={full ? "nc-stack-xs nc-sky-full-top" : "nc-stack-xs"}>
               {full && (
                 <div className="nc-row nc-between">

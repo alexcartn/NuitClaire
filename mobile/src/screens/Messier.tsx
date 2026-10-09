@@ -115,7 +115,7 @@ export function Messier({
   const shownGrid = showAllGrid ? dex.entries : dex.entries.filter((e) => !e.captured);
 
   return (
-    <div className="nc-screen">
+    <div className="nc-screen nc-screen-narrow">
       <ScreenHeader
         eyebrow="Objectif Messier"
         title={
